@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Padel Tracker IA API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: players
+    description: Gestión de jugadores
+  - name: matches
+    description: Gestión de partidos
+  - name: ranking
+    description: Ranking de jugadores
+  - name: stats
+    description: Estadísticas
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,196 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /players:
+    get:
+      operationId: listPlayers
+      tags: [players]
+      summary: Listar todos los jugadores
+      responses:
+        "200":
+          description: Lista de jugadores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Player"
+    post:
+      operationId: createPlayer
+      tags: [players]
+      summary: Crear un nuevo jugador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerInput"
+      responses:
+        "201":
+          description: Jugador creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "400":
+          description: Datos inválidos
+
+  /players/{id}:
+    get:
+      operationId: getPlayer
+      tags: [players]
+      summary: Obtener jugador por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Jugador encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "404":
+          description: Jugador no encontrado
+    delete:
+      operationId: deletePlayer
+      tags: [players]
+      summary: Eliminar jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Jugador eliminado
+        "404":
+          description: Jugador no encontrado
+
+  /players/{id}/stats:
+    get:
+      operationId: getPlayerStats
+      tags: [stats]
+      summary: Estadísticas detalladas de un jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Estadísticas del jugador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStats"
+        "404":
+          description: Jugador no encontrado
+
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: Listar todos los partidos
+      responses:
+        "200":
+          description: Lista de partidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+    post:
+      operationId: createMatch
+      tags: [matches]
+      summary: Registrar un partido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchInput"
+      responses:
+        "201":
+          description: Partido registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "400":
+          description: Datos inválidos
+
+  /matches/{id}:
+    get:
+      operationId: getMatch
+      tags: [matches]
+      summary: Obtener partido por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Partido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "404":
+          description: Partido no encontrado
+    delete:
+      operationId: deleteMatch
+      tags: [matches]
+      summary: Eliminar partido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Partido eliminado
+        "404":
+          description: Partido no encontrado
+
+  /ranking:
+    get:
+      operationId: getRanking
+      tags: [ranking]
+      summary: Obtener ranking de jugadores ordenado por puntos
+      responses:
+        "200":
+          description: Ranking de jugadores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankingEntry"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [stats]
+      summary: Resumen general del dashboard
+      responses:
+        "200":
+          description: Resumen del dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +231,166 @@ components:
       required:
         - status
 
+    Player:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nickname:
+          type: ["string", "null"]
+        avatarInitials:
+          type: string
+        createdAt:
+          type: string
+
+    PlayerInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        nickname:
+          type: string
+
+    PlayerStats:
+      type: object
+      required: [playerId, playerName, totalMatches, wins, losses, winRate, points, setsWon, setsLost, currentStreak]
+      properties:
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        totalMatches:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        points:
+          type: integer
+        setsWon:
+          type: integer
+        setsLost:
+          type: integer
+        currentStreak:
+          type: integer
+        recentMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+
+    Match:
+      type: object
+      required: [id, team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, team1SetsWon, team2SetsWon, sets, playedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        team1SetsWon:
+          type: integer
+        team2SetsWon:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+        createdAt:
+          type: string
+        team1Player1Name:
+          type: ["string", "null"]
+        team1Player2Name:
+          type: ["string", "null"]
+        team2Player1Name:
+          type: ["string", "null"]
+        team2Player2Name:
+          type: ["string", "null"]
+
+    SetScore:
+      type: object
+      required: [setNumber, team1Games, team2Games]
+      properties:
+        setNumber:
+          type: integer
+        team1Games:
+          type: integer
+        team2Games:
+          type: integer
+
+    MatchInput:
+      type: object
+      required: [team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt]
+      properties:
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+
+    RankingEntry:
+      type: object
+      required: [rank, playerId, playerName, points, wins, losses, totalMatches, winRate]
+      properties:
+        rank:
+          type: integer
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        nickname:
+          type: ["string", "null"]
+        points:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        totalMatches:
+          type: integer
+        winRate:
+          type: number
+
+    DashboardSummary:
+      type: object
+      required: [totalPlayers, totalMatches, topPlayer, recentMatches]
+      properties:
+        totalPlayers:
+          type: integer
+        totalMatches:
+          type: integer
+        topPlayer:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            points:
+              type: integer
+        recentMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
