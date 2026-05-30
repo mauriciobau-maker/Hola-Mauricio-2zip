@@ -4,6 +4,8 @@ import { db, playersTable, matchesTable } from "@workspace/db";
 import {
   CreatePlayerBody,
   GetPlayerParams,
+  UpdatePlayerParams,
+  UpdatePlayerBody,
   DeletePlayerParams,
   GetPlayerStatsParams,
 } from "@workspace/api-zod";
@@ -56,6 +58,40 @@ router.get("/players/:id", async (req, res): Promise<void> => {
     nickname: player.nickname ?? null,
     avatarInitials: player.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
     createdAt: player.createdAt.toISOString(),
+  });
+});
+
+router.patch("/players/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UpdatePlayerParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = UpdatePlayerBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const updates: Record<string, unknown> = {};
+  if (body.data.name !== undefined) updates.name = body.data.name;
+  if ("nickname" in body.data) updates.nickname = body.data.nickname ?? null;
+
+  const [updated] = await db
+    .update(playersTable)
+    .set(updates)
+    .where(eq(playersTable.id, params.data.id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Jugador no encontrado" });
+    return;
+  }
+  res.json({
+    id: updated.id,
+    name: updated.name,
+    nickname: updated.nickname ?? null,
+    avatarInitials: updated.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
+    createdAt: updated.createdAt.toISOString(),
   });
 });
 

@@ -58,6 +58,30 @@ export const GetPlayerResponse = zod.object({
 
 
 /**
+ * @summary Actualizar jugador
+ */
+export const UpdatePlayerParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdatePlayerBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "nickname": zod.string().nullish()
+})
+
+export const UpdatePlayerResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "nickname": zod.string().nullish(),
+  "avatarInitials": zod.string().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Eliminar jugador
  */
 export const DeletePlayerParams = zod.object({
@@ -157,6 +181,48 @@ export const GetMatchParams = zod.object({
 })
 
 export const GetMatchResponse = zod.object({
+  "id": zod.number(),
+  "team1Player1Id": zod.number(),
+  "team1Player2Id": zod.number(),
+  "team2Player1Id": zod.number(),
+  "team2Player2Id": zod.number(),
+  "team1SetsWon": zod.number(),
+  "team2SetsWon": zod.number(),
+  "sets": zod.array(zod.object({
+  "setNumber": zod.number(),
+  "team1Games": zod.number(),
+  "team2Games": zod.number()
+})),
+  "playedAt": zod.string(),
+  "createdAt": zod.string(),
+  "team1Player1Name": zod.string().nullish(),
+  "team1Player2Name": zod.string().nullish(),
+  "team2Player1Name": zod.string().nullish(),
+  "team2Player2Name": zod.string().nullish()
+})
+
+
+/**
+ * @summary Actualizar partido
+ */
+export const UpdateMatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateMatchBody = zod.object({
+  "team1Player1Id": zod.number().optional(),
+  "team1Player2Id": zod.number().optional(),
+  "team2Player1Id": zod.number().optional(),
+  "team2Player2Id": zod.number().optional(),
+  "sets": zod.array(zod.object({
+  "setNumber": zod.number(),
+  "team1Games": zod.number(),
+  "team2Games": zod.number()
+})).optional(),
+  "playedAt": zod.string().optional()
+})
+
+export const UpdateMatchResponse = zod.object({
   "id": zod.number(),
   "team1Player1Id": zod.number(),
   "team1Player2Id": zod.number(),

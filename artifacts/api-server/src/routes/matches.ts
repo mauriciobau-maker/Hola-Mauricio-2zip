@@ -4,6 +4,8 @@ import { db, matchesTable, playersTable } from "@workspace/db";
 import {
   CreateMatchBody,
   GetMatchParams,
+  UpdateMatchParams,
+  UpdateMatchBody,
   DeleteMatchParams,
 } from "@workspace/api-zod";
 
@@ -96,6 +98,59 @@ router.get("/matches/:id", async (req, res): Promise<void> => {
   const playerMap: Record<number, string> = {};
   for (const p of players) playerMap[p.id] = p.name;
   res.json(await enrichMatch(match, playerMap));
+});
+
+router.patch("/matches/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UpdateMatchParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = UpdateMatchBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [existing] = await db.select().from(matchesTable).where(eq(matchesTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Partido no encontrado" });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+
+  const setsData = body.data.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | undefined;
+  if (setsData) {
+    let team1SetsWon = 0;
+    let team2SetsWon = 0;
+    for (const s of setsData) {
+      if (s.team1Games > s.team2Games) team1SetsWon++;
+      else if (s.team2Games > s.team1Games) team2SetsWon++;
+    }
+    updates.sets = setsData;
+    updates.team1SetsWon = team1SetsWon;
+    updates.team2SetsWon = team2SetsWon;
+  }
+
+  if (body.data.team1Player1Id !== undefined) updates.team1Player1Id = body.data.team1Player1Id;
+  if (body.data.team1Player2Id !== undefined) updates.team1Player2Id = body.data.team1Player2Id;
+  if (body.data.team2Player1Id !== undefined) updates.team2Player1Id = body.data.team2Player1Id;
+  if (body.data.team2Player2Id !== undefined) updates.team2Player2Id = body.data.team2Player2Id;
+  if (body.data.playedAt !== undefined) updates.playedAt = new Date(body.data.playedAt);
+
+  const [updated] = await db
+    .update(matchesTable)
+    .set(updates)
+    .where(eq(matchesTable.id, params.data.id))
+    .returning();
+
+  const allPlayers = await db.select().from(playersTable);
+  const playerMap: Record<number, string> = {};
+  for (const p of allPlayers) playerMap[p.id] = p.name;
+
+  res.json(await enrichMatch(updated, playerMap));
 });
 
 router.delete("/matches/:id", async (req, res): Promise<void> => {

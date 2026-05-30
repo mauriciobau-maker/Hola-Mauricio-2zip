@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useListMatches, useDeleteMatch, getListMatchesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Calendar } from "lucide-react";
+import { Plus, Trash2, Calendar, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
@@ -115,13 +115,21 @@ export default function Partidos() {
                       </p>
                       <p className="text-xs text-muted-foreground">sets</p>
                     </div>
-                    <button
-                      onClick={() => handleDelete(m.id)}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Link
+                        href={`/partidos/${m.id}/editar`}
+                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 

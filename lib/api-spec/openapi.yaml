@@ -86,6 +86,31 @@ paths:
                 $ref: "#/components/schemas/Player"
         "404":
           description: Jugador no encontrado
+    patch:
+      operationId: updatePlayer
+      tags: [players]
+      summary: Actualizar jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerUpdate"
+      responses:
+        "200":
+          description: Jugador actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "404":
+          description: Jugador no encontrado
     delete:
       operationId: deletePlayer
       tags: [players]
@@ -177,6 +202,33 @@ paths:
                 $ref: "#/components/schemas/Match"
         "404":
           description: Partido no encontrado
+    patch:
+      operationId: updateMatch
+      tags: [matches]
+      summary: Actualizar partido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchUpdate"
+      responses:
+        "200":
+          description: Partido actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "400":
+          description: Datos inválidos
+        "404":
+          description: Partido no encontrado
     delete:
       operationId: deleteMatch
       tags: [matches]
@@ -256,6 +308,15 @@ components:
         nickname:
           type: string
 
+    PlayerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        nickname:
+          type: ["string", "null"]
+
     PlayerStats:
       type: object
       required: [playerId, playerName, totalMatches, wins, losses, winRate, points, setsWon, setsLost, currentStreak]
@@ -334,6 +395,24 @@ components:
     MatchInput:
       type: object
       required: [team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt]
+      properties:
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+
+    MatchUpdate:
+      type: object
       properties:
         team1Player1Id:
           type: integer

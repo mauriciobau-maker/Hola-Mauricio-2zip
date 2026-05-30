@@ -1,6 +1,6 @@
 import { Link, useParams } from "wouter";
 import { useGetPlayer, useGetPlayerStats, getGetPlayerQueryKey, getGetPlayerStatsQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, TrendingUp, Award, Target, Flame } from "lucide-react";
+import { ArrowLeft, TrendingUp, Award, Target, Flame, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
@@ -50,7 +50,14 @@ export default function JugadorDetalle() {
         <Link href="/jugadores" className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-xl font-bold">Perfil del jugador</h1>
+        <h1 className="text-xl font-bold flex-1">Perfil del jugador</h1>
+        <Link
+          href={`/jugadores/${id}/editar`}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted/50 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Pencil size={13} />
+          Editar
+        </Link>
       </div>
 
       {/* Player card */}

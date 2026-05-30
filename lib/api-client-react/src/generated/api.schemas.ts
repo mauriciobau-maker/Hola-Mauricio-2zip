@@ -24,6 +24,13 @@ export interface PlayerInput {
   nickname?: string;
 }
 
+export interface PlayerUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  nickname?: string | null;
+}
+
 export interface SetScore {
   setNumber: number;
   team1Games: number;
@@ -72,6 +79,15 @@ export interface MatchInput {
   team2Player2Id: number;
   sets: SetScore[];
   playedAt: string;
+}
+
+export interface MatchUpdate {
+  team1Player1Id?: number;
+  team1Player2Id?: number;
+  team2Player1Id?: number;
+  team2Player2Id?: number;
+  sets?: SetScore[];
+  playedAt?: string;
 }
 
 export interface RankingEntry {

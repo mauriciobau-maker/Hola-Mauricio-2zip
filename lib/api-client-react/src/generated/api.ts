@@ -24,9 +24,11 @@ import type {
   HealthStatus,
   Match,
   MatchInput,
+  MatchUpdate,
   Player,
   PlayerInput,
   PlayerStats,
+  PlayerUpdate,
   RankingEntry
 } from './api.schemas';
 
@@ -343,6 +345,78 @@ export function useGetPlayer<TData = Awaited<ReturnType<typeof getPlayer>>, TErr
 
 
 
+
+export const getUpdatePlayerUrl = (id: number,) => {
+
+
+
+
+  return `/api/players/${id}`
+}
+
+/**
+ * @summary Actualizar jugador
+ */
+export const updatePlayer = async (id: number,
+    playerUpdate: PlayerUpdate, options?: RequestInit): Promise<Player> => {
+
+  return customFetch<Player>(getUpdatePlayerUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playerUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdatePlayerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlayer>>, TError,{id: number;data: BodyType<PlayerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePlayer>>, TError,{id: number;data: BodyType<PlayerUpdate>}, TContext> => {
+
+const mutationKey = ['updatePlayer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePlayer>>, {id: number;data: BodyType<PlayerUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePlayer(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePlayerMutationResult = NonNullable<Awaited<ReturnType<typeof updatePlayer>>>
+    export type UpdatePlayerMutationBody = BodyType<PlayerUpdate>
+    export type UpdatePlayerMutationError = ErrorType<void>
+
+    /**
+ * @summary Actualizar jugador
+ */
+export const useUpdatePlayer = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlayer>>, TError,{id: number;data: BodyType<PlayerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePlayer>>,
+        TError,
+        {id: number;data: BodyType<PlayerUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdatePlayerMutationOptions(options));
+    }
 
 export const getDeletePlayerUrl = (id: number,) => {
 
@@ -715,6 +789,78 @@ export function useGetMatch<TData = Awaited<ReturnType<typeof getMatch>>, TError
 
 
 
+
+export const getUpdateMatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/matches/${id}`
+}
+
+/**
+ * @summary Actualizar partido
+ */
+export const updateMatch = async (id: number,
+    matchUpdate: MatchUpdate, options?: RequestInit): Promise<Match> => {
+
+  return customFetch<Match>(getUpdateMatchUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      matchUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateMatchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMatch>>, TError,{id: number;data: BodyType<MatchUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMatch>>, TError,{id: number;data: BodyType<MatchUpdate>}, TContext> => {
+
+const mutationKey = ['updateMatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMatch>>, {id: number;data: BodyType<MatchUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMatch(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateMatch>>>
+    export type UpdateMatchMutationBody = BodyType<MatchUpdate>
+    export type UpdateMatchMutationError = ErrorType<void>
+
+    /**
+ * @summary Actualizar partido
+ */
+export const useUpdateMatch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMatch>>, TError,{id: number;data: BodyType<MatchUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMatch>>,
+        TError,
+        {id: number;data: BodyType<MatchUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateMatchMutationOptions(options));
+    }
 
 export const getDeleteMatchUrl = (id: number,) => {
 
