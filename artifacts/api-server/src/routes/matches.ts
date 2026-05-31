@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, matchesTable, playersTable } from "@workspace/db";
+import { eq, desc, asc } from "drizzle-orm";
+import { db, matchesTable, playersTable, eloHistoryTable } from "@workspace/db";
 import {
   CreateMatchBody,
   GetMatchParams,
@@ -8,10 +8,88 @@ import {
   UpdateMatchBody,
   DeleteMatchParams,
 } from "@workspace/api-zod";
+import { calculateMatchEloChanges, STARTING_ELO } from "../elo";
 
 const router: IRouter = Router();
 
-async function enrichMatch(m: typeof matchesTable.$inferSelect, playerMap: Record<number, string>) {
+/**
+ * Replays all matches in chronological order to compute accurate Elo for every player.
+ * Called after any match create / update / delete to keep Elo consistent.
+ */
+async function recalculateAllElo(): Promise<void> {
+  // Reset all players to starting Elo
+  await db.update(playersTable).set({ elo: STARTING_ELO });
+  // Clear all Elo history
+  await db.delete(eloHistoryTable);
+
+  // Get all matches in chronological order
+  const matches = await db.select().from(matchesTable).orderBy(asc(matchesTable.playedAt));
+  if (matches.length === 0) return;
+
+  // Build an in-memory Elo map (all start at STARTING_ELO)
+  const players = await db.select().from(playersTable);
+  const eloMap: Record<number, number> = {};
+  for (const p of players) eloMap[p.id] = STARTING_ELO;
+
+  for (const match of matches) {
+    const team1Won = match.team1SetsWon > match.team2SetsWon;
+    const team1 = [
+      { id: match.team1Player1Id, elo: eloMap[match.team1Player1Id] ?? STARTING_ELO },
+      { id: match.team1Player2Id, elo: eloMap[match.team1Player2Id] ?? STARTING_ELO },
+    ];
+    const team2 = [
+      { id: match.team2Player1Id, elo: eloMap[match.team2Player1Id] ?? STARTING_ELO },
+      { id: match.team2Player2Id, elo: eloMap[match.team2Player2Id] ?? STARTING_ELO },
+    ];
+
+    const changes = calculateMatchEloChanges(team1, team2, team1Won);
+
+    // Save Elo history
+    await db.insert(eloHistoryTable).values(
+      changes.map((c) => ({
+        playerId: c.playerId,
+        matchId: match.id,
+        eloBefore: c.eloBefore,
+        eloAfter: c.eloAfter,
+        eloChange: c.eloChange,
+      }))
+    );
+
+    // Update in-memory Elo map
+    for (const c of changes) {
+      eloMap[c.playerId] = c.eloAfter;
+    }
+  }
+
+  // Persist final Elos to DB
+  for (const [playerIdStr, elo] of Object.entries(eloMap)) {
+    await db
+      .update(playersTable)
+      .set({ elo })
+      .where(eq(playersTable.id, parseInt(playerIdStr)));
+  }
+}
+
+/**
+ * Enrich a match record with player names and Elo changes from history.
+ */
+async function enrichMatch(
+  m: typeof matchesTable.$inferSelect,
+  playerMap: Record<number, string>,
+) {
+  const history = await db
+    .select()
+    .from(eloHistoryTable)
+    .where(eq(eloHistoryTable.matchId, m.id));
+
+  const eloChanges = history.map((h) => ({
+    playerId: h.playerId,
+    playerName: playerMap[h.playerId] ?? "Desconocido",
+    eloBefore: h.eloBefore,
+    eloAfter: h.eloAfter,
+    eloChange: h.eloChange,
+  }));
+
   return {
     id: m.id,
     team1Player1Id: m.team1Player1Id,
@@ -27,6 +105,7 @@ async function enrichMatch(m: typeof matchesTable.$inferSelect, playerMap: Recor
     team1Player2Name: playerMap[m.team1Player2Id] ?? null,
     team2Player1Name: playerMap[m.team2Player1Id] ?? null,
     team2Player2Name: playerMap[m.team2Player2Id] ?? null,
+    eloChanges,
   };
 }
 
@@ -46,16 +125,15 @@ router.post("/matches", async (req, res): Promise<void> => {
     return;
   }
 
-  const { team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt } = parsed.data;
+  const { team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt } =
+    parsed.data;
 
-  // Validate all 4 players are different
   const playerIds = [team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id];
   if (new Set(playerIds).size !== 4) {
     res.status(400).json({ error: "Los cuatro jugadores deben ser diferentes" });
     return;
   }
 
-  // Calculate sets won from the provided sets
   const setsData = sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>;
   let team1SetsWon = 0;
   let team2SetsWon = 0;
@@ -64,16 +142,13 @@ router.post("/matches", async (req, res): Promise<void> => {
     else if (s.team2Games > s.team1Games) team2SetsWon++;
   }
 
-  const [match] = await db.insert(matchesTable).values({
-    team1Player1Id,
-    team1Player2Id,
-    team2Player1Id,
-    team2Player2Id,
-    team1SetsWon,
-    team2SetsWon,
-    sets: setsData,
-    playedAt: new Date(playedAt),
-  }).returning();
+  const [match] = await db
+    .insert(matchesTable)
+    .values({ team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, team1SetsWon, team2SetsWon, sets: setsData, playedAt: new Date(playedAt) })
+    .returning();
+
+  // Recalculate Elo for all matches
+  await recalculateAllElo();
 
   const players = await db.select().from(playersTable);
   const playerMap: Record<number, string> = {};
@@ -120,7 +195,6 @@ router.patch("/matches/:id", async (req, res): Promise<void> => {
   }
 
   const updates: Record<string, unknown> = {};
-
   const setsData = body.data.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | undefined;
   if (setsData) {
     let team1SetsWon = 0;
@@ -146,6 +220,8 @@ router.patch("/matches/:id", async (req, res): Promise<void> => {
     .where(eq(matchesTable.id, params.data.id))
     .returning();
 
+  await recalculateAllElo();
+
   const allPlayers = await db.select().from(playersTable);
   const playerMap: Record<number, string> = {};
   for (const p of allPlayers) playerMap[p.id] = p.name;
@@ -160,11 +236,17 @@ router.delete("/matches/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [deleted] = await db.delete(matchesTable).where(eq(matchesTable.id, params.data.id)).returning();
+  const [deleted] = await db
+    .delete(matchesTable)
+    .where(eq(matchesTable.id, params.data.id))
+    .returning();
   if (!deleted) {
     res.status(404).json({ error: "Partido no encontrado" });
     return;
   }
+
+  await recalculateAllElo();
+
   res.sendStatus(204);
 });
 

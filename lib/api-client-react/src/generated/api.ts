@@ -21,6 +21,7 @@ import type {
 
 import type {
   DashboardSummary,
+  EloHistoryEntry,
   HealthStatus,
   Match,
   MatchInput,
@@ -553,6 +554,83 @@ export function useGetPlayerStats<TData = Awaited<ReturnType<typeof getPlayerSta
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPlayerStatsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPlayerEloHistoryUrl = (id: number,) => {
+
+
+
+
+  return `/api/players/${id}/elo-history`
+}
+
+/**
+ * @summary Historial de cambios Elo de un jugador
+ */
+export const getPlayerEloHistory = async (id: number, options?: RequestInit): Promise<EloHistoryEntry[]> => {
+
+  return customFetch<EloHistoryEntry[]>(getGetPlayerEloHistoryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlayerEloHistoryQueryKey = (id: number,) => {
+    return [
+    `/api/players/${id}/elo-history`
+    ] as const;
+    }
+
+
+export const getGetPlayerEloHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPlayerEloHistory>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerEloHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlayerEloHistoryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlayerEloHistory>>> = ({ signal }) => getPlayerEloHistory(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlayerEloHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPlayerEloHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getPlayerEloHistory>>>
+export type GetPlayerEloHistoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Historial de cambios Elo de un jugador
+ */
+
+export function useGetPlayerEloHistory<TData = Awaited<ReturnType<typeof getPlayerEloHistory>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerEloHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPlayerEloHistoryQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

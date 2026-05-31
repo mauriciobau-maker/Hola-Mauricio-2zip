@@ -1,7 +1,13 @@
 import { Link } from "wouter";
-import { useListMatches, useDeleteMatch, getListMatchesQueryKey } from "@workspace/api-client-react";
+import {
+  useListMatches,
+  useDeleteMatch,
+  getListMatchesQueryKey,
+  getGetRankingQueryKey,
+  getGetDashboardQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Calendar, Pencil } from "lucide-react";
+import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
@@ -13,6 +19,8 @@ function formatDate(iso: string) {
   });
 }
 
+type EloChange = { playerId: number; playerName: string; eloBefore: number; eloAfter: number; eloChange: number };
+
 export default function Partidos() {
   const { data: matches, isLoading } = useListMatches();
   const queryClient = useQueryClient();
@@ -20,6 +28,8 @@ export default function Partidos() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       },
     },
   });
@@ -51,7 +61,7 @@ export default function Partidos() {
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-card rounded-xl border border-border animate-pulse" />
+            <div key={i} className="h-28 bg-card rounded-xl border border-border animate-pulse" />
           ))}
         </div>
       ) : !matches?.length ? (
@@ -75,16 +85,26 @@ export default function Partidos() {
           {matches.map((m) => {
             const team1Won = m.team1SetsWon > m.team2SetsWon;
             const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>;
+            const eloChanges = (m.eloChanges ?? []) as EloChange[];
+            const team1Changes = eloChanges.filter(
+              (c) => c.playerId === m.team1Player1Id || c.playerId === m.team1Player2Id,
+            );
+            const team2Changes = eloChanges.filter(
+              (c) => c.playerId === m.team2Player1Id || c.playerId === m.team2Player2Id,
+            );
+
             return (
-              <div key={m.id} className="bg-card border border-border rounded-xl p-4 hover:bg-card/80 transition-colors group">
+              <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     {/* Team 1 */}
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded",
-                        team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
+                      <span
+                        className={cn(
+                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                          team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {team1Won ? "GANADOR" : "PERDEDOR"}
                       </span>
                       <p className="text-sm font-medium truncate">
@@ -93,10 +113,12 @@ export default function Partidos() {
                     </div>
                     {/* Team 2 */}
                     <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded",
-                        !team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
+                      <span
+                        className={cn(
+                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                          !team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {!team1Won ? "GANADOR" : "PERDEDOR"}
                       </span>
                       <p className="text-sm font-medium truncate">
@@ -105,13 +127,17 @@ export default function Partidos() {
                     </div>
                   </div>
 
-                  {/* Score */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* Score + actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="text-center">
                       <p className="text-2xl font-bold tabular-nums">
-                        <span className={team1Won ? "text-primary" : "text-muted-foreground"}>{m.team1SetsWon}</span>
+                        <span className={team1Won ? "text-primary" : "text-muted-foreground"}>
+                          {m.team1SetsWon}
+                        </span>
                         <span className="text-muted-foreground mx-1 text-lg">-</span>
-                        <span className={!team1Won ? "text-primary" : "text-muted-foreground"}>{m.team2SetsWon}</span>
+                        <span className={!team1Won ? "text-primary" : "text-muted-foreground"}>
+                          {m.team2SetsWon}
+                        </span>
                       </p>
                       <p className="text-xs text-muted-foreground">sets</p>
                     </div>
@@ -133,17 +159,28 @@ export default function Partidos() {
                   </div>
                 </div>
 
-                {/* Sets detail */}
+                {/* Sets detail + date */}
                 {sets && sets.length > 0 && (
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                  <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
                     {sets.map((s) => (
-                      <div key={s.setNumber} className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <div key={s.setNumber} className="text-xs text-muted-foreground">
                         <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
-                          Set {s.setNumber}: {s.team1Games}-{s.team2Games}
+                          {s.team1Games}-{s.team2Games}
                         </span>
                       </div>
                     ))}
                     <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt)}</span>
+                  </div>
+                )}
+
+                {/* Elo changes */}
+                {eloChanges.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {[...team1Changes, ...team2Changes].map((c) => (
+                        <EloChangePill key={c.playerId} change={c} />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -151,6 +188,32 @@ export default function Partidos() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function EloChangePill({ change }: { change: EloChange }) {
+  const positive = change.eloChange > 0;
+  const neutral = change.eloChange === 0;
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      {positive ? (
+        <TrendingUp size={10} className="text-green-400" />
+      ) : neutral ? null : (
+        <TrendingDown size={10} className="text-red-400" />
+      )}
+      <span className="text-muted-foreground truncate max-w-[80px]">
+        {change.playerName.split(" ")[0]}
+      </span>
+      <span
+        className={cn(
+          "font-bold tabular-nums",
+          positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
+        )}
+      >
+        {positive ? "+" : ""}{change.eloChange}
+      </span>
+      <span className="text-muted-foreground/60 tabular-nums">({change.eloAfter})</span>
     </div>
   );
 }

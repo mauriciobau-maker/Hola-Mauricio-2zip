@@ -148,6 +148,29 @@ paths:
         "404":
           description: Jugador no encontrado
 
+  /players/{id}/elo-history:
+    get:
+      operationId: getPlayerEloHistory
+      tags: [stats]
+      summary: Historial de cambios Elo de un jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Historial Elo del jugador
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EloHistoryEntry"
+        "404":
+          description: Jugador no encontrado
+
   /matches:
     get:
       operationId: listMatches
@@ -285,7 +308,7 @@ components:
 
     Player:
       type: object
-      required: [id, name, createdAt]
+      required: [id, name, elo, createdAt]
       properties:
         id:
           type: integer
@@ -295,6 +318,8 @@ components:
           type: ["string", "null"]
         avatarInitials:
           type: string
+        elo:
+          type: integer
         createdAt:
           type: string
 
@@ -346,6 +371,42 @@ components:
           items:
             $ref: "#/components/schemas/Match"
 
+    EloChange:
+      type: object
+      required: [playerId, playerName, eloBefore, eloAfter, eloChange]
+      properties:
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        eloBefore:
+          type: integer
+        eloAfter:
+          type: integer
+        eloChange:
+          type: integer
+
+    EloHistoryEntry:
+      type: object
+      required: [id, playerId, matchId, eloBefore, eloAfter, eloChange, matchPlayedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        playerId:
+          type: integer
+        matchId:
+          type: integer
+        eloBefore:
+          type: integer
+        eloAfter:
+          type: integer
+        eloChange:
+          type: integer
+        matchPlayedAt:
+          type: string
+        createdAt:
+          type: string
+
     Match:
       type: object
       required: [id, team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, team1SetsWon, team2SetsWon, sets, playedAt, createdAt]
@@ -380,6 +441,10 @@ components:
           type: ["string", "null"]
         team2Player2Name:
           type: ["string", "null"]
+        eloChanges:
+          type: array
+          items:
+            $ref: "#/components/schemas/EloChange"
 
     SetScore:
       type: object
@@ -431,7 +496,7 @@ components:
 
     RankingEntry:
       type: object
-      required: [rank, playerId, playerName, points, wins, losses, totalMatches, winRate]
+      required: [rank, playerId, playerName, elo, points, wins, losses, totalMatches, winRate]
       properties:
         rank:
           type: integer
@@ -441,6 +506,8 @@ components:
           type: string
         nickname:
           type: ["string", "null"]
+        elo:
+          type: integer
         points:
           type: integer
         wins:

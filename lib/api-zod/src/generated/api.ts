@@ -24,6 +24,7 @@ export const ListPlayersResponseItem = zod.object({
   "name": zod.string(),
   "nickname": zod.string().nullish(),
   "avatarInitials": zod.string().optional(),
+  "elo": zod.number(),
   "createdAt": zod.string()
 })
 export const ListPlayersResponse = zod.array(ListPlayersResponseItem)
@@ -53,6 +54,7 @@ export const GetPlayerResponse = zod.object({
   "name": zod.string(),
   "nickname": zod.string().nullish(),
   "avatarInitials": zod.string().optional(),
+  "elo": zod.number(),
   "createdAt": zod.string()
 })
 
@@ -77,6 +79,7 @@ export const UpdatePlayerResponse = zod.object({
   "name": zod.string(),
   "nickname": zod.string().nullish(),
   "avatarInitials": zod.string().optional(),
+  "elo": zod.number(),
   "createdAt": zod.string()
 })
 
@@ -125,9 +128,36 @@ export const GetPlayerStatsResponse = zod.object({
   "team1Player1Name": zod.string().nullish(),
   "team1Player2Name": zod.string().nullish(),
   "team2Player1Name": zod.string().nullish(),
-  "team2Player2Name": zod.string().nullish()
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
 })).optional()
 })
+
+
+/**
+ * @summary Historial de cambios Elo de un jugador
+ */
+export const GetPlayerEloHistoryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPlayerEloHistoryResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "matchId": zod.number(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number(),
+  "matchPlayedAt": zod.string(),
+  "createdAt": zod.string()
+})
+export const GetPlayerEloHistoryResponse = zod.array(GetPlayerEloHistoryResponseItem)
 
 
 /**
@@ -151,7 +181,14 @@ export const ListMatchesResponseItem = zod.object({
   "team1Player1Name": zod.string().nullish(),
   "team1Player2Name": zod.string().nullish(),
   "team2Player1Name": zod.string().nullish(),
-  "team2Player2Name": zod.string().nullish()
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
 })
 export const ListMatchesResponse = zod.array(ListMatchesResponseItem)
 
@@ -198,7 +235,14 @@ export const GetMatchResponse = zod.object({
   "team1Player1Name": zod.string().nullish(),
   "team1Player2Name": zod.string().nullish(),
   "team2Player1Name": zod.string().nullish(),
-  "team2Player2Name": zod.string().nullish()
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
 })
 
 
@@ -240,7 +284,14 @@ export const UpdateMatchResponse = zod.object({
   "team1Player1Name": zod.string().nullish(),
   "team1Player2Name": zod.string().nullish(),
   "team2Player1Name": zod.string().nullish(),
-  "team2Player2Name": zod.string().nullish()
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
 })
 
 
@@ -260,6 +311,7 @@ export const GetRankingResponseItem = zod.object({
   "playerId": zod.number(),
   "playerName": zod.string(),
   "nickname": zod.string().nullish(),
+  "elo": zod.number(),
   "points": zod.number(),
   "wins": zod.number(),
   "losses": zod.number(),
@@ -298,7 +350,14 @@ export const GetDashboardResponse = zod.object({
   "team1Player1Name": zod.string().nullish(),
   "team1Player2Name": zod.string().nullish(),
   "team2Player1Name": zod.string().nullish(),
-  "team2Player2Name": zod.string().nullish()
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
 }))
 })
 

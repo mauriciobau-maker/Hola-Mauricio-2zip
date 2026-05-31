@@ -12,6 +12,7 @@ export interface RankingEntry {
   playerName: string;
   /** @nullable */
   nickname?: string | null;
+  elo: number;
   points: number;
   wins: number;
   losses: number;

@@ -15,23 +15,20 @@ router.get("/ranking", async (_req, res): Promise<void> => {
 
   for (const m of matches) {
     const winner = m.team1SetsWon > m.team2SetsWon ? "team1" : "team2";
-    const winnerIds = winner === "team1"
-      ? [m.team1Player1Id, m.team1Player2Id]
-      : [m.team2Player1Id, m.team2Player2Id];
-    const loserIds = winner === "team1"
-      ? [m.team2Player1Id, m.team2Player2Id]
-      : [m.team1Player1Id, m.team1Player2Id];
+    const winnerIds =
+      winner === "team1"
+        ? [m.team1Player1Id, m.team1Player2Id]
+        : [m.team2Player1Id, m.team2Player2Id];
+    const loserIds =
+      winner === "team1"
+        ? [m.team2Player1Id, m.team2Player2Id]
+        : [m.team1Player1Id, m.team1Player2Id];
 
     for (const id of winnerIds) {
-      if (stats[id]) {
-        stats[id].wins++;
-        stats[id].points += 3;
-      }
+      if (stats[id]) { stats[id].wins++; stats[id].points += 3; }
     }
     for (const id of loserIds) {
-      if (stats[id]) {
-        stats[id].losses++;
-      }
+      if (stats[id]) stats[id].losses++;
     }
   }
 
@@ -44,6 +41,7 @@ router.get("/ranking", async (_req, res): Promise<void> => {
         playerId: p.id,
         playerName: p.name,
         nickname: p.nickname ?? null,
+        elo: p.elo,
         points: s.points,
         wins: s.wins,
         losses: s.losses,
@@ -51,7 +49,8 @@ router.get("/ranking", async (_req, res): Promise<void> => {
         winRate,
       };
     })
-    .sort((a, b) => b.points - a.points || b.wins - a.wins || a.losses - b.losses)
+    // Primary sort: Elo (desc). Tiebreaker: wins, then losses
+    .sort((a, b) => b.elo - a.elo || b.wins - a.wins || a.losses - b.losses)
     .map((entry, i) => ({ ...entry, rank: i + 1 }));
 
   res.json(ranking);
@@ -68,26 +67,29 @@ router.get("/dashboard", async (_req, res): Promise<void> => {
 
   for (const m of allMatches) {
     const winner = m.team1SetsWon > m.team2SetsWon ? "team1" : "team2";
-    const winnerIds = winner === "team1"
-      ? [m.team1Player1Id, m.team1Player2Id]
-      : [m.team2Player1Id, m.team2Player2Id];
-    const loserIds = winner === "team1"
-      ? [m.team2Player1Id, m.team2Player2Id]
-      : [m.team1Player1Id, m.team1Player2Id];
+    const winnerIds =
+      winner === "team1"
+        ? [m.team1Player1Id, m.team1Player2Id]
+        : [m.team2Player1Id, m.team2Player2Id];
+    const loserIds =
+      winner === "team1"
+        ? [m.team2Player1Id, m.team2Player2Id]
+        : [m.team1Player1Id, m.team1Player2Id];
     for (const id of winnerIds) {
       if (stats[id]) { stats[id].wins++; stats[id].points += 3; }
     }
     for (const id of loserIds) {
-      if (stats[id]) { stats[id].losses++; }
+      if (stats[id]) stats[id].losses++;
     }
   }
 
-  let topPlayer: { id: number; name: string; points: number } | null = null;
-  let maxPoints = -1;
+  // Top player by Elo
+  let topPlayer: { id: number; name: string; elo: number } | null = null;
+  let maxElo = -1;
   for (const p of players) {
-    if (stats[p.id].points > maxPoints) {
-      maxPoints = stats[p.id].points;
-      topPlayer = { id: p.id, name: p.name, points: stats[p.id].points };
+    if (p.elo > maxElo) {
+      maxElo = p.elo;
+      topPlayer = { id: p.id, name: p.name, elo: p.elo };
     }
   }
 
@@ -114,7 +116,7 @@ router.get("/dashboard", async (_req, res): Promise<void> => {
   res.json({
     totalPlayers: players.length,
     totalMatches: allMatches.length,
-    topPlayer: topPlayer && topPlayer.points > 0 ? topPlayer : null,
+    topPlayer: topPlayer && topPlayer.elo > 1500 ? topPlayer : null,
     recentMatches,
   });
 });

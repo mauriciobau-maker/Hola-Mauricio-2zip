@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, playersTable, matchesTable } from "@workspace/db";
+import { eq, desc, asc } from "drizzle-orm";
+import { db, playersTable, matchesTable, eloHistoryTable } from "@workspace/db";
 import {
   CreatePlayerBody,
   GetPlayerParams,
@@ -12,16 +12,20 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/players", async (_req, res): Promise<void> => {
-  const players = await db.select().from(playersTable).orderBy(playersTable.name);
-  const result = players.map((p) => ({
+function toPlayerResponse(p: typeof playersTable.$inferSelect) {
+  return {
     id: p.id,
     name: p.name,
     nickname: p.nickname ?? null,
+    elo: p.elo,
     avatarInitials: p.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
     createdAt: p.createdAt.toISOString(),
-  }));
-  res.json(result);
+  };
+}
+
+router.get("/players", async (_req, res): Promise<void> => {
+  const players = await db.select().from(playersTable).orderBy(playersTable.name);
+  res.json(players.map(toPlayerResponse));
 });
 
 router.post("/players", async (req, res): Promise<void> => {
@@ -31,13 +35,7 @@ router.post("/players", async (req, res): Promise<void> => {
     return;
   }
   const [player] = await db.insert(playersTable).values(parsed.data).returning();
-  res.status(201).json({
-    id: player.id,
-    name: player.name,
-    nickname: player.nickname ?? null,
-    avatarInitials: player.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
-    createdAt: player.createdAt.toISOString(),
-  });
+  res.status(201).json(toPlayerResponse(player));
 });
 
 router.get("/players/:id", async (req, res): Promise<void> => {
@@ -52,13 +50,7 @@ router.get("/players/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
-  res.json({
-    id: player.id,
-    name: player.name,
-    nickname: player.nickname ?? null,
-    avatarInitials: player.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
-    createdAt: player.createdAt.toISOString(),
-  });
+  res.json(toPlayerResponse(player));
 });
 
 router.patch("/players/:id", async (req, res): Promise<void> => {
@@ -86,13 +78,7 @@ router.patch("/players/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
-  res.json({
-    id: updated.id,
-    name: updated.name,
-    nickname: updated.nickname ?? null,
-    avatarInitials: updated.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
-    createdAt: updated.createdAt.toISOString(),
-  });
+  res.json(toPlayerResponse(updated));
 });
 
 router.delete("/players/:id", async (req, res): Promise<void> => {
@@ -125,20 +111,15 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
   }
 
   const allMatches = await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt));
-
   const playerMatches = allMatches.filter(
     (m) =>
       m.team1Player1Id === playerId ||
       m.team1Player2Id === playerId ||
       m.team2Player1Id === playerId ||
-      m.team2Player2Id === playerId
+      m.team2Player2Id === playerId,
   );
 
-  let wins = 0;
-  let losses = 0;
-  let setsWon = 0;
-  let setsLost = 0;
-
+  let wins = 0, losses = 0, setsWon = 0, setsLost = 0;
   for (const match of playerMatches) {
     const onTeam1 = match.team1Player1Id === playerId || match.team1Player2Id === playerId;
     if (onTeam1) {
@@ -200,6 +181,40 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     currentStreak,
     recentMatches,
   });
+});
+
+router.get("/players/:id/elo-history", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const [player] = await db.select().from(playersTable).where(eq(playersTable.id, id));
+  if (!player) {
+    res.status(404).json({ error: "Jugador no encontrado" });
+    return;
+  }
+
+  const history = await db
+    .select({ h: eloHistoryTable, playedAt: matchesTable.playedAt })
+    .from(eloHistoryTable)
+    .innerJoin(matchesTable, eq(eloHistoryTable.matchId, matchesTable.id))
+    .where(eq(eloHistoryTable.playerId, id))
+    .orderBy(asc(matchesTable.playedAt));
+
+  res.json(
+    history.map((row) => ({
+      id: row.h.id,
+      playerId: row.h.playerId,
+      matchId: row.h.matchId,
+      eloBefore: row.h.eloBefore,
+      eloAfter: row.h.eloAfter,
+      eloChange: row.h.eloChange,
+      matchPlayedAt: row.playedAt.toISOString(),
+      createdAt: row.h.createdAt.toISOString(),
+    }))
+  );
 });
 
 export default router;

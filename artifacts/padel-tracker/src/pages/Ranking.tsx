@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useGetRanking } from "@workspace/api-client-react";
-import { Trophy, Medal, TrendingUp } from "lucide-react";
+import { Trophy, Medal, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function initials(name: string) {
@@ -13,8 +13,10 @@ export default function Ranking() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Ranking</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Clasificacion por puntos (3 pts por victoria)</p>
+        <h1 className="text-2xl font-bold tracking-tight">Ranking Elo</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Sistema Elo profesional — puntuacion basada en la fuerza de los rivales
+        </p>
       </div>
 
       {isLoading ? (
@@ -35,14 +37,11 @@ export default function Ranking() {
         </div>
       ) : (
         <>
-          {/* Podium for top 3 */}
+          {/* Podium top 3 */}
           {ranking.length >= 3 && (
             <div className="grid grid-cols-3 gap-3 mb-2">
-              {/* 2nd place */}
               <PodiumCard entry={ranking[1]} />
-              {/* 1st place */}
               <PodiumCard entry={ranking[0]} isFirst />
-              {/* 3rd place */}
               <PodiumCard entry={ranking[2]} />
             </div>
           )}
@@ -51,8 +50,8 @@ export default function Ranking() {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               <div className="col-span-1">#</div>
-              <div className="col-span-5">Jugador</div>
-              <div className="col-span-2 text-center">Pts</div>
+              <div className="col-span-4">Jugador</div>
+              <div className="col-span-3 text-center">Elo</div>
               <div className="col-span-1 text-center">V</div>
               <div className="col-span-1 text-center">D</div>
               <div className="col-span-2 text-center">%V</div>
@@ -67,19 +66,19 @@ export default function Ranking() {
                   <div className="col-span-1">
                     <RankBadge rank={entry.rank} />
                   </div>
-                  <div className="col-span-5 flex items-center gap-2 min-w-0">
+                  <div className="col-span-4 flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
                       {initials(entry.playerName)}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{entry.playerName}</p>
                       {entry.nickname && (
-                        <p className="text-xs text-muted-foreground truncate">{entry.nickname}</p>
+                        <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
                       )}
                     </div>
                   </div>
-                  <div className="col-span-2 text-center">
-                    <span className="text-sm font-bold text-primary">{entry.points}</span>
+                  <div className="col-span-3 text-center">
+                    <EloDisplay elo={entry.elo} />
                   </div>
                   <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
                   <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
@@ -91,23 +90,49 @@ export default function Ranking() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp size={14} className="text-primary" />
-              <h3 className="text-sm font-semibold">Sistema de puntos</h3>
+          {/* Elo explanation */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Zap size={14} className="text-primary" />
+              <h3 className="text-sm font-semibold">Como funciona el Elo</h3>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                Victoria: +3 puntos
+            <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <TrendingUp size={12} className="text-green-400 mt-0.5 flex-shrink-0" />
+                <span>Ganar contra rivales de mayor Elo otorga mas puntos que ganar contra rivales debiles.</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" />
-                Derrota: 0 puntos
+              <div className="flex items-start gap-2">
+                <TrendingDown size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
+                <span>Perder contra rivales de menor Elo resta mas puntos. Cada partido importa.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-3 h-3 rounded-full bg-primary/50 flex-shrink-0 mt-0.5" />
+                <span>Todos empiezan con 1500 puntos. Factor K = 32 (estandar FIDE para jugadores activos).</span>
               </div>
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function EloDisplay({ elo }: { elo: number }) {
+  const diff = elo - 1500;
+  const color =
+    diff > 100 ? "text-yellow-400" :
+    diff > 0 ? "text-green-400" :
+    diff < -100 ? "text-red-400" :
+    diff < 0 ? "text-orange-400" :
+    "text-muted-foreground";
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className={cn("text-sm font-bold tabular-nums", color)}>{elo}</span>
+      {diff !== 0 && (
+        <span className={cn("text-xs tabular-nums", diff > 0 ? "text-green-400" : "text-red-400")}>
+          {diff > 0 ? "+" : ""}{diff}
+        </span>
       )}
     </div>
   );
@@ -124,10 +149,7 @@ function WinRateBar({ rate }: { rate: number }) {
   return (
     <div className="flex items-center gap-1.5">
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full"
-          style={{ width: `${rate}%` }}
-        />
+        <div className="h-full bg-primary rounded-full" style={{ width: `${rate}%` }} />
       </div>
       <span className="text-xs text-muted-foreground w-7 text-right">{rate}%</span>
     </div>
@@ -147,7 +169,7 @@ function PodiumCard({ entry, isFirst = false }: { entry: any; isFirst?: boolean 
       className={cn(
         "border rounded-xl p-3 text-center flex flex-col items-center gap-1.5 hover:opacity-80 transition-opacity",
         colors[entry.rank] ?? "border-border bg-card",
-        isFirst && "scale-105 shadow-lg"
+        isFirst && "scale-105 shadow-lg",
       )}
     >
       <RankBadge rank={entry.rank} />
@@ -155,7 +177,10 @@ function PodiumCard({ entry, isFirst = false }: { entry: any; isFirst?: boolean 
         {initials(entry.playerName)}
       </div>
       <p className="text-xs font-semibold truncate max-w-full">{entry.playerName.split(" ")[0]}</p>
-      <p className="text-xs font-bold text-primary">{entry.points} pts</p>
+      <div className="flex flex-col items-center">
+        <span className="text-sm font-bold text-primary tabular-nums">{entry.elo}</span>
+        <span className="text-xs text-muted-foreground">Elo</span>
+      </div>
     </Link>
   );
 }

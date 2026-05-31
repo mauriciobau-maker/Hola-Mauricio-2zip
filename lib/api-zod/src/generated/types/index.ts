@@ -8,6 +8,8 @@
 
 export * from './dashboardSummary';
 export * from './dashboardSummaryTopPlayer';
+export * from './eloChange';
+export * from './eloHistoryEntry';
 export * from './healthStatus';
 export * from './match';
 export * from './matchInput';

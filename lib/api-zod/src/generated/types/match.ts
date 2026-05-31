@@ -5,6 +5,7 @@
  * Padel Tracker IA API
  * OpenAPI spec version: 0.1.0
  */
+import type { EloChange } from './eloChange';
 import type { SetScore } from './setScore';
 
 export interface Match {
@@ -26,4 +27,5 @@ export interface Match {
   team2Player1Name?: string | null;
   /** @nullable */
   team2Player2Name?: string | null;
+  eloChanges?: EloChange[];
 }

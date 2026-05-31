@@ -6,12 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Player {
+export interface EloHistoryEntry {
   id: number;
-  name: string;
-  /** @nullable */
-  nickname?: string | null;
-  avatarInitials?: string;
-  elo: number;
+  playerId: number;
+  matchId: number;
+  eloBefore: number;
+  eloAfter: number;
+  eloChange: number;
+  matchPlayedAt: string;
   createdAt: string;
 }

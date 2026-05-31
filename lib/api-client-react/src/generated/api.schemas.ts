@@ -15,6 +15,7 @@ export interface Player {
   /** @nullable */
   nickname?: string | null;
   avatarInitials?: string;
+  elo: number;
   createdAt: string;
 }
 
@@ -37,6 +38,14 @@ export interface SetScore {
   team2Games: number;
 }
 
+export interface EloChange {
+  playerId: number;
+  playerName: string;
+  eloBefore: number;
+  eloAfter: number;
+  eloChange: number;
+}
+
 export interface Match {
   id: number;
   team1Player1Id: number;
@@ -56,6 +65,7 @@ export interface Match {
   team2Player1Name?: string | null;
   /** @nullable */
   team2Player2Name?: string | null;
+  eloChanges?: EloChange[];
 }
 
 export interface PlayerStats {
@@ -70,6 +80,17 @@ export interface PlayerStats {
   setsLost: number;
   currentStreak: number;
   recentMatches?: Match[];
+}
+
+export interface EloHistoryEntry {
+  id: number;
+  playerId: number;
+  matchId: number;
+  eloBefore: number;
+  eloAfter: number;
+  eloChange: number;
+  matchPlayedAt: string;
+  createdAt: string;
 }
 
 export interface MatchInput {
@@ -96,6 +117,7 @@ export interface RankingEntry {
   playerName: string;
   /** @nullable */
   nickname?: string | null;
+  elo: number;
   points: number;
   wins: number;
   losses: number;

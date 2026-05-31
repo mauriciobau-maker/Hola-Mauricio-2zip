@@ -1,0 +1,1 @@
+- [Elo system design](elo-system.md) — recalculates ALL Elo from scratch after every match mutation; use PL/pgSQL for initial seeding since tsx not available
