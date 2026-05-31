@@ -8,12 +8,14 @@ import {
   PlusCircle,
   Menu,
   X,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/ranking", label: "Ranking", icon: Trophy },
+  { href: "/parejas", label: "Parejas", icon: Handshake },
   { href: "/partidos", label: "Partidos", icon: Calendar },
   { href: "/jugadores", label: "Jugadores", icon: Users },
 ];

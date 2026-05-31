@@ -125,6 +125,27 @@ export interface RankingEntry {
   winRate: number;
 }
 
+export interface ParejaStats {
+  player1Id: number;
+  player1Name: string;
+  /** @nullable */
+  player1Nickname?: string | null;
+  player2Id: number;
+  player2Name: string;
+  /** @nullable */
+  player2Nickname?: string | null;
+  totalMatches: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  setsWon: number;
+  setsLost: number;
+  gamesWon: number;
+  gamesLost: number;
+  gameDiff: number;
+  avgElo: number;
+}
+
 /**
  * @nullable
  */

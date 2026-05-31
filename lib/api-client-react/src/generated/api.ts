@@ -26,6 +26,7 @@ import type {
   Match,
   MatchInput,
   MatchUpdate,
+  ParejaStats,
   Player,
   PlayerInput,
   PlayerStats,
@@ -1075,6 +1076,83 @@ export function useGetRanking<TData = Awaited<ReturnType<typeof getRanking>>, TE
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListParejasUrl = () => {
+
+
+
+
+  return `/api/parejas`
+}
+
+/**
+ * @summary Estadísticas de todas las parejas
+ */
+export const listParejas = async ( options?: RequestInit): Promise<ParejaStats[]> => {
+
+  return customFetch<ParejaStats[]>(getListParejasUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListParejasQueryKey = () => {
+    return [
+    `/api/parejas`
+    ] as const;
+    }
+
+
+export const getListParejasQueryOptions = <TData = Awaited<ReturnType<typeof listParejas>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listParejas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListParejasQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listParejas>>> = ({ signal }) => listParejas({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listParejas>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListParejasQueryResult = NonNullable<Awaited<ReturnType<typeof listParejas>>>
+export type ListParejasQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Estadísticas de todas las parejas
+ */
+
+export function useListParejas<TData = Awaited<ReturnType<typeof listParejas>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listParejas>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListParejasQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

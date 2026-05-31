@@ -322,6 +322,30 @@ export const GetRankingResponse = zod.array(GetRankingResponseItem)
 
 
 /**
+ * @summary Estadísticas de todas las parejas
+ */
+export const ListParejasResponseItem = zod.object({
+  "player1Id": zod.number(),
+  "player1Name": zod.string(),
+  "player1Nickname": zod.string().nullish(),
+  "player2Id": zod.number(),
+  "player2Name": zod.string(),
+  "player2Nickname": zod.string().nullish(),
+  "totalMatches": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "winRate": zod.number(),
+  "setsWon": zod.number(),
+  "setsLost": zod.number(),
+  "gamesWon": zod.number(),
+  "gamesLost": zod.number(),
+  "gameDiff": zod.number(),
+  "avgElo": zod.number()
+})
+export const ListParejasResponse = zod.array(ListParejasResponseItem)
+
+
+/**
  * @summary Resumen general del dashboard
  */
 export const GetDashboardResponse = zod.object({
