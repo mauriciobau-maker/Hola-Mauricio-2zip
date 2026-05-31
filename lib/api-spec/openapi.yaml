@@ -298,6 +298,32 @@ paths:
                 items:
                   $ref: "#/components/schemas/ParejaStats"
 
+  /parejas/{player1Id}/{player2Id}:
+    get:
+      operationId: getParejaDetail
+      tags: [stats]
+      summary: Detalle de una pareja con historial de partidos
+      parameters:
+        - name: player1Id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: player2Id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detalle de la pareja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParejaDetail"
+        "404":
+          description: Pareja no encontrada
+
   /dashboard:
     get:
       operationId: getDashboard
@@ -533,6 +559,17 @@ components:
           type: integer
         winRate:
           type: number
+
+    ParejaDetail:
+      type: object
+      required: [stats, matches]
+      properties:
+        stats:
+          $ref: "#/components/schemas/ParejaStats"
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
 
     ParejaStats:
       type: object

@@ -26,6 +26,7 @@ import type {
   Match,
   MatchInput,
   MatchUpdate,
+  ParejaDetail,
   ParejaStats,
   Player,
   PlayerInput,
@@ -1153,6 +1154,88 @@ export function useListParejas<TData = Awaited<ReturnType<typeof listParejas>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListParejasQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetParejaDetailUrl = (player1Id: number,
+    player2Id: number,) => {
+
+
+
+
+  return `/api/parejas/${player1Id}/${player2Id}`
+}
+
+/**
+ * @summary Detalle de una pareja con historial de partidos
+ */
+export const getParejaDetail = async (player1Id: number,
+    player2Id: number, options?: RequestInit): Promise<ParejaDetail> => {
+
+  return customFetch<ParejaDetail>(getGetParejaDetailUrl(player1Id,player2Id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetParejaDetailQueryKey = (player1Id: number,
+    player2Id: number,) => {
+    return [
+    `/api/parejas/${player1Id}/${player2Id}`
+    ] as const;
+    }
+
+
+export const getGetParejaDetailQueryOptions = <TData = Awaited<ReturnType<typeof getParejaDetail>>, TError = ErrorType<void>>(player1Id: number,
+    player2Id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getParejaDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetParejaDetailQueryKey(player1Id,player2Id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getParejaDetail>>> = ({ signal }) => getParejaDetail(player1Id,player2Id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(player1Id && player2Id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getParejaDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetParejaDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getParejaDetail>>>
+export type GetParejaDetailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Detalle de una pareja con historial de partidos
+ */
+
+export function useGetParejaDetail<TData = Awaited<ReturnType<typeof getParejaDetail>>, TError = ErrorType<void>>(
+ player1Id: number,
+    player2Id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getParejaDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetParejaDetailQueryOptions(player1Id,player2Id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -145,6 +145,16 @@ function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Dif G</span>
         </div>
       </div>
+
+      {/* Detail link */}
+      <div className="pt-1 border-t border-border/30">
+        <Link
+          href={`/parejas/${pareja.player1Id}/${pareja.player2Id}`}
+          className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors"
+        >
+          Ver historial completo →
+        </Link>
+      </div>
     </div>
   );
 }

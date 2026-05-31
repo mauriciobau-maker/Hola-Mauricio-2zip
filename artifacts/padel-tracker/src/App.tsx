@@ -13,6 +13,7 @@ import EditarJugador from "@/pages/EditarJugador";
 import EditarPartido from "@/pages/EditarPartido";
 import Ranking from "@/pages/Ranking";
 import Parejas from "@/pages/Parejas";
+import ParejaDetalle from "@/pages/ParejaDetalle";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ function Router() {
         <Route path="/partidos/:id/editar" component={EditarPartido} />
         <Route path="/ranking" component={Ranking} />
         <Route path="/parejas" component={Parejas} />
+        <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

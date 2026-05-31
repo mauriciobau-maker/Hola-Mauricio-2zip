@@ -14,6 +14,7 @@ export * from './healthStatus';
 export * from './match';
 export * from './matchInput';
 export * from './matchUpdate';
+export * from './parejaDetail';
 export * from './parejaStats';
 export * from './player';
 export * from './playerInput';

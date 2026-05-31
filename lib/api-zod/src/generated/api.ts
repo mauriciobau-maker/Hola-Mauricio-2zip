@@ -346,6 +346,63 @@ export const ListParejasResponse = zod.array(ListParejasResponseItem)
 
 
 /**
+ * @summary Detalle de una pareja con historial de partidos
+ */
+export const GetParejaDetailParams = zod.object({
+  "player1Id": zod.coerce.number(),
+  "player2Id": zod.coerce.number()
+})
+
+export const GetParejaDetailResponse = zod.object({
+  "stats": zod.object({
+  "player1Id": zod.number(),
+  "player1Name": zod.string(),
+  "player1Nickname": zod.string().nullish(),
+  "player2Id": zod.number(),
+  "player2Name": zod.string(),
+  "player2Nickname": zod.string().nullish(),
+  "totalMatches": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "winRate": zod.number(),
+  "setsWon": zod.number(),
+  "setsLost": zod.number(),
+  "gamesWon": zod.number(),
+  "gamesLost": zod.number(),
+  "gameDiff": zod.number(),
+  "avgElo": zod.number()
+}),
+  "matches": zod.array(zod.object({
+  "id": zod.number(),
+  "team1Player1Id": zod.number(),
+  "team1Player2Id": zod.number(),
+  "team2Player1Id": zod.number(),
+  "team2Player2Id": zod.number(),
+  "team1SetsWon": zod.number(),
+  "team2SetsWon": zod.number(),
+  "sets": zod.array(zod.object({
+  "setNumber": zod.number(),
+  "team1Games": zod.number(),
+  "team2Games": zod.number()
+})),
+  "playedAt": zod.string(),
+  "createdAt": zod.string(),
+  "team1Player1Name": zod.string().nullish(),
+  "team1Player2Name": zod.string().nullish(),
+  "team2Player1Name": zod.string().nullish(),
+  "team2Player2Name": zod.string().nullish(),
+  "eloChanges": zod.array(zod.object({
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "eloBefore": zod.number(),
+  "eloAfter": zod.number(),
+  "eloChange": zod.number()
+})).optional()
+}))
+})
+
+
+/**
  * @summary Resumen general del dashboard
  */
 export const GetDashboardResponse = zod.object({

@@ -146,6 +146,11 @@ export interface ParejaStats {
   avgElo: number;
 }
 
+export interface ParejaDetail {
+  stats: ParejaStats;
+  matches: Match[];
+}
+
 /**
  * @nullable
  */
