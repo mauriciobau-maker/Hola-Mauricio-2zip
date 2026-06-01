@@ -9,6 +9,199 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Get the currently authenticated user
+ */
+export const GetCurrentAuthUserHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — `Bearer <sid>`.')
+})
+
+export const GetCurrentAuthUserResponse = zod.object({
+  "user": zod.union([zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
+  "playerId": zod.number().nullish(),
+  "isAdmin": zod.number().optional()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Vincular cuenta de usuario a un jugador
+ */
+export const LinkPlayerAccountBody = zod.object({
+  "playerId": zod.number()
+})
+
+export const LinkPlayerAccountResponse = zod.object({
+  "user": zod.union([zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
+  "playerId": zod.number().nullish(),
+  "isAdmin": zod.number().optional()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export const BeginBrowserLoginQueryParams = zod.object({
+  "returnTo": zod.coerce.string().optional()
+})
+
+
+/**
+ * @summary Clear session and begin OIDC logout
+ */
+export const LogoutBrowserSessionHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — `Bearer <sid>`.')
+})
+
+
+/**
+ * @summary Listar todos los encuentros
+ */
+export const ListEncuentrosResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "dateTime": zod.string(),
+  "location": zod.string(),
+  "maxSpots": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "organizerId": zod.string().nullish(),
+  "notificationEmail": zod.boolean().optional(),
+  "notificationWhatsapp": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+export const ListEncuentrosResponse = zod.array(ListEncuentrosResponseItem)
+
+
+/**
+ * @summary Crear un encuentro
+ */
+
+
+
+
+
+export const CreateEncuentroBody = zod.object({
+  "title": zod.string().min(1),
+  "dateTime": zod.string(),
+  "location": zod.string().min(1),
+  "maxSpots": zod.number().min(1).optional(),
+  "notes": zod.string().optional(),
+  "playerIds": zod.array(zod.number()).optional(),
+  "notificationEmail": zod.boolean().optional(),
+  "notificationWhatsapp": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Obtener encuentro con lista de asistencia
+ */
+export const GetEncuentroParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEncuentroResponse = zod.object({
+  "encuentro": zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "dateTime": zod.string(),
+  "location": zod.string(),
+  "maxSpots": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "organizerId": zod.string().nullish(),
+  "notificationEmail": zod.boolean().optional(),
+  "notificationWhatsapp": zod.boolean().optional(),
+  "createdAt": zod.string()
+}),
+  "asistencia": zod.array(zod.object({
+  "id": zod.number(),
+  "encuentroId": zod.number(),
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "playerNickname": zod.string().nullish(),
+  "status": zod.enum(['confirmed', 'declined', 'pending']),
+  "respondedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Actualizar encuentro
+ */
+export const UpdateEncuentroParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const UpdateEncuentroBody = zod.object({
+  "title": zod.string().min(1).optional(),
+  "dateTime": zod.string().optional(),
+  "location": zod.string().min(1).optional(),
+  "maxSpots": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "notificationEmail": zod.boolean().optional(),
+  "notificationWhatsapp": zod.boolean().optional()
+})
+
+export const UpdateEncuentroResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "dateTime": zod.string(),
+  "location": zod.string(),
+  "maxSpots": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "organizerId": zod.string().nullish(),
+  "notificationEmail": zod.boolean().optional(),
+  "notificationWhatsapp": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Eliminar encuentro
+ */
+export const DeleteEncuentroParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Responder a un encuentro (asistir / no asistir / pendiente)
+ */
+export const RespondEncuentroParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespondEncuentroBody = zod.object({
+  "status": zod.enum(['confirmed', 'declined', 'pending'])
+})
+
+export const RespondEncuentroResponse = zod.object({
+  "id": zod.number(),
+  "encuentroId": zod.number(),
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "playerNickname": zod.string().nullish(),
+  "status": zod.enum(['confirmed', 'declined', 'pending']),
+  "respondedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({

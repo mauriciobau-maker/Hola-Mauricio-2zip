@@ -14,6 +14,10 @@ import EditarPartido from "@/pages/EditarPartido";
 import Ranking from "@/pages/Ranking";
 import Parejas from "@/pages/Parejas";
 import ParejaDetalle from "@/pages/ParejaDetalle";
+import { Encuentros } from "@/pages/Encuentros";
+import { EncuentroDetalle } from "@/pages/EncuentroDetalle";
+import { NuevoEncuentro } from "@/pages/NuevoEncuentro";
+import { VincularJugador } from "@/pages/VincularJugador";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -40,6 +44,10 @@ function Router() {
         <Route path="/ranking" component={Ranking} />
         <Route path="/parejas" component={Parejas} />
         <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
+        <Route path="/encuentros" component={Encuentros} />
+        <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
+        <Route path="/encuentros/:id" component={EncuentroDetalle} />
+        <Route path="/vincular" component={VincularJugador} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

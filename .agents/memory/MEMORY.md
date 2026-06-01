@@ -1,1 +1,3 @@
 - [Elo system design](elo-system.md) — recalculates ALL Elo from scratch after every match mutation; use PL/pgSQL for initial seeding since tsx not available
+- [Orval hook naming](orval-hook-naming.md) — orval generates useListX for collections, not useGetX; always verify after codegen or renames break the frontend.
+- [Replit Auth + Encuentros](replit-auth-encuentros.md) — full auth implemented (sessions+users+replit-auth-web); encuentros/asistencia/notification_subscriptions tables; zod must be direct dep of api-server; replit-auth-web must NOT use import.meta.env (no vite types in lib context).

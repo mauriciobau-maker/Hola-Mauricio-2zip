@@ -6,11 +6,25 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './asistenciaEntry';
+export * from './asistenciaEntryStatus';
+export * from './authorizationSessionHeaderParameter';
+export * from './authUser';
+export * from './authUserEnvelope';
+export * from './beginBrowserLoginParams';
 export * from './dashboardSummary';
 export * from './dashboardSummaryTopPlayer';
 export * from './eloChange';
 export * from './eloHistoryEntry';
+export * from './encuentro';
+export * from './encuentroDetail';
+export * from './encuentroInput';
+export * from './encuentroUpdate';
+export * from './exchangeMobileAuthorizationCodeBody';
+export * from './exchangeMobileAuthorizationCodeResponse';
 export * from './healthStatus';
+export * from './linkPlayerInput';
+export * from './logoutMobileSessionResponse';
 export * from './match';
 export * from './matchInput';
 export * from './matchUpdate';
@@ -21,4 +35,6 @@ export * from './playerInput';
 export * from './playerStats';
 export * from './playerUpdate';
 export * from './rankingEntry';
+export * from './rsvpInput';
+export * from './rsvpInputStatus';
 export * from './setScore';

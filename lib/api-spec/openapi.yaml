@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Autenticación y usuarios
   - name: players
     description: Gestión de jugadores
   - name: matches
@@ -17,8 +19,213 @@ tags:
     description: Ranking de jugadores
   - name: stats
     description: Estadísticas
+  - name: encuentros
+    description: Gestión de encuentros y asistencia
 
 paths:
+  /auth/user:
+    get:
+      tags: [auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /auth/link-player:
+    post:
+      tags: [auth]
+      operationId: linkPlayerAccount
+      summary: Vincular cuenta de usuario a un jugador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkPlayerInput'
+      responses:
+        '200':
+          description: Vinculado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '401':
+          description: No autenticado
+        '404':
+          description: Jugador no encontrado
+
+  /login:
+    get:
+      tags: [auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      responses:
+        '302':
+          description: Redirect to returnTo path on success.
+
+  /logout:
+    get:
+      tags: [auth]
+      operationId: logoutBrowserSession
+      summary: Clear session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to OIDC provider logout URL.
+
+  /encuentros:
+    get:
+      tags: [encuentros]
+      operationId: listEncuentros
+      summary: Listar todos los encuentros
+      responses:
+        '200':
+          description: Lista de encuentros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Encuentro'
+    post:
+      tags: [encuentros]
+      operationId: createEncuentro
+      summary: Crear un encuentro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncuentroInput'
+      responses:
+        '201':
+          description: Encuentro creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Encuentro'
+        '401':
+          description: No autenticado
+
+  /encuentros/{id}:
+    get:
+      tags: [encuentros]
+      operationId: getEncuentro
+      summary: Obtener encuentro con lista de asistencia
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalle del encuentro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EncuentroDetail'
+        '404':
+          description: No encontrado
+    patch:
+      tags: [encuentros]
+      operationId: updateEncuentro
+      summary: Actualizar encuentro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncuentroUpdate'
+      responses:
+        '200':
+          description: Encuentro actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Encuentro'
+        '401':
+          description: No autenticado
+        '404':
+          description: No encontrado
+    delete:
+      tags: [encuentros]
+      operationId: deleteEncuentro
+      summary: Eliminar encuentro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Eliminado
+        '401':
+          description: No autenticado
+        '404':
+          description: No encontrado
+
+  /encuentros/{id}/rsvp:
+    post:
+      tags: [encuentros]
+      operationId: respondEncuentro
+      summary: Responder a un encuentro (asistir / no asistir / pendiente)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RsvpInput'
+      responses:
+        '200':
+          description: Respuesta registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsistenciaEntry'
+        '401':
+          description: No autenticado
+        '404':
+          description: Encuentro no encontrado
+
   /healthz:
     get:
       operationId: healthCheck
@@ -338,7 +545,199 @@ paths:
                 $ref: "#/components/schemas/DashboardSummary"
 
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
+    AuthUser:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        playerId:
+          type: ["integer", "null"]
+        isAdmin:
+          type: integer
+
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+
+    LinkPlayerInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId:
+          type: integer
+
+    ExchangeMobileAuthorizationCodeBody:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+        code_verifier:
+          type: string
+        redirect_uri:
+          type: string
+        state:
+          type: string
+        nonce:
+          type: string
+
+    ExchangeMobileAuthorizationCodeResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    LogoutMobileSessionResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    Encuentro:
+      type: object
+      required: [id, title, dateTime, location, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        dateTime:
+          type: string
+        location:
+          type: string
+        maxSpots:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        organizerId:
+          type: ["string", "null"]
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+        createdAt:
+          type: string
+
+    EncuentroInput:
+      type: object
+      required: [title, dateTime, location]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        dateTime:
+          type: string
+        location:
+          type: string
+          minLength: 1
+        maxSpots:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+        playerIds:
+          type: array
+          items:
+            type: integer
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+
+    EncuentroUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        dateTime:
+          type: string
+        location:
+          type: string
+          minLength: 1
+        maxSpots:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+
+    AsistenciaEntry:
+      type: object
+      required: [id, encuentroId, playerId, playerName, status, createdAt]
+      properties:
+        id:
+          type: integer
+        encuentroId:
+          type: integer
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        playerNickname:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [confirmed, declined, pending]
+        respondedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RsvpInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [confirmed, declined, pending]
+
+    EncuentroDetail:
+      type: object
+      required: [encuentro, asistencia]
+      properties:
+        encuentro:
+          $ref: '#/components/schemas/Encuentro'
+        asistencia:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsistenciaEntry'
+
     HealthStatus:
       type: object
       properties:

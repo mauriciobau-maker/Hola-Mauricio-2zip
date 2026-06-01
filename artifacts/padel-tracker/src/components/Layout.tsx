@@ -9,8 +9,10 @@ import {
   Menu,
   X,
   Handshake,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AuthButton } from "@/components/AuthButton";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -18,6 +20,7 @@ const navItems = [
   { href: "/parejas", label: "Parejas", icon: Handshake },
   { href: "/partidos", label: "Partidos", icon: Calendar },
   { href: "/jugadores", label: "Jugadores", icon: Users },
+  { href: "/encuentros", label: "Encuentros", icon: CalendarDays },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -62,15 +65,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <PlusCircle size={15} />
               Nuevo Partido
             </Link>
+            <AuthButton />
           </div>
 
           {/* Mobile burger */}
-          <button
-            className="md:hidden p-2 rounded-md hover:bg-muted/50"
-            onClick={() => setMobileOpen((v) => !v)}
-          >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <AuthButton />
+            <button
+              className="p-2 rounded-md hover:bg-muted/50"
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu */}

@@ -20,9 +20,17 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AsistenciaEntry,
+  AuthUserEnvelope,
+  BeginBrowserLoginParams,
   DashboardSummary,
   EloHistoryEntry,
+  Encuentro,
+  EncuentroDetail,
+  EncuentroInput,
+  EncuentroUpdate,
   HealthStatus,
+  LinkPlayerInput,
   Match,
   MatchInput,
   MatchUpdate,
@@ -32,7 +40,8 @@ import type {
   PlayerInput,
   PlayerStats,
   PlayerUpdate,
-  RankingEntry
+  RankingEntry,
+  RsvpInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -46,6 +55,831 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetCurrentAuthUserUrl = () => {
+
+
+
+
+  return `/api/auth/user`
+}
+
+/**
+ * @summary Get the currently authenticated user
+ */
+export const getCurrentAuthUser = async ( options?: RequestInit): Promise<AuthUserEnvelope> => {
+
+  return customFetch<AuthUserEnvelope>(getGetCurrentAuthUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentAuthUserQueryKey = () => {
+    return [
+    `/api/auth/user`
+    ] as const;
+    }
+
+
+export const getGetCurrentAuthUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentAuthUser>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentAuthUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentAuthUser>>> = ({ signal }) => getCurrentAuthUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentAuthUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentAuthUser>>>
+export type GetCurrentAuthUserQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the currently authenticated user
+ */
+
+export function useGetCurrentAuthUser<TData = Awaited<ReturnType<typeof getCurrentAuthUser>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentAuthUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLinkPlayerAccountUrl = () => {
+
+
+
+
+  return `/api/auth/link-player`
+}
+
+/**
+ * @summary Vincular cuenta de usuario a un jugador
+ */
+export const linkPlayerAccount = async (linkPlayerInput: LinkPlayerInput, options?: RequestInit): Promise<AuthUserEnvelope> => {
+
+  return customFetch<AuthUserEnvelope>(getLinkPlayerAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      linkPlayerInput,)
+  }
+);}
+
+
+
+
+export const getLinkPlayerAccountMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkPlayerAccount>>, TError,{data: BodyType<LinkPlayerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof linkPlayerAccount>>, TError,{data: BodyType<LinkPlayerInput>}, TContext> => {
+
+const mutationKey = ['linkPlayerAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkPlayerAccount>>, {data: BodyType<LinkPlayerInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  linkPlayerAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LinkPlayerAccountMutationResult = NonNullable<Awaited<ReturnType<typeof linkPlayerAccount>>>
+    export type LinkPlayerAccountMutationBody = BodyType<LinkPlayerInput>
+    export type LinkPlayerAccountMutationError = ErrorType<void>
+
+    /**
+ * @summary Vincular cuenta de usuario a un jugador
+ */
+export const useLinkPlayerAccount = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkPlayerAccount>>, TError,{data: BodyType<LinkPlayerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof linkPlayerAccount>>,
+        TError,
+        {data: BodyType<LinkPlayerInput>},
+        TContext
+      > => {
+      return useMutation(getLinkPlayerAccountMutationOptions(options));
+    }
+
+export const getBeginBrowserLoginUrl = (params?: BeginBrowserLoginParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/login?${stringifiedParams}` : `/api/login`
+}
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export const beginBrowserLogin = async (params?: BeginBrowserLoginParams, options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getBeginBrowserLoginUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBeginBrowserLoginQueryKey = (params?: BeginBrowserLoginParams,) => {
+    return [
+    `/api/login`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBeginBrowserLoginQueryOptions = <TData = Awaited<ReturnType<typeof beginBrowserLogin>>, TError = ErrorType<void>>(params?: BeginBrowserLoginParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBeginBrowserLoginQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof beginBrowserLogin>>> = ({ signal }) => beginBrowserLogin(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BeginBrowserLoginQueryResult = NonNullable<Awaited<ReturnType<typeof beginBrowserLogin>>>
+export type BeginBrowserLoginQueryError = ErrorType<void>
+
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+
+export function useBeginBrowserLogin<TData = Awaited<ReturnType<typeof beginBrowserLogin>>, TError = ErrorType<void>>(
+ params?: BeginBrowserLoginParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBeginBrowserLoginQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getHandleBrowserLoginCallbackUrl = () => {
+
+
+
+
+  return `/api/callback`
+}
+
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+export const handleBrowserLoginCallback = async ( options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getHandleBrowserLoginCallbackUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getHandleBrowserLoginCallbackQueryKey = () => {
+    return [
+    `/api/callback`
+    ] as const;
+    }
+
+
+export const getHandleBrowserLoginCallbackQueryOptions = <TData = Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHandleBrowserLoginCallbackQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof handleBrowserLoginCallback>>> = ({ signal }) => handleBrowserLoginCallback({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type HandleBrowserLoginCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof handleBrowserLoginCallback>>>
+export type HandleBrowserLoginCallbackQueryError = ErrorType<void>
+
+
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+
+export function useHandleBrowserLoginCallback<TData = Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getHandleBrowserLoginCallbackQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLogoutBrowserSessionUrl = () => {
+
+
+
+
+  return `/api/logout`
+}
+
+/**
+ * @summary Clear session and begin OIDC logout
+ */
+export const logoutBrowserSession = async ( options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getLogoutBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutBrowserSessionQueryKey = () => {
+    return [
+    `/api/logout`
+    ] as const;
+    }
+
+
+export const getLogoutBrowserSessionQueryOptions = <TData = Awaited<ReturnType<typeof logoutBrowserSession>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLogoutBrowserSessionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof logoutBrowserSession>>> = ({ signal }) => logoutBrowserSession({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type LogoutBrowserSessionQueryResult = NonNullable<Awaited<ReturnType<typeof logoutBrowserSession>>>
+export type LogoutBrowserSessionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Clear session and begin OIDC logout
+ */
+
+export function useLogoutBrowserSession<TData = Awaited<ReturnType<typeof logoutBrowserSession>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getLogoutBrowserSessionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListEncuentrosUrl = () => {
+
+
+
+
+  return `/api/encuentros`
+}
+
+/**
+ * @summary Listar todos los encuentros
+ */
+export const listEncuentros = async ( options?: RequestInit): Promise<Encuentro[]> => {
+
+  return customFetch<Encuentro[]>(getListEncuentrosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEncuentrosQueryKey = () => {
+    return [
+    `/api/encuentros`
+    ] as const;
+    }
+
+
+export const getListEncuentrosQueryOptions = <TData = Awaited<ReturnType<typeof listEncuentros>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEncuentros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEncuentrosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEncuentros>>> = ({ signal }) => listEncuentros({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEncuentros>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEncuentrosQueryResult = NonNullable<Awaited<ReturnType<typeof listEncuentros>>>
+export type ListEncuentrosQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Listar todos los encuentros
+ */
+
+export function useListEncuentros<TData = Awaited<ReturnType<typeof listEncuentros>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEncuentros>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEncuentrosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateEncuentroUrl = () => {
+
+
+
+
+  return `/api/encuentros`
+}
+
+/**
+ * @summary Crear un encuentro
+ */
+export const createEncuentro = async (encuentroInput: EncuentroInput, options?: RequestInit): Promise<Encuentro> => {
+
+  return customFetch<Encuentro>(getCreateEncuentroUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      encuentroInput,)
+  }
+);}
+
+
+
+
+export const getCreateEncuentroMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEncuentro>>, TError,{data: BodyType<EncuentroInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEncuentro>>, TError,{data: BodyType<EncuentroInput>}, TContext> => {
+
+const mutationKey = ['createEncuentro'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEncuentro>>, {data: BodyType<EncuentroInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEncuentro(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEncuentroMutationResult = NonNullable<Awaited<ReturnType<typeof createEncuentro>>>
+    export type CreateEncuentroMutationBody = BodyType<EncuentroInput>
+    export type CreateEncuentroMutationError = ErrorType<void>
+
+    /**
+ * @summary Crear un encuentro
+ */
+export const useCreateEncuentro = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEncuentro>>, TError,{data: BodyType<EncuentroInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEncuentro>>,
+        TError,
+        {data: BodyType<EncuentroInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEncuentroMutationOptions(options));
+    }
+
+export const getGetEncuentroUrl = (id: number,) => {
+
+
+
+
+  return `/api/encuentros/${id}`
+}
+
+/**
+ * @summary Obtener encuentro con lista de asistencia
+ */
+export const getEncuentro = async (id: number, options?: RequestInit): Promise<EncuentroDetail> => {
+
+  return customFetch<EncuentroDetail>(getGetEncuentroUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEncuentroQueryKey = (id: number,) => {
+    return [
+    `/api/encuentros/${id}`
+    ] as const;
+    }
+
+
+export const getGetEncuentroQueryOptions = <TData = Awaited<ReturnType<typeof getEncuentro>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncuentro>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEncuentroQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEncuentro>>> = ({ signal }) => getEncuentro(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEncuentro>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEncuentroQueryResult = NonNullable<Awaited<ReturnType<typeof getEncuentro>>>
+export type GetEncuentroQueryError = ErrorType<void>
+
+
+/**
+ * @summary Obtener encuentro con lista de asistencia
+ */
+
+export function useGetEncuentro<TData = Awaited<ReturnType<typeof getEncuentro>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEncuentro>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEncuentroQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateEncuentroUrl = (id: number,) => {
+
+
+
+
+  return `/api/encuentros/${id}`
+}
+
+/**
+ * @summary Actualizar encuentro
+ */
+export const updateEncuentro = async (id: number,
+    encuentroUpdate: EncuentroUpdate, options?: RequestInit): Promise<Encuentro> => {
+
+  return customFetch<Encuentro>(getUpdateEncuentroUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      encuentroUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateEncuentroMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEncuentro>>, TError,{id: number;data: BodyType<EncuentroUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEncuentro>>, TError,{id: number;data: BodyType<EncuentroUpdate>}, TContext> => {
+
+const mutationKey = ['updateEncuentro'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEncuentro>>, {id: number;data: BodyType<EncuentroUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateEncuentro(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEncuentroMutationResult = NonNullable<Awaited<ReturnType<typeof updateEncuentro>>>
+    export type UpdateEncuentroMutationBody = BodyType<EncuentroUpdate>
+    export type UpdateEncuentroMutationError = ErrorType<void>
+
+    /**
+ * @summary Actualizar encuentro
+ */
+export const useUpdateEncuentro = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEncuentro>>, TError,{id: number;data: BodyType<EncuentroUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEncuentro>>,
+        TError,
+        {id: number;data: BodyType<EncuentroUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEncuentroMutationOptions(options));
+    }
+
+export const getDeleteEncuentroUrl = (id: number,) => {
+
+
+
+
+  return `/api/encuentros/${id}`
+}
+
+/**
+ * @summary Eliminar encuentro
+ */
+export const deleteEncuentro = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteEncuentroUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEncuentroMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEncuentro>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEncuentro>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteEncuentro'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEncuentro>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteEncuentro(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEncuentroMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEncuentro>>>
+
+    export type DeleteEncuentroMutationError = ErrorType<void>
+
+    /**
+ * @summary Eliminar encuentro
+ */
+export const useDeleteEncuentro = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEncuentro>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEncuentro>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEncuentroMutationOptions(options));
+    }
+
+export const getRespondEncuentroUrl = (id: number,) => {
+
+
+
+
+  return `/api/encuentros/${id}/rsvp`
+}
+
+/**
+ * @summary Responder a un encuentro (asistir / no asistir / pendiente)
+ */
+export const respondEncuentro = async (id: number,
+    rsvpInput: RsvpInput, options?: RequestInit): Promise<AsistenciaEntry> => {
+
+  return customFetch<AsistenciaEntry>(getRespondEncuentroUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rsvpInput,)
+  }
+);}
+
+
+
+
+export const getRespondEncuentroMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondEncuentro>>, TError,{id: number;data: BodyType<RsvpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respondEncuentro>>, TError,{id: number;data: BodyType<RsvpInput>}, TContext> => {
+
+const mutationKey = ['respondEncuentro'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respondEncuentro>>, {id: number;data: BodyType<RsvpInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  respondEncuentro(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RespondEncuentroMutationResult = NonNullable<Awaited<ReturnType<typeof respondEncuentro>>>
+    export type RespondEncuentroMutationBody = BodyType<RsvpInput>
+    export type RespondEncuentroMutationError = ErrorType<void>
+
+    /**
+ * @summary Responder a un encuentro (asistir / no asistir / pendiente)
+ */
+export const useRespondEncuentro = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondEncuentro>>, TError,{id: number;data: BodyType<RsvpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof respondEncuentro>>,
+        TError,
+        {id: number;data: BodyType<RsvpInput>},
+        TContext
+      > => {
+      return useMutation(getRespondEncuentroMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

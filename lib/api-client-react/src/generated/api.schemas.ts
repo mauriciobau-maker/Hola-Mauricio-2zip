@@ -5,6 +5,129 @@
  * Padel Tracker IA API
  * OpenAPI spec version: 0.1.0
  */
+export interface AuthUser {
+  id: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  profileImageUrl?: string | null;
+  /** @nullable */
+  playerId?: number | null;
+  isAdmin?: number;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface LinkPlayerInput {
+  playerId: number;
+}
+
+export interface ExchangeMobileAuthorizationCodeBody {
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  state: string;
+  nonce?: string;
+}
+
+export interface ExchangeMobileAuthorizationCodeResponse {
+  token: string;
+}
+
+export interface LogoutMobileSessionResponse {
+  success: boolean;
+}
+
+export interface Encuentro {
+  id: number;
+  title: string;
+  dateTime: string;
+  location: string;
+  /** @nullable */
+  maxSpots?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  organizerId?: string | null;
+  notificationEmail?: boolean;
+  notificationWhatsapp?: boolean;
+  createdAt: string;
+}
+
+export interface EncuentroInput {
+  /** @minLength 1 */
+  title: string;
+  dateTime: string;
+  /** @minLength 1 */
+  location: string;
+  /** @minimum 1 */
+  maxSpots?: number;
+  notes?: string;
+  playerIds?: number[];
+  notificationEmail?: boolean;
+  notificationWhatsapp?: boolean;
+}
+
+export interface EncuentroUpdate {
+  /** @minLength 1 */
+  title?: string;
+  dateTime?: string;
+  /** @minLength 1 */
+  location?: string;
+  /** @nullable */
+  maxSpots?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  notificationEmail?: boolean;
+  notificationWhatsapp?: boolean;
+}
+
+export type AsistenciaEntryStatus = typeof AsistenciaEntryStatus[keyof typeof AsistenciaEntryStatus];
+
+
+export const AsistenciaEntryStatus = {
+  confirmed: 'confirmed',
+  declined: 'declined',
+  pending: 'pending',
+} as const;
+
+export interface AsistenciaEntry {
+  id: number;
+  encuentroId: number;
+  playerId: number;
+  playerName: string;
+  /** @nullable */
+  playerNickname?: string | null;
+  status: AsistenciaEntryStatus;
+  /** @nullable */
+  respondedAt?: string | null;
+  createdAt: string;
+}
+
+export type RsvpInputStatus = typeof RsvpInputStatus[keyof typeof RsvpInputStatus];
+
+
+export const RsvpInputStatus = {
+  confirmed: 'confirmed',
+  declined: 'declined',
+  pending: 'pending',
+} as const;
+
+export interface RsvpInput {
+  status: RsvpInputStatus;
+}
+
+export interface EncuentroDetail {
+  encuentro: Encuentro;
+  asistencia: AsistenciaEntry[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -167,4 +290,13 @@ export interface DashboardSummary {
   topPlayer: DashboardSummaryTopPlayer;
   recentMatches: Match[];
 }
+
+/**
+ * Opaque session token — `Bearer <sid>`.
+ */
+export type AuthorizationSessionHeaderParameter = string;
+
+export type BeginBrowserLoginParams = {
+returnTo?: string;
+};
 
