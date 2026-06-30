@@ -1,67 +1,65 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc } from "drizzle-orm";
-import { db, matchesTable, playersTable, eloHistoryTable } from "@workspace/db";
-import {
-  CreateMatchBody,
-  GetMatchParams,
-  UpdateMatchParams,
-  UpdateMatchBody,
-  DeleteMatchParams,
-} from "@workspace/api-zod";
+import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable, sportsTable } from "@workspace/db";
 import { calculateMatchEloChanges, STARTING_ELO } from "../elo";
 
 const router: IRouter = Router();
 
 /**
- * Replays all matches in chronological order to compute accurate Elo for every player.
- * Called after any match create / update / delete to keep Elo consistent.
+ * Recalcula todo el Elo desde cero, agrupado por deporte.
+ * Soporta equipos de tamaño variable via match_players.
  */
 async function recalculateAllElo(): Promise<void> {
-  // Reset all players to starting Elo
   await db.update(playersTable).set({ elo: STARTING_ELO });
-  // Clear all Elo history
   await db.delete(eloHistoryTable);
 
-  // Get all matches in chronological order
   const matches = await db.select().from(matchesTable).orderBy(asc(matchesTable.playedAt));
   if (matches.length === 0) return;
 
-  // Build an in-memory Elo map (all start at STARTING_ELO)
   const players = await db.select().from(playersTable);
   const eloMap: Record<number, number> = {};
   for (const p of players) eloMap[p.id] = STARTING_ELO;
 
   for (const match of matches) {
-    const team1Won = match.team1SetsWon > match.team2SetsWon;
-    const team1 = [
-      { id: match.team1Player1Id, elo: eloMap[match.team1Player1Id] ?? STARTING_ELO },
-      { id: match.team1Player2Id, elo: eloMap[match.team1Player2Id] ?? STARTING_ELO },
-    ];
-    const team2 = [
-      { id: match.team2Player1Id, elo: eloMap[match.team2Player1Id] ?? STARTING_ELO },
-      { id: match.team2Player2Id, elo: eloMap[match.team2Player2Id] ?? STARTING_ELO },
-    ];
+    const matchPlayers = await db
+      .select()
+      .from(matchPlayersTable)
+      .where(eq(matchPlayersTable.matchId, match.id));
 
-    const changes = calculateMatchEloChanges(team1, team2, team1Won);
+    const team1 = matchPlayers
+      .filter((mp) => mp.team === "team1")
+      .map((mp) => ({ id: mp.playerId, elo: eloMap[mp.playerId] ?? STARTING_ELO }));
 
-    // Save Elo history
+    const team2 = matchPlayers
+      .filter((mp) => mp.team === "team2")
+      .map((mp) => ({ id: mp.playerId, elo: eloMap[mp.playerId] ?? STARTING_ELO }));
+
+    if (team1.length === 0 || team2.length === 0) continue;
+
+    const team1Won = match.result === "team1";
+    const isDraw = match.result === "draw";
+
+    // Para empate usamos 0.5 como resultado
+    const changes = isDraw
+      ? calculateMatchEloChanges(team1, team2, false, true)
+      : calculateMatchEloChanges(team1, team2, team1Won);
+
     await db.insert(eloHistoryTable).values(
       changes.map((c) => ({
         playerId: c.playerId,
         matchId: match.id,
+        sportId: match.sportId,
         eloBefore: c.eloBefore,
         eloAfter: c.eloAfter,
         eloChange: c.eloChange,
       }))
     );
 
-    // Update in-memory Elo map
     for (const c of changes) {
       eloMap[c.playerId] = c.eloAfter;
     }
   }
 
-  // Persist final Elos to DB
   for (const [playerIdStr, elo] of Object.entries(eloMap)) {
     await db
       .update(playersTable)
@@ -71,12 +69,30 @@ async function recalculateAllElo(): Promise<void> {
 }
 
 /**
- * Enrich a match record with player names and Elo changes from history.
+ * Enriquece un partido con jugadores, deporte y cambios de Elo.
  */
-async function enrichMatch(
-  m: typeof matchesTable.$inferSelect,
-  playerMap: Record<number, string>,
-) {
+async function enrichMatch(m: typeof matchesTable.$inferSelect) {
+  const matchPlayers = await db
+    .select()
+    .from(matchPlayersTable)
+    .where(eq(matchPlayersTable.matchId, m.id));
+
+  const playerIds = matchPlayers.map((mp) => mp.playerId);
+  const players = playerIds.length > 0
+    ? await db.select().from(playersTable).where(
+        playerIds.length === 1
+          ? eq(playersTable.id, playerIds[0])
+          : eq(playersTable.id, playerIds[0]) // fallback — se mapea abajo
+      )
+    : [];
+
+  // Cargamos todos los jugadores para el mapa
+  const allPlayers = await db.select().from(playersTable);
+  const playerMap: Record<number, string> = {};
+  for (const p of allPlayers) playerMap[p.id] = p.name;
+
+  const [sport] = await db.select().from(sportsTable).where(eq(sportsTable.id, m.sportId));
+
   const history = await db
     .select()
     .from(eloHistoryTable)
@@ -90,164 +106,172 @@ async function enrichMatch(
     eloChange: h.eloChange,
   }));
 
+  const team1Players = matchPlayers
+    .filter((mp) => mp.team === "team1")
+    .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+
+  const team2Players = matchPlayers
+    .filter((mp) => mp.team === "team2")
+    .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+
   return {
     id: m.id,
-    team1Player1Id: m.team1Player1Id,
-    team1Player2Id: m.team1Player2Id,
-    team2Player1Id: m.team2Player1Id,
-    team2Player2Id: m.team2Player2Id,
-    team1SetsWon: m.team1SetsWon,
-    team2SetsWon: m.team2SetsWon,
-    sets: m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>,
+    sportId: m.sportId,
+    sportName: sport?.name ?? "Desconocido",
+    sportSlug: sport?.slug ?? "",
+    team1Players,
+    team2Players,
+    team1Score: m.team1Score,
+    team2Score: m.team2Score,
+    sets: m.sets,
+    result: m.result,
     playedAt: m.playedAt.toISOString(),
     createdAt: m.createdAt.toISOString(),
-    team1Player1Name: playerMap[m.team1Player1Id] ?? null,
-    team1Player2Name: playerMap[m.team1Player2Id] ?? null,
-    team2Player1Name: playerMap[m.team2Player1Id] ?? null,
-    team2Player2Name: playerMap[m.team2Player2Id] ?? null,
     eloChanges,
   };
 }
 
+// GET /matches
 router.get("/matches", async (_req, res): Promise<void> => {
   const matches = await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt));
-  const players = await db.select().from(playersTable);
-  const playerMap: Record<number, string> = {};
-  for (const p of players) playerMap[p.id] = p.name;
-  const result = await Promise.all(matches.map((m) => enrichMatch(m, playerMap)));
+  const result = await Promise.all(matches.map((m) => enrichMatch(m)));
   res.json(result);
 });
 
+// POST /matches
 router.post("/matches", async (req, res): Promise<void> => {
-  const parsed = CreateMatchBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const { sportId, team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt } = req.body;
+
+  if (!sportId || !team1PlayerIds || !team2PlayerIds || !playedAt) {
+    res.status(400).json({ error: "Faltan campos requeridos: sportId, team1PlayerIds, team2PlayerIds, playedAt" });
     return;
   }
 
-  const { team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt } =
-    parsed.data;
-
-  const playerIds = [team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id];
-  if (new Set(playerIds).size !== 4) {
-    res.status(400).json({ error: "Los cuatro jugadores deben ser diferentes" });
+  if (!Array.isArray(team1PlayerIds) || !Array.isArray(team2PlayerIds)) {
+    res.status(400).json({ error: "team1PlayerIds y team2PlayerIds deben ser arrays" });
     return;
   }
 
-  const setsData = sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>;
-  let team1SetsWon = 0;
-  let team2SetsWon = 0;
-  for (const s of setsData) {
-    if (s.team1Games > s.team2Games) team1SetsWon++;
-    else if (s.team2Games > s.team1Games) team2SetsWon++;
+  const allIds = [...team1PlayerIds, ...team2PlayerIds];
+  if (new Set(allIds).size !== allIds.length) {
+    res.status(400).json({ error: "Un jugador no puede estar en ambos equipos" });
+    return;
   }
 
+  // Verificar deporte existe
+  const [sport] = await db.select().from(sportsTable).where(eq(sportsTable.id, sportId));
+  if (!sport) {
+    res.status(404).json({ error: "Deporte no encontrado" });
+    return;
+  }
+
+  // Calcular resultado
+  const t1Score = team1Score ?? 0;
+  const t2Score = team2Score ?? 0;
+  let result = "draw";
+  if (t1Score > t2Score) result = "team1";
+  else if (t2Score > t1Score) result = "team2";
+
+  // Insertar partido
   const [match] = await db
     .insert(matchesTable)
-    .values({ team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, team1SetsWon, team2SetsWon, sets: setsData, playedAt: new Date(playedAt) })
+    .values({
+      sportId,
+      team1Score: t1Score,
+      team2Score: t2Score,
+      sets: sets ?? null,
+      result,
+      playedAt: new Date(playedAt),
+    })
     .returning();
 
-  // Recalculate Elo for all matches
+  // Insertar jugadores del partido
+  const matchPlayerValues = [
+    ...team1PlayerIds.map((pid: number) => ({ matchId: match.id, playerId: pid, team: "team1" })),
+    ...team2PlayerIds.map((pid: number) => ({ matchId: match.id, playerId: pid, team: "team2" })),
+  ];
+  await db.insert(matchPlayersTable).values(matchPlayerValues);
+
   await recalculateAllElo();
 
-  const players = await db.select().from(playersTable);
-  const playerMap: Record<number, string> = {};
-  for (const p of players) playerMap[p.id] = p.name;
-
-  res.status(201).json(await enrichMatch(match, playerMap));
+  res.status(201).json(await enrichMatch(match));
 });
 
+// GET /matches/:id
 router.get("/matches/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetMatchParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  const [match] = await db.select().from(matchesTable).where(eq(matchesTable.id, params.data.id));
-  if (!match) {
-    res.status(404).json({ error: "Partido no encontrado" });
-    return;
-  }
-  const players = await db.select().from(playersTable);
-  const playerMap: Record<number, string> = {};
-  for (const p of players) playerMap[p.id] = p.name;
-  res.json(await enrichMatch(match, playerMap));
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [match] = await db.select().from(matchesTable).where(eq(matchesTable.id, id));
+  if (!match) { res.status(404).json({ error: "Partido no encontrado" }); return; }
+
+  res.json(await enrichMatch(match));
 });
 
+// PATCH /matches/:id
 router.patch("/matches/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = UpdateMatchParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  const body = UpdateMatchBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
-    return;
-  }
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
 
-  const [existing] = await db.select().from(matchesTable).where(eq(matchesTable.id, params.data.id));
-  if (!existing) {
-    res.status(404).json({ error: "Partido no encontrado" });
-    return;
-  }
+  const [existing] = await db.select().from(matchesTable).where(eq(matchesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Partido no encontrado" }); return; }
+
+  const { team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt } = req.body;
 
   const updates: Record<string, unknown> = {};
-  const setsData = body.data.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | undefined;
-  if (setsData) {
-    let team1SetsWon = 0;
-    let team2SetsWon = 0;
-    for (const s of setsData) {
-      if (s.team1Games > s.team2Games) team1SetsWon++;
-      else if (s.team2Games > s.team1Games) team2SetsWon++;
-    }
-    updates.sets = setsData;
-    updates.team1SetsWon = team1SetsWon;
-    updates.team2SetsWon = team2SetsWon;
-  }
+  if (team1Score !== undefined) updates.team1Score = team1Score;
+  if (team2Score !== undefined) updates.team2Score = team2Score;
+  if (sets !== undefined) updates.sets = sets;
+  if (playedAt !== undefined) updates.playedAt = new Date(playedAt);
 
-  if (body.data.team1Player1Id !== undefined) updates.team1Player1Id = body.data.team1Player1Id;
-  if (body.data.team1Player2Id !== undefined) updates.team1Player2Id = body.data.team1Player2Id;
-  if (body.data.team2Player1Id !== undefined) updates.team2Player1Id = body.data.team2Player1Id;
-  if (body.data.team2Player2Id !== undefined) updates.team2Player2Id = body.data.team2Player2Id;
-  if (body.data.playedAt !== undefined) updates.playedAt = new Date(body.data.playedAt);
+  // Recalcular resultado si cambian scores
+  const t1 = team1Score ?? existing.team1Score;
+  const t2 = team2Score ?? existing.team2Score;
+  updates.result = t1 > t2 ? "team1" : t2 > t1 ? "team2" : "draw";
 
   const [updated] = await db
     .update(matchesTable)
     .set(updates)
-    .where(eq(matchesTable.id, params.data.id))
+    .where(eq(matchesTable.id, id))
     .returning();
 
+  // Actualizar jugadores si se envían
+  if (team1PlayerIds || team2PlayerIds) {
+    await db.delete(matchPlayersTable).where(eq(matchPlayersTable.matchId, id));
+    const t1Ids = team1PlayerIds ?? [];
+    const t2Ids = team2PlayerIds ?? [];
+    if (t1Ids.length > 0 || t2Ids.length > 0) {
+      await db.insert(matchPlayersTable).values([
+        ...t1Ids.map((pid: number) => ({ matchId: id, playerId: pid, team: "team1" })),
+        ...t2Ids.map((pid: number) => ({ matchId: id, playerId: pid, team: "team2" })),
+      ]);
+    }
+  }
+
   await recalculateAllElo();
-
-  const allPlayers = await db.select().from(playersTable);
-  const playerMap: Record<number, string> = {};
-  for (const p of allPlayers) playerMap[p.id] = p.name;
-
-  res.json(await enrichMatch(updated, playerMap));
+  res.json(await enrichMatch(updated));
 });
 
+// DELETE /matches/:id
 router.delete("/matches/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = DeleteMatchParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
   const [deleted] = await db
     .delete(matchesTable)
-    .where(eq(matchesTable.id, params.data.id))
+    .where(eq(matchesTable.id, id))
     .returning();
-  if (!deleted) {
-    res.status(404).json({ error: "Partido no encontrado" });
-    return;
-  }
+
+  if (!deleted) { res.status(404).json({ error: "Partido no encontrado" }); return; }
 
   await recalculateAllElo();
-
   res.sendStatus(204);
+});
+
+// GET /sports — lista deportes disponibles
+router.get("/sports", async (_req, res): Promise<void> => {
+  const sports = await db.select().from(sportsTable).where(eq(sportsTable.active, true));
+  res.json(sports);
 });
 
 export default router;
