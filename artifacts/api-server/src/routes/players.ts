@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc } from "drizzle-orm";
-import { db, playersTable, matchesTable, eloHistoryTable } from "@workspace/db";
+import { db, playersTable, matchesTable, eloHistoryTable, matchPlayersTable } from "@workspace/db";
 import {
   CreatePlayerBody,
   GetPlayerParams,
@@ -110,63 +110,102 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     return;
   }
 
-  const allMatches = await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt));
-  const playerMatches = allMatches.filter(
-    (m) =>
-      m.team1Player1Id === playerId ||
-      m.team1Player2Id === playerId ||
-      m.team2Player1Id === playerId ||
-      m.team2Player2Id === playerId,
-  );
+  // Obtener entradas de match_players para este jugador
+  const playerMatchEntries = await db
+    .select()
+    .from(matchPlayersTable)
+    .where(eq(matchPlayersTable.playerId, playerId));
 
-  let wins = 0, losses = 0, setsWon = 0, setsLost = 0;
-  for (const match of playerMatches) {
-    const onTeam1 = match.team1Player1Id === playerId || match.team1Player2Id === playerId;
-    if (onTeam1) {
-      if (match.team1SetsWon > match.team2SetsWon) wins++;
-      else losses++;
-      setsWon += match.team1SetsWon;
-      setsLost += match.team2SetsWon;
-    } else {
-      if (match.team2SetsWon > match.team1SetsWon) wins++;
-      else losses++;
-      setsWon += match.team2SetsWon;
-      setsLost += match.team1SetsWon;
+  const matchIds = playerMatchEntries.map((mp) => mp.matchId);
+
+  if (matchIds.length === 0) {
+    res.json({
+      playerId,
+      playerName: player.name,
+      totalMatches: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      winRate: 0,
+      points: 0,
+      setsWon: 0,
+      setsLost: 0,
+      currentStreak: 0,
+      recentMatches: [],
+    });
+    return;
+  }
+
+  const [allMatches, allMatchPlayers, allPlayersList] = await Promise.all([
+    db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
+    db.select().from(matchPlayersTable),
+    db.select().from(playersTable),
+  ]);
+
+  const playerMatches = allMatches.filter((m) => matchIds.includes(m.id));
+
+  const mpByMatchId: Record<number, typeof matchPlayersTable.$inferSelect[]> = {};
+  for (const mp of allMatchPlayers) {
+    if (matchIds.includes(mp.matchId)) {
+      if (!mpByMatchId[mp.matchId]) mpByMatchId[mp.matchId] = [];
+      mpByMatchId[mp.matchId].push(mp);
     }
   }
 
-  const totalMatches = playerMatches.length;
-  const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
-  const points = wins * 3;
-
-  let currentStreak = 0;
-  for (const match of playerMatches) {
-    const onTeam1 = match.team1Player1Id === playerId || match.team1Player2Id === playerId;
-    const won = onTeam1 ? match.team1SetsWon > match.team2SetsWon : match.team2SetsWon > match.team1SetsWon;
-    if (won) currentStreak++;
-    else break;
-  }
-
-  const allPlayersList = await db.select().from(playersTable);
   const playerMap: Record<number, string> = {};
   for (const p of allPlayersList) playerMap[p.id] = p.name;
 
-  const recentMatches = playerMatches.slice(0, 5).map((m) => ({
-    id: m.id,
-    team1Player1Id: m.team1Player1Id,
-    team1Player2Id: m.team1Player2Id,
-    team2Player1Id: m.team2Player1Id,
-    team2Player2Id: m.team2Player2Id,
-    team1SetsWon: m.team1SetsWon,
-    team2SetsWon: m.team2SetsWon,
-    sets: m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>,
-    playedAt: m.playedAt.toISOString(),
-    createdAt: m.createdAt.toISOString(),
-    team1Player1Name: playerMap[m.team1Player1Id] ?? null,
-    team1Player2Name: playerMap[m.team1Player2Id] ?? null,
-    team2Player1Name: playerMap[m.team2Player1Id] ?? null,
-    team2Player2Name: playerMap[m.team2Player2Id] ?? null,
-  }));
+  let wins = 0, losses = 0, draws = 0, setsWon = 0, setsLost = 0;
+  for (const match of playerMatches) {
+    const matchPlayers = mpByMatchId[match.id] ?? [];
+    const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
+    if (!myEntry) continue;
+    const onTeam1 = myEntry.team === "team1";
+
+    if (match.result === "draw") {
+      draws++;
+    } else {
+      const won = onTeam1 ? match.result === "team1" : match.result === "team2";
+      if (won) wins++; else losses++;
+    }
+    setsWon += onTeam1 ? match.team1Score : match.team2Score;
+    setsLost += onTeam1 ? match.team2Score : match.team1Score;
+  }
+
+  const totalMatches = wins + losses + draws;
+  const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+  const points = wins * 3 + draws;
+
+  let currentStreak = 0;
+  for (const match of playerMatches) {
+    const matchPlayers = mpByMatchId[match.id] ?? [];
+    const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
+    if (!myEntry) break;
+    const onTeam1 = myEntry.team === "team1";
+    const won = onTeam1 ? match.result === "team1" : match.result === "team2";
+    if (won) currentStreak++; else break;
+  }
+
+  const recentMatches = playerMatches.slice(0, 5).map((m) => {
+    const matchPlayers = mpByMatchId[m.id] ?? [];
+    const team1Players = matchPlayers
+      .filter((mp) => mp.team === "team1")
+      .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+    const team2Players = matchPlayers
+      .filter((mp) => mp.team === "team2")
+      .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+    return {
+      id: m.id,
+      team1Players,
+      team2Players,
+      team1Score: m.team1Score,
+      team2Score: m.team2Score,
+      result: m.result,
+      sets: m.sets,
+      playedAt: m.playedAt.toISOString(),
+      createdAt: m.createdAt.toISOString(),
+    };
+  });
 
   res.json({
     playerId,
@@ -174,6 +213,7 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     totalMatches,
     wins,
     losses,
+    draws,
     winRate,
     points,
     setsWon,

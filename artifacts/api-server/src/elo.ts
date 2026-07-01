@@ -1,3 +1,11 @@
+/**
+ * Professional Elo rating system for padel and other sports.
+ * K = 32 (standard for active players)
+ * Starting Elo = 1500
+ * Each player's expected score is computed against the opposing team's average Elo.
+ * Supports variable team sizes and draws.
+ */
+
 export const K_FACTOR = 32;
 export const STARTING_ELO = 1500;
 
@@ -20,6 +28,7 @@ export function calculateMatchEloChanges(
 ): EloChangeResult[] {
   const team1Avg = team1.reduce((s, p) => s + p.elo, 0) / team1.length;
   const team2Avg = team2.reduce((s, p) => s + p.elo, 0) / team2.length;
+
   const results: EloChangeResult[] = [];
 
   for (const player of team1) {

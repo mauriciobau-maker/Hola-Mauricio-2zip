@@ -18,7 +18,8 @@ router.get("/notificaciones/config", (_req: Request, res: Response) => {
 
 // GET /notificaciones/suscripciones/:playerId
 router.get("/notificaciones/suscripciones/:playerId", async (req: Request, res: Response): Promise<void> => {
-  const playerId = parseInt(req.params.playerId, 10);
+  const rawPlayerId = Array.isArray(req.params.playerId) ? req.params.playerId[0] : req.params.playerId;
+  const playerId = parseInt(rawPlayerId, 10);
   if (isNaN(playerId)) { res.status(400).json({ error: "ID inválido" }); return; }
 
   const rows = await db
@@ -39,7 +40,8 @@ router.get("/notificaciones/suscripciones/:playerId", async (req: Request, res: 
 router.post("/notificaciones/suscripciones/:playerId", async (req: Request, res: Response): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "No autenticado" }); return; }
 
-  const playerId = parseInt(req.params.playerId, 10);
+  const rawPlayerId2 = Array.isArray(req.params.playerId) ? req.params.playerId[0] : req.params.playerId;
+  const playerId = parseInt(rawPlayerId2, 10);
   if (isNaN(playerId)) { res.status(400).json({ error: "ID inválido" }); return; }
 
   const parsed = SubscriptionSchema.safeParse(req.body);
@@ -87,7 +89,8 @@ router.post("/notificaciones/suscripciones/:playerId", async (req: Request, res:
 router.delete("/notificaciones/suscripciones/:id", async (req: Request, res: Response): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "No autenticado" }); return; }
 
-  const id = parseInt(req.params.id, 10);
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
 
   await db.delete(notificationSubscriptionsTable).where(eq(notificationSubscriptionsTable.id, id));
