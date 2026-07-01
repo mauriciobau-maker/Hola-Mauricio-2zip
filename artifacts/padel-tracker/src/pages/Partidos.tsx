@@ -12,14 +12,12 @@ import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-ES", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
   });
 }
 
 type EloChange = { playerId: number; playerName: string; eloBefore: number; eloAfter: number; eloChange: number };
+type TeamPlayer = { id: number; name: string };
 
 export default function Partidos() {
   const { data: matches, isLoading } = useListMatches();
@@ -35,7 +33,7 @@ export default function Partidos() {
   });
 
   const handleDelete = (id: number) => {
-    if (confirm("Eliminar este partido? Esta accion no se puede deshacer.")) {
+    if (confirm("¿Eliminar este partido? Esta acción no se puede deshacer.")) {
       deleteMutation.mutate({ id });
     }
   };
@@ -53,8 +51,7 @@ export default function Partidos() {
           href="/partidos/nuevo"
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
-          <Plus size={15} />
-          Registrar
+          <Plus size={15} /> Registrar
         </Link>
       </div>
 
@@ -70,7 +67,7 @@ export default function Partidos() {
             <Calendar size={28} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="font-semibold">Sin partidos aun</p>
+            <p className="font-semibold">Sin partidos aún</p>
             <p className="text-sm text-muted-foreground">Registra el primer partido para empezar</p>
           </div>
           <Link
@@ -82,47 +79,53 @@ export default function Partidos() {
         </div>
       ) : (
         <div className="space-y-2">
-          {matches.map((m) => {
-            const team1Won = m.team1SetsWon > m.team2SetsWon;
-            const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }>;
-            const eloChanges = (m.eloChanges ?? []) as EloChange[];
-            const team1Changes = eloChanges.filter(
-              (c) => c.playerId === m.team1Player1Id || c.playerId === m.team1Player2Id,
-            );
-            const team2Changes = eloChanges.filter(
-              (c) => c.playerId === m.team2Player1Id || c.playerId === m.team2Player2Id,
-            );
+          {matches.map((m: any) => {
+            const team1Players: TeamPlayer[] = m.team1Players ?? [];
+            const team2Players: TeamPlayer[] = m.team2Players ?? [];
+            const team1Won = m.result === "team1";
+            const isDraw = m.result === "draw";
+            const eloChanges: EloChange[] = m.eloChanges ?? [];
+            const team1Ids = team1Players.map((p) => p.id);
+            const team2Ids = team2Players.map((p) => p.id);
+            const team1EloChanges = eloChanges.filter((c) => team1Ids.includes(c.playerId));
+            const team2EloChanges = eloChanges.filter((c) => team2Ids.includes(c.playerId));
+            const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | null;
 
             return (
               <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
+                {/* Sport badge */}
+                {m.sportName && (
+                  <div className="mb-2">
+                    <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                      {m.sportName}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     {/* Team 1 */}
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span
-                        className={cn(
-                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                          team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {team1Won ? "GANADOR" : "PERDEDOR"}
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        team1Won ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {team1Won ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
                       </span>
                       <p className="text-sm font-medium truncate">
-                        {m.team1Player1Name} / {m.team1Player2Name}
+                        {team1Players.map((p) => p.name).join(" / ") || "—"}
                       </p>
                     </div>
                     {/* Team 2 */}
                     <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                          !team1Won ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {!team1Won ? "GANADOR" : "PERDEDOR"}
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        !team1Won && !isDraw ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {!team1Won && !isDraw ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
                       </span>
                       <p className="text-sm font-medium truncate">
-                        {m.team2Player1Name} / {m.team2Player2Name}
+                        {team2Players.map((p) => p.name).join(" / ") || "—"}
                       </p>
                     </div>
                   </div>
@@ -132,14 +135,16 @@ export default function Partidos() {
                     <div className="text-center">
                       <p className="text-2xl font-bold tabular-nums">
                         <span className={team1Won ? "text-primary" : "text-muted-foreground"}>
-                          {m.team1SetsWon}
+                          {m.team1Score}
                         </span>
                         <span className="text-muted-foreground mx-1 text-lg">-</span>
-                        <span className={!team1Won ? "text-primary" : "text-muted-foreground"}>
-                          {m.team2SetsWon}
+                        <span className={!team1Won && !isDraw ? "text-primary" : "text-muted-foreground"}>
+                          {m.team2Score}
                         </span>
                       </p>
-                      <p className="text-xs text-muted-foreground">sets</p>
+                      <p className="text-xs text-muted-foreground">
+                        {sets && sets.length > 0 ? "sets" : "goles"}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Link
@@ -159,7 +164,7 @@ export default function Partidos() {
                   </div>
                 </div>
 
-                {/* Sets detail + date */}
+                {/* Sets detail */}
                 {sets && sets.length > 0 && (
                   <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
                     {sets.map((s) => (
@@ -173,11 +178,17 @@ export default function Partidos() {
                   </div>
                 )}
 
+                {!sets && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt)}</span>
+                  </div>
+                )}
+
                 {/* Elo changes */}
                 {eloChanges.length > 0 && (
                   <div className="mt-2.5 pt-2.5 border-t border-border">
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {[...team1Changes, ...team2Changes].map((c) => (
+                      {[...team1EloChanges, ...team2EloChanges].map((c) => (
                         <EloChangePill key={c.playerId} change={c} />
                       ))}
                     </div>
@@ -205,12 +216,10 @@ function EloChangePill({ change }: { change: EloChange }) {
       <span className="text-muted-foreground truncate max-w-[80px]">
         {change.playerName.split(" ")[0]}
       </span>
-      <span
-        className={cn(
-          "font-bold tabular-nums",
-          positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
-        )}
-      >
+      <span className={cn(
+        "font-bold tabular-nums",
+        positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
+      )}>
         {positive ? "+" : ""}{change.eloChange}
       </span>
       <span className="text-muted-foreground/60 tabular-nums">({change.eloAfter})</span>
