@@ -18,6 +18,7 @@ import { Encuentros } from "@/pages/Encuentros";
 import { EncuentroDetalle } from "@/pages/EncuentroDetalle";
 import { NuevoEncuentro } from "@/pages/NuevoEncuentro";
 import { VincularJugador } from "@/pages/VincularJugador";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
         <Route path="/encuentros/:id" component={EncuentroDetalle} />
         <Route path="/vincular" component={VincularJugador} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
