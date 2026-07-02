@@ -19,4 +19,6 @@ export interface AuthUser {
   /** @nullable */
   playerId?: number | null;
   isAdmin?: number;
+  /** @nullable */
+  clubId?: number | null;
 }

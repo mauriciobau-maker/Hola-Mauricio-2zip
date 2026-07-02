@@ -1,3 +1,4 @@
+export * from "./clubs";
 export * from "./players";
 export * from "./sports";
 export * from "./matches";

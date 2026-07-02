@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { clubsTable } from "./clubs";
 
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessionsTable = pgTable(
@@ -21,6 +22,7 @@ export const usersTable = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   playerId: integer("player_id"),
   isAdmin: integer("is_admin").notNull().default(0),
+  clubId: integer("club_id").references(() => clubsTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

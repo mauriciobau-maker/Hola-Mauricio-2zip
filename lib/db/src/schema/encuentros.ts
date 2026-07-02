@@ -1,4 +1,5 @@
 import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { clubsTable } from "./clubs";
 
 export const encuentrosTable = pgTable("encuentros", {
   id: serial("id").primaryKey(),
@@ -8,6 +9,7 @@ export const encuentrosTable = pgTable("encuentros", {
   maxSpots: integer("max_spots"),
   notes: text("notes"),
   organizerId: text("organizer_id"),
+  clubId: integer("club_id").references(() => clubsTable.id),
   notificationEmail: boolean("notification_email").notNull().default(false),
   notificationWhatsapp: boolean("notification_whatsapp").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
