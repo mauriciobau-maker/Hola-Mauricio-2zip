@@ -6,6 +6,7 @@ import matchesRouter from "./matches";
 import rankingRouter from "./ranking";
 import parejasRouter from "./parejas";
 import encuentrosRouter from "./encuentros";
+import clubRouter from "./club";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(matchesRouter);
 router.use(rankingRouter);
 router.use(parejasRouter);
 router.use(encuentrosRouter);
+router.use(clubRouter);
 
 export default router;
