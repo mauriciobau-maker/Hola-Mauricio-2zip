@@ -60,9 +60,9 @@ export default function Dashboard() {
         />
         <StatCard
           icon={<Trophy size={18} className="text-yellow-400" />}
-          label="Lider"
+          label="Líder"
           value={dashboard?.topPlayer?.name ?? "—"}
-          sub={dashboard?.topPlayer ? `${dashboard.topPlayer.points} pts` : undefined}
+          sub={dashboard?.topPlayer ? `${dashboard.topPlayer.elo ?? dashboard.topPlayer.points ?? ""} pts` : undefined}
           href="/ranking"
         />
         <StatCard
@@ -78,7 +78,7 @@ export default function Dashboard() {
         {/* Recent matches */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-sm">Ultimos Partidos</h2>
+            <h2 className="font-semibold text-sm">Últimos Partidos</h2>
             <Link href="/partidos" className="text-xs text-primary hover:underline flex items-center gap-0.5">
               Ver todos <ChevronRight size={12} />
             </Link>
@@ -90,7 +90,7 @@ export default function Dashboard() {
             />
           ) : (
             <div className="divide-y divide-border">
-              {dashboard.recentMatches.map((m) => (
+              {dashboard.recentMatches.map((m: any) => (
                 <MatchRow key={m.id} match={m} />
               ))}
             </div>
@@ -112,7 +112,7 @@ export default function Dashboard() {
             />
           ) : (
             <div className="divide-y divide-border">
-              {top5.map((entry) => (
+              {top5.map((entry: any) => (
                 <Link
                   key={entry.playerId}
                   href={`/jugadores/${entry.playerId}`}
@@ -132,9 +132,11 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{entry.playerName}</p>
-                    <p className="text-xs text-muted-foreground">{entry.wins}V / {entry.losses}D</p>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.wins}V / {entry.losses}D{entry.draws > 0 ? ` / ${entry.draws}E` : ""}
+                    </p>
                   </div>
-                  <span className="font-bold text-primary text-sm">{entry.points} pts</span>
+                  <span className="font-bold text-primary text-sm">{entry.elo ?? entry.points} pts</span>
                 </Link>
               ))}
             </div>
@@ -145,13 +147,7 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  href,
-}: {
+function StatCard({ icon, label, value, sub, href }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
@@ -172,35 +168,41 @@ function StatCard({
 }
 
 function MatchRow({ match }: { match: any }) {
-  const team1Won = match.team1SetsWon > match.team2SetsWon;
+  const team1Players: Array<{ id: number; name: string }> = match.team1Players ?? [];
+  const team2Players: Array<{ id: number; name: string }> = match.team2Players ?? [];
+  const team1Won = match.result === "team1";
+  const isDraw = match.result === "draw";
+
+  const team1Names = team1Players.map((p) => p.name).join(" / ") || "—";
+  const team2Names = team2Players.map((p) => p.name).join(" / ") || "—";
+
   return (
-    <Link href={`/partidos`} className="block px-4 py-3 hover:bg-muted/30 transition-colors">
+    <Link href="/partidos" className="block px-4 py-3 hover:bg-muted/30 transition-colors">
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate">
-            {match.team1Player1Name} / {match.team1Player2Name}
+          <p className={cn("text-xs font-medium truncate", team1Won ? "text-primary" : "text-foreground/70")}>
+            {team1Names}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {match.team2Player1Name} / {match.team2Player2Name}
+          <p className={cn("text-xs truncate", !team1Won && !isDraw ? "text-primary font-medium" : "text-muted-foreground")}>
+            {team2Names}
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className={cn(
-            "text-sm font-bold tabular-nums",
-            team1Won ? "text-primary" : "text-muted-foreground"
-          )}>
-            {match.team1SetsWon}
+          <span className={cn("text-sm font-bold tabular-nums", team1Won ? "text-primary" : "text-muted-foreground")}>
+            {match.team1Score ?? 0}
           </span>
           <span className="text-muted-foreground text-xs">-</span>
-          <span className={cn(
-            "text-sm font-bold tabular-nums",
-            !team1Won ? "text-primary" : "text-muted-foreground"
-          )}>
-            {match.team2SetsWon}
+          <span className={cn("text-sm font-bold tabular-nums", !team1Won && !isDraw ? "text-primary" : "text-muted-foreground")}>
+            {match.team2Score ?? 0}
           </span>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground mt-1">{formatDate(match.playedAt)}</p>
+      <div className="flex items-center justify-between mt-1">
+        <p className="text-xs text-muted-foreground">{formatDate(match.playedAt)}</p>
+        {match.sportName && (
+          <span className="text-xs text-muted-foreground/60">{match.sportName}</span>
+        )}
+      </div>
     </Link>
   );
 }
