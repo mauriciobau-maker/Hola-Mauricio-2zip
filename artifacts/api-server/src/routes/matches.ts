@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc } from "drizzle-orm";
-import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable, sportsTable } from "@workspace/db";
+import { eq, desc, asc, and } from "drizzle-orm";
+import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable, sportsTable, clubSportsTable } from "@workspace/db";
 import { calculateMatchEloChanges, STARTING_ELO } from "../elo";
 
 const router: IRouter = Router();
@@ -132,8 +132,11 @@ async function enrichMatch(m: typeof matchesTable.$inferSelect) {
 }
 
 // GET /matches
-router.get("/matches", async (_req, res): Promise<void> => {
-  const matches = await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt));
+router.get("/matches", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const matches = clubId
+    ? await db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)).orderBy(desc(matchesTable.playedAt))
+    : await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt));
   const result = await Promise.all(matches.map((m) => enrichMatch(m)));
   res.json(result);
 });
@@ -172,11 +175,14 @@ router.post("/matches", async (req, res): Promise<void> => {
   if (t1Score > t2Score) result = "team1";
   else if (t2Score > t1Score) result = "team2";
 
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId ?? null;
+
   // Insertar partido
   const [match] = await db
     .insert(matchesTable)
     .values({
       sportId,
+      clubId,
       team1Score: t1Score,
       team2Score: t2Score,
       sets: sets ?? null,
@@ -268,8 +274,33 @@ router.delete("/matches/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-// GET /sports — lista deportes disponibles
-router.get("/sports", async (_req, res): Promise<void> => {
+// GET /sports — lista deportes disponibles del club (o todos si sin club)
+router.get("/sports", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+
+  if (clubId) {
+    const sports = await db
+      .select({
+        id: sportsTable.id,
+        name: sportsTable.name,
+        slug: sportsTable.slug,
+        teamSize: sportsTable.teamSize,
+        useSets: sportsTable.useSets,
+        active: sportsTable.active,
+      })
+      .from(sportsTable)
+      .innerJoin(clubSportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+      .where(
+        and(
+          eq(clubSportsTable.clubId, clubId),
+          eq(clubSportsTable.active, true),
+          eq(sportsTable.active, true),
+        ),
+      );
+    res.json(sports);
+    return;
+  }
+
   const sports = await db.select().from(sportsTable).where(eq(sportsTable.active, true));
   res.json(sports);
 });
