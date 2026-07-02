@@ -2,7 +2,7 @@ import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as z from "zod";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, clubsTable } from "@workspace/db";
 import {
   clearSession,
   getOidcConfig,
@@ -67,9 +67,7 @@ async function upsertUser(claims: Record<string, unknown>) {
     email: (claims.email as string) || null,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as
-      | string
-      | null,
+    profileImageUrl: (claims.profile_image_url || claims.picture) as string | null,
   };
 
   const [user] = await db
@@ -77,19 +75,41 @@ async function upsertUser(claims: Record<string, unknown>) {
     .values(userData)
     .onConflictDoUpdate({
       target: usersTable.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
+      set: { ...userData, updatedAt: new Date() },
     })
     .returning();
   return user;
 }
 
-router.get("/auth/user", (req: Request, res: Response) => {
-  res.json({
-    user: req.isAuthenticated() ? req.user : null,
-  });
+// Carga el club del usuario si tiene clubId
+async function getUserWithClub(userId: string) {
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user) return null;
+
+  let club = null;
+  if (user.clubId) {
+    const [c] = await db
+      .select({ id: clubsTable.id, name: clubsTable.name, slug: clubsTable.slug, plan: clubsTable.plan })
+      .from(clubsTable)
+      .where(eq(clubsTable.id, user.clubId));
+    club = c ?? null;
+  }
+
+  return { ...user, club };
+}
+
+router.get("/auth/user", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || !req.user) {
+    res.json({ user: null });
+    return;
+  }
+
+  const userWithClub = await getUserWithClub(req.user.id);
+  res.json({ user: userWithClub });
 });
 
 router.post("/auth/link-player", async (req: Request, res: Response) => {
@@ -113,7 +133,6 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
 router.get("/login", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
-
   const returnTo = getSafeReturnTo(req.query.returnTo);
 
   const state = oidc.randomState();
@@ -139,8 +158,6 @@ router.get("/login", async (req: Request, res: Response) => {
   res.redirect(redirectTo.href);
 });
 
-// Query params are not validated because the OIDC provider may include
-// parameters not expressed in the schema.
 router.get("/callback", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
@@ -184,9 +201,7 @@ router.get("/callback", async (req: Request, res: Response) => {
     return;
   }
 
-  const dbUser = await upsertUser(
-    claims as unknown as Record<string, unknown>,
-  );
+  const dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
@@ -196,6 +211,8 @@ router.get("/callback", async (req: Request, res: Response) => {
       firstName: dbUser.firstName,
       lastName: dbUser.lastName,
       profileImageUrl: dbUser.profileImageUrl,
+      clubId: dbUser.clubId ?? null,
+      isAdmin: dbUser.isAdmin,
     },
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -222,64 +239,61 @@ router.get("/logout", async (req: Request, res: Response) => {
   res.redirect(endSessionUrl.href);
 });
 
-router.post(
-  "/mobile-auth/token-exchange",
-  async (req: Request, res: Response) => {
-    const parsed = ExchangeMobileAuthorizationCodeBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Missing or invalid required parameters" });
+router.post("/mobile-auth/token-exchange", async (req: Request, res: Response) => {
+  const parsed = ExchangeMobileAuthorizationCodeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Missing or invalid required parameters" });
+    return;
+  }
+
+  const { code, code_verifier, redirect_uri, state, nonce } = parsed.data;
+
+  try {
+    const config = await getOidcConfig();
+
+    const callbackUrl = new URL(redirect_uri);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("state", state);
+    callbackUrl.searchParams.set("iss", ISSUER_URL);
+
+    const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
+      pkceCodeVerifier: code_verifier,
+      expectedNonce: nonce ?? undefined,
+      expectedState: state,
+      idTokenExpected: true,
+    });
+
+    const claims = tokens.claims();
+    if (!claims) {
+      res.status(401).json({ error: "No claims in ID token" });
       return;
     }
 
-    const { code, code_verifier, redirect_uri, state, nonce } = parsed.data;
+    const dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
 
-    try {
-      const config = await getOidcConfig();
+    const now = Math.floor(Date.now() / 1000);
+    const sessionData: SessionData = {
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        firstName: dbUser.firstName,
+        lastName: dbUser.lastName,
+        profileImageUrl: dbUser.profileImageUrl,
+        clubId: dbUser.clubId ?? null,
+        isAdmin: dbUser.isAdmin,
+      },
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
+    };
 
-      const callbackUrl = new URL(redirect_uri);
-      callbackUrl.searchParams.set("code", code);
-      callbackUrl.searchParams.set("state", state);
-      callbackUrl.searchParams.set("iss", ISSUER_URL);
-
-      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
-        pkceCodeVerifier: code_verifier,
-        expectedNonce: nonce ?? undefined,
-        expectedState: state,
-        idTokenExpected: true,
-      });
-
-      const claims = tokens.claims();
-      if (!claims) {
-        res.status(401).json({ error: "No claims in ID token" });
-        return;
-      }
-
-      const dbUser = await upsertUser(
-        claims as unknown as Record<string, unknown>,
-      );
-
-      const now = Math.floor(Date.now() / 1000);
-      const sessionData: SessionData = {
-        user: {
-          id: dbUser.id,
-          email: dbUser.email,
-          firstName: dbUser.firstName,
-          lastName: dbUser.lastName,
-          profileImageUrl: dbUser.profileImageUrl,
-        },
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
-      };
-
-      const sid = await createSession(sessionData);
-      res.json({ token: sid });
-    } catch (err) {
-      req.log.error({ err }, "Mobile token exchange error");
-      res.status(500).json({ error: "Token exchange failed" });
-    }
-  },
-);
+    const sid = await createSession(sessionData);
+    res.json({ token: sid });
+  } catch (err) {
+    req.log.error({ err }, "Mobile token exchange error");
+    res.status(500).json({ error: "Token exchange failed" });
+  }
+});
 
 router.post("/mobile-auth/logout", async (req: Request, res: Response) => {
   const sid = getSessionId(req);
