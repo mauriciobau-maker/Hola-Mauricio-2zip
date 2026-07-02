@@ -37,7 +37,8 @@ router.post("/players", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [player] = await db.insert(playersTable).values(parsed.data).returning();
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId ?? null;
+  const [player] = await db.insert(playersTable).values({ ...parsed.data, clubId }).returning();
   res.status(201).json(toPlayerResponse(player));
 });
 

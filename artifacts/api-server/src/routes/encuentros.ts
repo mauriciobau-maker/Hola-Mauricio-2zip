@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, encuentrosTable, asistenciaTable, playersTable, usersTable } from "@workspace/db";
 import * as z from "zod";
 
@@ -68,8 +68,11 @@ async function getAsistenciaList(encuentroId: number) {
 }
 
 // GET /encuentros
-router.get("/encuentros", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(encuentrosTable).orderBy(desc(encuentrosTable.dateTime));
+router.get("/encuentros", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const rows = clubId
+    ? await db.select().from(encuentrosTable).where(eq(encuentrosTable.clubId, clubId)).orderBy(desc(encuentrosTable.dateTime))
+    : await db.select().from(encuentrosTable).orderBy(desc(encuentrosTable.dateTime));
   const result = await Promise.all(rows.map(enrichEncuentro));
   res.json(result);
 });
@@ -87,6 +90,8 @@ router.post("/encuentros", async (req, res): Promise<void> => {
   }
   const { title, dateTime, location, maxSpots, notes, playerIds, notificationEmail, notificationWhatsapp } = parsed.data;
 
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId ?? null;
+
   const [encuentro] = await db
     .insert(encuentrosTable)
     .values({
@@ -96,6 +101,7 @@ router.post("/encuentros", async (req, res): Promise<void> => {
       maxSpots: maxSpots ?? null,
       notes: notes ?? null,
       organizerId: req.user.id,
+      clubId,
       notificationEmail: notificationEmail ?? false,
       notificationWhatsapp: notificationWhatsapp ?? false,
     })
@@ -120,7 +126,11 @@ router.get("/encuentros/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
 
-  const [encuentro] = await db.select().from(encuentrosTable).where(eq(encuentrosTable.id, id));
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const whereClause = clubId
+    ? and(eq(encuentrosTable.id, id), eq(encuentrosTable.clubId, clubId))
+    : eq(encuentrosTable.id, id);
+  const [encuentro] = await db.select().from(encuentrosTable).where(whereClause);
   if (!encuentro) { res.status(404).json({ error: "No encontrado" }); return; }
 
   const asistencia = await getAsistenciaList(id);
