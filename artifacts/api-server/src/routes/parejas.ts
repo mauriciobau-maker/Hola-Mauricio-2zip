@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -18,10 +18,15 @@ function sortedPair(a: number, b: number): ParejaKey {
 }
 function pairKey(p: ParejaKey): string { return `${p.p1}_${p.p2}`; }
 
-router.get("/parejas", async (_req, res): Promise<void> => {
+router.get("/parejas", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
   const [matches, players, allMatchPlayers] = await Promise.all([
-    db.select().from(matchesTable),
-    db.select().from(playersTable),
+    clubId
+      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId))
+      : db.select().from(matchesTable),
+    clubId
+      ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
+      : db.select().from(playersTable),
     db.select().from(matchPlayersTable),
   ]);
 

@@ -1,13 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db, matchesTable, playersTable, matchPlayersTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-router.get("/ranking", async (_req, res): Promise<void> => {
+router.get("/ranking", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
   const [players, matches, allMatchPlayers] = await Promise.all([
-    db.select().from(playersTable),
-    db.select().from(matchesTable),
+    clubId
+      ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
+      : db.select().from(playersTable),
+    clubId
+      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId))
+      : db.select().from(matchesTable),
     db.select().from(matchPlayersTable),
   ]);
 
@@ -65,10 +70,15 @@ router.get("/ranking", async (_req, res): Promise<void> => {
   res.json(ranking);
 });
 
-router.get("/dashboard", async (_req, res): Promise<void> => {
+router.get("/dashboard", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
   const [players, allMatches, allMatchPlayers] = await Promise.all([
-    db.select().from(playersTable),
-    db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
+    clubId
+      ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
+      : db.select().from(playersTable),
+    clubId
+      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)).orderBy(desc(matchesTable.playedAt))
+      : db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
     db.select().from(matchPlayersTable),
   ]);
 

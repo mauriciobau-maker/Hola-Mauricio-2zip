@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and } from "drizzle-orm";
 import { db, playersTable, matchesTable, eloHistoryTable, matchPlayersTable } from "@workspace/db";
 import {
   CreatePlayerBody,
@@ -23,8 +23,11 @@ function toPlayerResponse(p: typeof playersTable.$inferSelect) {
   };
 }
 
-router.get("/players", async (_req, res): Promise<void> => {
-  const players = await db.select().from(playersTable).orderBy(playersTable.name);
+router.get("/players", async (req, res): Promise<void> => {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const players = clubId
+    ? await db.select().from(playersTable).where(eq(playersTable.clubId, clubId)).orderBy(playersTable.name)
+    : await db.select().from(playersTable).orderBy(playersTable.name);
   res.json(players.map(toPlayerResponse));
 });
 
@@ -45,7 +48,11 @@ router.get("/players/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [player] = await db.select().from(playersTable).where(eq(playersTable.id, params.data.id));
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const whereClause = clubId
+    ? and(eq(playersTable.id, params.data.id), eq(playersTable.clubId, clubId))
+    : eq(playersTable.id, params.data.id);
+  const [player] = await db.select().from(playersTable).where(whereClause);
   if (!player) {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
