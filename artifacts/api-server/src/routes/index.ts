@@ -7,6 +7,7 @@ import rankingRouter from "./ranking";
 import parejasRouter from "./parejas";
 import encuentrosRouter from "./encuentros";
 import clubRouter from "./club";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(rankingRouter);
 router.use(parejasRouter);
 router.use(encuentrosRouter);
 router.use(clubRouter);
+router.use(adminRouter);
 
 export default router;
