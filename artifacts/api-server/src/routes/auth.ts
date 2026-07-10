@@ -70,18 +70,24 @@ async function upsertUser(claims: Record<string, unknown>) {
     profileImageUrl: (claims.profile_image_url || claims.picture) as string | null,
   };
 
+  // Solo actualiza campos de perfil — nunca sobreescribe clubId ni isAdmin
   const [user] = await db
     .insert(usersTable)
     .values(userData)
     .onConflictDoUpdate({
       target: usersTable.id,
-      set: { ...userData, updatedAt: new Date() },
+      set: {
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        profileImageUrl: userData.profileImageUrl,
+        updatedAt: new Date(),
+      },
     })
     .returning();
   return user;
 }
 
-// Carga el club del usuario si tiene clubId
 async function getUserWithClub(userId: string) {
   const [user] = await db
     .select()
@@ -128,6 +134,44 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     .where(eq(usersTable.id, req.user.id))
     .returning();
   res.json({ user: updated });
+});
+// POST /auth/join-club — usuario ingresa código de invitación
+router.post("/auth/join-club", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+  const { inviteCode } = req.body;
+  if (!inviteCode || typeof inviteCode !== "string") {
+    res.status(400).json({ error: "Código de invitación requerido" });
+    return;
+  }
+
+  const [club] = await db
+    .select()
+    .from(clubsTable)
+    .where(eq(clubsTable.inviteCode, inviteCode.toUpperCase().trim()));
+
+  if (!club) {
+    res.status(404).json({ error: "Código de invitación inválido" });
+    return;
+  }
+  if (!club.active) {
+    res.status(403).json({ error: "Este club no está activo" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ clubId: club.id, updatedAt: new Date() })
+    .where(eq(usersTable.id, req.user.id))
+    .returning();
+
+  res.json({ 
+    success: true, 
+    club: { id: club.id, name: club.name, slug: club.slug },
+    user: updated,
+  });
 });
 
 router.get("/login", async (req: Request, res: Response) => {

@@ -1,5 +1,5 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -10,9 +10,11 @@ import {
   X,
   Handshake,
   CalendarDays,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
+import { useAuth } from "@workspace/replit-auth-web";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -23,9 +25,18 @@ const navItems = [
   { href: "/encuentros", label: "Encuentros", icon: CalendarDays },
 ];
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  export default function Layout({ children }: { children: React.ReactNode }) {
+    const [location, navigate] = useLocation();
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const { user, isLoading } = useAuth();
+    const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0);
+
+    // Redirigir a onboarding si está autenticado pero sin club
+    useEffect(() => {
+      if (!isLoading && user && !(user as any).clubId && location !== "/onboarding" && location !== "/vincular") {
+        navigate("/onboarding");
+      }
+    }, [user, isLoading, location]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -55,6 +66,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  location === "/admin"
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Shield size={15} />
+                Admin
+              </Link>
+            )}
           </nav>
 
           <div className="hidden md:flex items-center gap-2">
@@ -99,6 +124,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  location === "/admin"
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Shield size={16} />
+                Admin
+              </Link>
+            )}
             <Link
               href="/partidos/nuevo"
               onClick={() => setMobileOpen(false)}
@@ -131,6 +171,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {item.label}
           </Link>
         ))}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
+              location === "/admin" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <Shield size={20} />
+            Admin
+          </Link>
+        )}
       </nav>
       <div className="md:hidden h-16" />
     </div>

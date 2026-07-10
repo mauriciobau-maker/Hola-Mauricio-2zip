@@ -9,6 +9,7 @@ export const clubsTable = pgTable("clubs", {
   slug: text("slug").notNull().unique(),
   plan: text("plan").notNull().default("basic"),
   active: boolean("active").notNull().default(true),
+  inviteCode: text("invite_code").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

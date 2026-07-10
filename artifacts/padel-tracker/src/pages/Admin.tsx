@@ -204,7 +204,21 @@ export default function Admin() {
                 </div>
                 <div>
                   <p className="font-semibold">{club.name}</p>
-                  <p className="text-xs text-muted-foreground">/{club.slug} · Plan {club.plan}</p>
+                <p className="text-xs text-muted-foreground">/{club.slug} · Plan {club.plan}</p>
+                {(club as any).inviteCode && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-muted-foreground">Código:</span>
+                    <span className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-widest">
+                      {(club as any).inviteCode}
+                    </span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText((club as any).inviteCode)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                )}
                 </div>
               </div>
               <button

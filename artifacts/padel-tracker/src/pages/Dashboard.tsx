@@ -62,7 +62,7 @@ export default function Dashboard() {
           icon={<Trophy size={18} className="text-yellow-400" />}
           label="Líder"
           value={dashboard?.topPlayer?.name ?? "—"}
-          sub={dashboard?.topPlayer ? `${dashboard.topPlayer.elo ?? dashboard.topPlayer.points ?? ""} pts` : undefined}
+          sub={dashboard?.topPlayer ? `${(dashboard.topPlayer as any).elo ?? dashboard.topPlayer.points ?? ""} pts` : undefined}
           href="/ranking"
         />
         <StatCard
