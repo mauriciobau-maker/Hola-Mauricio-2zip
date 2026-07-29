@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { cobrosTable } from "@workspace/db/schema";
+import { cobrosTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();

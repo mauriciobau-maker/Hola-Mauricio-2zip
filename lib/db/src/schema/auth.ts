@@ -20,6 +20,10 @@ export const usersTable = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  // Nombre de display para admins creados manualmente (no tienen OIDC login)
+  name: varchar("name"),
+  nickname: varchar("nickname"),
+  phone: varchar("phone"),
   playerId: integer("player_id"),
   isAdmin: integer("is_admin").notNull().default(0),
   isClubAdmin: integer("is_club_admin").notNull().default(0),

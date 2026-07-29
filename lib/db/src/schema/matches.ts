@@ -22,6 +22,8 @@ export const matchesTable = pgTable("matches", {
   team2Score: integer("team2_score").notNull().default(0),
   sets: jsonb("sets").$type<SetScore[]>(),
   result: text("result").notNull(),
+  // Estado del partido: pending_confirmation | confirmed
+  status: text("status").notNull().default("pending_confirmation"),
   playedAt: timestamp("played_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

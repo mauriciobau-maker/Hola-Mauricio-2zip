@@ -27,8 +27,14 @@ router.get("/ranking", async (req, res): Promise<void> => {
 
   for (const m of matches) {
     const matchPlayers = mpByMatchId[m.id] ?? [];
-    const team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
-    const team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
+    let team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
+    let team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
+
+    // Respaldo por si no se usó la tabla match_players
+    if (team1Ids.length === 0 && team2Ids.length === 0) {
+      team1Ids = [m.team1Player1Id, m.team1Player2Id].filter((id): id is number => id != null);
+      team2Ids = [m.team2Player1Id, m.team2Player2Id].filter((id): id is number => id != null);
+    }
 
     if (m.result === "draw") {
       for (const id of [...team1Ids, ...team2Ids]) {
@@ -93,8 +99,13 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 
   for (const m of allMatches) {
     const matchPlayers = mpByMatchId[m.id] ?? [];
-    const team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
-    const team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
+    let team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
+    let team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
+
+    if (team1Ids.length === 0 && team2Ids.length === 0) {
+      team1Ids = [m.team1Player1Id, m.team1Player2Id].filter((id): id is number => id != null);
+      team2Ids = [m.team2Player1Id, m.team2Player2Id].filter((id): id is number => id != null);
+    }
 
     if (m.result === "draw") {
       for (const id of [...team1Ids, ...team2Ids]) {
@@ -123,12 +134,25 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 
   const recentMatches = allMatches.slice(0, 5).map((m) => {
     const matchPlayers = mpByMatchId[m.id] ?? [];
-    const team1Players = matchPlayers
+    let team1Players = matchPlayers
       .filter((mp) => mp.team === "team1")
       .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
-    const team2Players = matchPlayers
+    let team2Players = matchPlayers
       .filter((mp) => mp.team === "team2")
       .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+
+    if (team1Players.length === 0) {
+      team1Players = [m.team1Player1Id, m.team1Player2Id]
+        .filter((id): id is number => id != null)
+        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
+    }
+
+    if (team2Players.length === 0) {
+      team2Players = [m.team2Player1Id, m.team2Player2Id]
+        .filter((id): id is number => id != null)
+        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
+    }
+
     return {
       id: m.id,
       team1Players,

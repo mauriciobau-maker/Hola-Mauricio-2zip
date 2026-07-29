@@ -14,6 +14,11 @@ export const clubsTable = pgTable("clubs", {
   primaryColor: text("primary_color"),
   secondaryColor: text("secondary_color"),
   address: text("address"),
+  country: text("country"),
+  state: text("state"),
+  city: text("city"),
+  mapUrl: text("map_url"),
+  defaultLanguage: text("default_language").default("es"),
   // --- CAMBIO SEGURO ---
   // Mantenemos integer para el admin, pero sin la referencia circular
   adminId: integer("admin_id"), 

@@ -1,0 +1,34 @@
+Actúa como un Desarrollador Full-Stack Senior. Necesito que hagas una auditoría y corrección integral de nuestro proyecto actual para dejar todo lo que hemos construido funcionando al 100%. 
+
+Recientemente hemos tenido errores de servidor (Status 500) causados por desajustes entre los datos (payloads) que envía el frontend y las columnas que realmente existen en el esquema de la base de datos (PostgreSQL con Drizzle ORM). Además, hemos tenido cruces de información con los permisos de usuario.
+
+Tu objetivo es estabilizar el código, asegurar que la base de datos, la API y el frontend estén perfectamente sincronizados, y garantizar que las funcionalidades operen sin fallos.
+
+Por favor, revisa y aplica correcciones enfocándote en los siguientes 4 pilares:
+
+1. SINCRONIZACIÓN GENERAL (Frontend <-> API <-> Base de Datos):
+- Revisa el esquema de la base de datos en Drizzle. Asegúrate de que las tablas actuales (clubs, users, sports, gastos) coincidan exactamente con lo que la API (Express) intenta insertar o actualizar.
+- Revisa las peticiones en el frontend para asegurarte de que no estemos enviando campos extra que rompan la base de datos.
+- Aplica estrategias de seguridad en la API (extrayendo solo las propiedades válidas del req.body antes de hacer un update/insert) para evitar errores 500.
+
+2. SISTEMA DE ROLES Y PERMISOS (RBAC):
+- Revisa el middleware de seguridad y roles (ej. `checkRole`, `requireSuperAdmin`, `requireClubAdmin`).
+- Asegúrate de que la asignación de `Super Admin` y `Club Admin` se guarde y consulte correctamente en la `usersTable` (revisando campos como `isAdmin`, `role`, `clubId`).
+- Garantiza que al crear o editar un club, el correo del SuperAdmin NO se sobreescriba ni se asigne por error como si fuera el administrador de ese club en particular.
+
+3. PESTAÑA DE GASTOS (Módulo de Gastos):
+- Verifica que el esquema de la tabla `gastosTable` esté correcto.
+- Revisa las rutas de la API (GET y POST) para asegurarte de que guardan y devuelven la información correctamente.
+- Revisa el componente Frontend de Gastos. Asegúrate de que todas las columnas rendericen bien y que el formulario "Nuevo Gasto" envíe el formato correcto.
+
+4. ENVÍO DE MENSAJES:
+- Revisa el módulo y las rutas encargadas del envío de mensajes.
+- Asegúrate de que la lógica de backend procese las peticiones, capture cualquier error (try/catch) y devuelva los códigos de estado HTTP adecuados (200, 400, 500) para que el frontend pueda mostrar notificaciones de éxito o error.
+
+REGLAS DE EJECUCIÓN:
+- No elimines funcionalidades existentes. Si algo está obsoleto, coméntalo, pero no borres código a menos que sea estrictamente necesario para arreglar un bug.
+- Trabaja archivo por archivo de manera ordenada.
+- Antes de modificar, lee los archivos clave relacionados (ej. `admin.ts`, `schema.ts` y los componentes de React).
+- Si necesitas hacer un push a la base de datos (drizzle-kit push), avísame primero para confirmar.
+
+Comienza dándome un breve diagnóstico de lo que vas a revisar primero y procede paso a paso.

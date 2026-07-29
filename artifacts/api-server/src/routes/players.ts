@@ -108,14 +108,22 @@ router.post("/players", async (req, res): Promise<void> => {
     const nameFormatted = formatName(parsed.data.name);
     const nicknameFormatted = parsed.data.nickname ? formatName(parsed.data.nickname) : null;
 
-    const { clubCode, categoryIds: parsedCategoryIds, ...restParsedData } = parsed.data as Record<string, unknown>;
+    const { clubCode, categoryIds: parsedCategoryIds, ...restParsedData } = parsed.data as Record<string, any>;
 
-    const [player] = await db.insert(playersTable).values({ 
-      ...restParsedData, 
+    // Mapeo seguro de valores a insertar en la tabla
+    const insertValues: Record<string, any> = {
       name: nameFormatted,
       nickname: nicknameFormatted,
-      clubId: targetClubId 
-    }).returning();
+      clubId: targetClubId,
+    };
+
+    if (restParsedData.elo !== undefined) insertValues.elo = restParsedData.elo;
+    if (restParsedData.phone !== undefined) insertValues.phone = restParsedData.phone;
+    if (restParsedData.waId !== undefined) insertValues.waId = restParsedData.waId;
+    if (restParsedData.wspConsent !== undefined) insertValues.wspConsent = restParsedData.wspConsent;
+    if (restParsedData.language !== undefined) insertValues.language = restParsedData.language;
+
+    const [player] = await db.insert(playersTable).values(insertValues as any).returning();
 
     const categoryIds = (parsedCategoryIds as number[]) || (bodyData.categoryIds as number[]) || (req.body.categoryIds as number[]) || [];
     if (Array.isArray(categoryIds) && categoryIds.length > 0) {
@@ -243,20 +251,43 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     return;
   }
   const playerId = params.data.id;
+  const userClubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+
   const [player] = await db.select().from(playersTable).where(eq(playersTable.id, playerId));
   if (!player) {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
 
-  const playerMatchEntries = await db
-    .select()
-    .from(matchPlayersTable)
-    .where(eq(matchPlayersTable.playerId, playerId));
+  const [allMatches, allMatchPlayers, allPlayersList] = await Promise.all([
+    userClubId
+      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, userClubId)).orderBy(desc(matchesTable.playedAt))
+      : db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
+    db.select().from(matchPlayersTable),
+    db.select().from(playersTable),
+  ]);
 
-  const matchIds = playerMatchEntries.map((mp) => mp.matchId);
+  const mpByMatchId: Record<number, typeof matchPlayersTable.$inferSelect[]> = {};
+  for (const mp of allMatchPlayers) {
+    if (!mpByMatchId[mp.matchId]) mpByMatchId[mp.matchId] = [];
+    mpByMatchId[mp.matchId].push(mp);
+  }
 
-  if (matchIds.length === 0) {
+  // Filtrar partidos donde participó este jugador (sea por match_players o columnas embebidas)
+  const playerMatches = allMatches.filter((m) => {
+    const mPlayers = mpByMatchId[m.id] ?? [];
+    if (mPlayers.length > 0) {
+      return mPlayers.some((mp) => mp.playerId === playerId);
+    }
+    return (
+      m.team1Player1Id === playerId ||
+      m.team1Player2Id === playerId ||
+      m.team2Player1Id === playerId ||
+      m.team2Player2Id === playerId
+    );
+  });
+
+  if (playerMatches.length === 0) {
     res.json({
       playerId,
       playerName: player.name,
@@ -274,31 +305,20 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     return;
   }
 
-  const [allMatches, allMatchPlayers, allPlayersList] = await Promise.all([
-    db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
-    db.select().from(matchPlayersTable),
-    db.select().from(playersTable),
-  ]);
-
-  const playerMatches = allMatches.filter((m) => matchIds.includes(m.id));
-
-  const mpByMatchId: Record<number, typeof matchPlayersTable.$inferSelect[]> = {};
-  for (const mp of allMatchPlayers) {
-    if (matchIds.includes(mp.matchId)) {
-      if (!mpByMatchId[mp.matchId]) mpByMatchId[mp.matchId] = [];
-      mpByMatchId[mp.matchId].push(mp);
-    }
-  }
-
   const playerMap: Record<number, string> = {};
   for (const p of allPlayersList) playerMap[p.id] = p.name;
 
   let wins = 0, losses = 0, draws = 0, setsWon = 0, setsLost = 0;
   for (const match of playerMatches) {
     const matchPlayers = mpByMatchId[match.id] ?? [];
-    const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
-    if (!myEntry) continue;
-    const onTeam1 = myEntry.team === "team1";
+    let onTeam1 = false;
+
+    if (matchPlayers.length > 0) {
+      const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
+      if (myEntry) onTeam1 = myEntry.team === "team1";
+    } else {
+      onTeam1 = match.team1Player1Id === playerId || match.team1Player2Id === playerId;
+    }
 
     if (match.result === "draw") {
       draws++;
@@ -317,21 +337,39 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
   let currentStreak = 0;
   for (const match of playerMatches) {
     const matchPlayers = mpByMatchId[match.id] ?? [];
-    const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
-    if (!myEntry) break;
-    const onTeam1 = myEntry.team === "team1";
+    let onTeam1 = false;
+    if (matchPlayers.length > 0) {
+      const myEntry = matchPlayers.find((mp) => mp.playerId === playerId);
+      if (!myEntry) break;
+      onTeam1 = myEntry.team === "team1";
+    } else {
+      onTeam1 = match.team1Player1Id === playerId || match.team1Player2Id === playerId;
+    }
     const won = onTeam1 ? match.result === "team1" : match.result === "team2";
     if (won) currentStreak++; else break;
   }
 
   const recentMatches = playerMatches.slice(0, 5).map((m) => {
     const matchPlayers = mpByMatchId[m.id] ?? [];
-    const team1Players = matchPlayers
+    let team1Players = matchPlayers
       .filter((mp) => mp.team === "team1")
       .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
-    const team2Players = matchPlayers
+    let team2Players = matchPlayers
       .filter((mp) => mp.team === "team2")
       .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
+
+    if (team1Players.length === 0) {
+      team1Players = [m.team1Player1Id, m.team1Player2Id]
+        .filter((id): id is number => id != null)
+        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
+    }
+
+    if (team2Players.length === 0) {
+      team2Players = [m.team2Player1Id, m.team2Player2Id]
+        .filter((id): id is number => id != null)
+        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
+    }
+
     return {
       id: m.id,
       team1Players,

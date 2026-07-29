@@ -19,7 +19,7 @@ function generateInviteCode(): string {
 }
 
 /**
- * Middleware de seguridad (RBAC)
+ * Middleware de seguridad (RBAC) con soporte dual para banderas e identificadores de rol en texto
  */
 function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -30,12 +30,22 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
       return;
     }
 
-    if (user.isAdmin === 1) {
+    const isSuperAdmin =
+      user.isAdmin === 1 ||
+      user.role === "superadmin" ||
+      user.role === "admin";
+
+    if (isSuperAdmin) {
       next();
       return;
     }
 
-    if (requiredRole === "CLUB_ADMIN" && user.isClubAdmin === 1) {
+    const isClubAdmin =
+      user.isClubAdmin === 1 ||
+      user.role === "club_admin" ||
+      user.isClubAdmin === true;
+
+    if (requiredRole === "CLUB_ADMIN" && isClubAdmin) {
       const rawId = req.params.id;
       const routeId = rawId ? parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10) : null;
       if (routeId !== null && !isNaN(routeId) && user.clubId !== routeId) {
@@ -57,7 +67,7 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
 const requireSuperAdmin = checkRole("SUPER_ADMIN");
 const requireClubAdmin = checkRole("CLUB_ADMIN");
 
-// --- CURRENT CLUB ROUTE (Evita el Error 500 en Layout.tsx) ---
+// --- CURRENT CLUB ROUTE ---
 
 router.get(
   ["/clubs/current", "/admin/clubs/current"],
@@ -96,7 +106,7 @@ router.get(
 router.get(
   "/admin/clubs",
   requireSuperAdmin,
-  async (_req, res): Promise<void> => {
+  async (req, res): Promise<void> => {
     try {
       const clubs = await db.select().from(clubsTable).orderBy(clubsTable.id);
 
@@ -120,11 +130,14 @@ router.get(
 
           let adminUser = null;
           try {
-            const [foundUser] = await db
+            // Buscar primero un usuario asignado al club
+            const clubUsers = await db
               .select()
               .from(usersTable)
               .where(eq(usersTable.clubId, club.id));
-            adminUser = foundUser;
+
+            // Si hay más de un usuario, preferir el que no sea SuperAdmin general
+            adminUser = clubUsers.find((u: any) => u.isAdmin === 0) || clubUsers[0] || null;
           } catch (e) {
             // Ignorar error
           }
@@ -132,32 +145,19 @@ router.get(
           const dbInviteCode = (club as any).inviteCode || (club as any).invite_code;
 
           const resolvedAdminName =
-            (adminUser as any)?.name ||
+            adminUser?.name ||
             (club as any).adminName ||
-            (club as any).admin_name ||
             null;
 
           const resolvedAdminEmail =
-            (adminUser as any)?.email ||
+            adminUser?.email ||
             (club as any).adminEmail ||
-            (club as any).admin_email ||
             null;
 
           const resolvedAdminPhone =
-            (adminUser as any)?.phone ||
+            adminUser?.phone ||
             (club as any).adminPhone ||
-            (club as any).admin_phone ||
             null;
-
-          const resolvedWhatsappAlias =
-            (club as any).adminWhatsappAlias ||
-            (club as any).admin_whatsapp_alias ||
-            null;
-
-          const resolvedContactPreference =
-            (club as any).contactPreference ||
-            (club as any).contact_preference ||
-            "whatsapp";
 
           return {
             ...club,
@@ -166,9 +166,7 @@ router.get(
             adminName: resolvedAdminName,
             adminEmail: resolvedAdminEmail,
             adminPhone: resolvedAdminPhone,
-            adminWhatsappAlias: resolvedWhatsappAlias,
-            contactPreference: resolvedContactPreference,
-            admin: resolvedAdminName
+            admin: resolvedAdminName || resolvedAdminEmail
               ? {
                   name: resolvedAdminName,
                   email: resolvedAdminEmail,
@@ -192,11 +190,6 @@ router.post(
   "/admin/clubs",
   requireSuperAdmin,
   async (req, res): Promise<void> => {
-    console.log(
-      "👉 [POST /admin/clubs] Payload recibido:",
-      JSON.stringify(req.body, null, 2),
-    );
-
     try {
       const clubName = req.body.name || req.body.clubName || req.body.nombre;
       if (!clubName) {
@@ -218,13 +211,11 @@ router.post(
       const address = req.body.address || null;
       const mapUrl = req.body.mapUrl || null;
       const defaultLanguage = req.body.defaultLanguage || "es";
-      const adminWhatsappAlias = req.body.adminWhatsappAlias || null;
-      const contactPreference = req.body.contactPreference || "whatsapp";
 
-      const adminEmail = req.body.adminEmail || req.body.email;
-      const adminName = req.body.adminName || clubName;
+      const adminEmail = req.body.adminEmail || req.body.admin?.email || null;
+      const adminName = req.body.adminName || req.body.admin?.name || null;
       const adminNickname = req.body.adminNickname || null;
-      const adminPhone = req.body.adminPhone || req.body.phone || null;
+      const adminPhone = req.body.adminPhone || req.body.phone || req.body.admin?.phone || null;
 
       const baseSlug =
         (rawSlug || clubName)
@@ -259,11 +250,6 @@ router.post(
         address,
         mapUrl,
         defaultLanguage,
-        adminWhatsappAlias,
-        contactPreference,
-        adminName,
-        adminEmail,
-        adminPhone,
       };
 
       if (logoUrl) clubInsertData.logoUrl = logoUrl;
@@ -274,7 +260,6 @@ router.post(
         .insert(clubsTable)
         .values(clubInsertData as any)
         .returning();
-      console.log("✅ Club guardado con ID:", club.id);
 
       if (Array.isArray(sports) && sports.length > 0) {
         for (const sportItem of sports) {
@@ -290,18 +275,11 @@ router.post(
                 active: true,
               });
             } catch (e: any) {
-              console.error(
-                `⚠️ No se pudo asociar el deporte ${sportId}:`,
-                e?.message,
-              );
+              console.error(`⚠️ No se pudo asociar el deporte ${sportId}:`, e?.message);
             }
           }
         }
       }
-
-      let savedAdminName = adminName;
-      let savedAdminEmail = adminEmail;
-      let savedAdminPhone = adminPhone;
 
       if (adminEmail) {
         try {
@@ -309,20 +287,29 @@ router.post(
             .select()
             .from(usersTable)
             .where(eq(usersTable.email, adminEmail));
+
           if (existingUser) {
+            // Solo actualizamos el club y el rol de club-admin.
+            // NO tocamos isAdmin para no sobreescribir a un super-admin existente.
             await db
               .update(usersTable)
-              .set({ clubId: club.id, isAdmin: 1, nickname: adminNickname } as any)
+              .set({
+                clubId: club.id,
+                isClubAdmin: 1,
+                name: adminName || (existingUser as any).name || undefined,
+                nickname: adminNickname || (existingUser as any).nickname || undefined,
+                phone: adminPhone || (existingUser as any).phone || undefined,
+              } as any)
               .where(eq(usersTable.id, (existingUser as any).id));
-            savedAdminName = (existingUser as any).name || (existingUser as any).firstName || adminName;
           } else {
             await db.insert(usersTable).values({
               email: adminEmail,
-              name: adminName,
-              nickname: adminNickname,
-              phone: adminPhone,
+              name: adminName || null,
+              nickname: adminNickname || null,
+              phone: adminPhone || null,
               clubId: club.id,
-              isAdmin: 1,
+              isAdmin: 0,
+              isClubAdmin: 1,
             } as any);
           }
         } catch (userErr: any) {
@@ -335,19 +322,17 @@ router.post(
         inviteCode: generatedInviteCode,
         invite_code: generatedInviteCode,
         slug: finalSlug,
-        adminName: savedAdminName,
-        adminEmail: savedAdminEmail,
-        adminPhone: savedAdminPhone,
-        adminWhatsappAlias: adminWhatsappAlias,
-        contactPreference: contactPreference,
+        adminName: adminName,
+        adminEmail: adminEmail,
+        adminPhone: adminPhone,
         admin: {
-          name: savedAdminName,
-          email: savedAdminEmail,
-          phone: savedAdminPhone,
+          name: adminName,
+          email: adminEmail,
+          phone: adminPhone,
         },
       });
     } catch (error: any) {
-      console.error("🚨 Error grave en POST /admin/clubs:", error);
+      console.error("🚨 Error en POST /admin/clubs:", error);
       res.status(500).json({
         error: "Error al crear el club",
         detalleTecnico: error?.message || String(error),
@@ -356,7 +341,7 @@ router.post(
   },
 );
 
-// PATCH /admin/clubs/:id — Club Admin o Super Admin
+// PATCH /admin/clubs/:id — Edición segura sin colisión de columnas
 router.patch(
   "/admin/clubs/:id",
   requireClubAdmin,
@@ -369,33 +354,155 @@ router.patch(
     }
 
     try {
-      const updateData: Record<string, any> = { ...req.body };
+      const body = req.body || {};
+      const { sports, admin } = body;
 
-      if (updateData.logo && !updateData.logoUrl) {
-        updateData.logoUrl = updateData.logo;
+      // 1. Extraer datos del Administrador
+      const adminEmail = body.adminEmail || body.admin_email || admin?.email || body.correoAdmin;
+      const adminName = body.adminName || body.admin_name || admin?.name || body.nombreAdmin;
+      const adminPhone = body.adminPhone || body.admin_phone || admin?.phone || body.phone;
+      const adminNickname = body.adminNickname || body.nickname || body.apodo;
+
+      // 2. Extraer ÚNICAMENTE campos nativos de la tabla `clubsTable`
+      const clubUpdate: Record<string, any> = {};
+      if (body.name || body.nombre) clubUpdate.name = body.name || body.nombre;
+      if (body.slug) clubUpdate.slug = body.slug;
+      if (body.plan) clubUpdate.plan = body.plan;
+      if (body.logoUrl || body.logo) clubUpdate.logoUrl = body.logoUrl || body.logo;
+      if (body.active !== undefined) clubUpdate.active = body.active;
+      if (body.country) clubUpdate.country = body.country;
+      if (body.state) clubUpdate.state = body.state;
+      if (body.city) clubUpdate.city = body.city;
+      if (body.address) clubUpdate.address = body.address;
+      if (body.mapUrl) clubUpdate.mapUrl = body.mapUrl;
+      if (body.primaryColor) clubUpdate.primaryColor = body.primaryColor;
+      if (body.secondaryColor) clubUpdate.secondaryColor = body.secondaryColor;
+
+      let updatedClub = null;
+      if (Object.keys(clubUpdate).length > 0) {
+        try {
+          const [resUpdate] = await db
+            .update(clubsTable)
+            .set(clubUpdate as any)
+            .where(eq(clubsTable.id, id))
+            .returning();
+          updatedClub = resUpdate;
+        } catch (dbErr) {
+          console.warn("⚠️ Advertencia al actualizar clubsTable:", dbErr);
+        }
       }
-      delete updateData.logo;
-      delete updateData.id;
 
-      const [updated] = await db
-        .update(clubsTable)
-        .set(updateData)
-        .where(eq(clubsTable.id, id))
-        .returning();
-
-      if (!updated) {
-        res.status(404).json({ error: "Club no encontrado" });
-        return;
+      if (!updatedClub) {
+        const [existing] = await db.select().from(clubsTable).where(eq(clubsTable.id, id));
+        updatedClub = existing;
       }
-      res.json(updated);
+
+      // 3. Sincronizar usuario Administrador en `usersTable`
+      if (adminEmail) {
+        try {
+          const [existingUserByEmail] = await db
+            .select()
+            .from(usersTable)
+            .where(eq(usersTable.email, adminEmail));
+
+          if (existingUserByEmail) {
+            // Actualizamos datos del usuario existente sin tocar su isAdmin (preservar super-admins)
+            await db
+              .update(usersTable)
+              .set({
+                clubId: id,
+                isClubAdmin: 1,
+                name: adminName || (existingUserByEmail as any).name || undefined,
+                phone: adminPhone || (existingUserByEmail as any).phone || undefined,
+                nickname: adminNickname || (existingUserByEmail as any).nickname || undefined,
+              } as any)
+              .where(eq(usersTable.id, (existingUserByEmail as any).id));
+          } else {
+            // Buscar club admin existente (por isClubAdmin, no isAdmin para no confundir con super-admin)
+            const [existingClubAdmin] = await db
+              .select()
+              .from(usersTable)
+              .where(and(eq(usersTable.clubId, id), eq(usersTable.isClubAdmin, 1)));
+
+            if (existingClubAdmin) {
+              await db
+                .update(usersTable)
+                .set({
+                  email: adminEmail,
+                  name: adminName || (existingClubAdmin as any).name || undefined,
+                  phone: adminPhone || (existingClubAdmin as any).phone || undefined,
+                  nickname: adminNickname || (existingClubAdmin as any).nickname || undefined,
+                } as any)
+                .where(eq(usersTable.id, (existingClubAdmin as any).id));
+            } else {
+              await db.insert(usersTable).values({
+                email: adminEmail,
+                name: adminName || null,
+                phone: adminPhone || null,
+                nickname: adminNickname || null,
+                clubId: id,
+                isAdmin: 0,
+                isClubAdmin: 1,
+              } as any);
+            }
+          }
+        } catch (uErr) {
+          console.error("⚠️ Error actualizando usuario admin en usersTable:", uErr);
+        }
+      }
+
+      // 4. Actualizar deportes del club
+      if (Array.isArray(sports)) {
+        for (const sportItem of sports) {
+          const sportId =
+            typeof sportItem === "object" && sportItem !== null
+              ? Number(sportItem.id)
+              : Number(sportItem);
+          if (!isNaN(sportId) && sportId > 0) {
+            try {
+              const [existing] = await db
+                .select()
+                .from(clubSportsTable)
+                .where(
+                  and(
+                    eq(clubSportsTable.clubId, id),
+                    eq(clubSportsTable.sportId, sportId)
+                  )
+                );
+              if (!existing) {
+                await db
+                  .insert(clubSportsTable)
+                  .values({ clubId: id, sportId, active: true });
+              }
+            } catch (sErr) {
+              // Ignorar duplicados
+            }
+          }
+        }
+      }
+
+      res.json({
+        ...updatedClub,
+        adminName,
+        adminEmail,
+        adminPhone,
+        admin: {
+          name: adminName,
+          email: adminEmail,
+          phone: adminPhone,
+        },
+      });
     } catch (error: any) {
       console.error("🚨 Error en PATCH /admin/clubs/:id:", error);
-      res.status(500).json({ error: "Error interno al actualizar", detalle: error?.message });
+      res.status(500).json({
+        error: "Error interno al actualizar",
+        detalle: error?.message || String(error),
+      });
     }
   },
 );
 
-// PATCH /admin/clubs/:id/sports — Club Admin o Super Admin
+// PATCH /admin/clubs/:id/sports
 router.patch(
   "/admin/clubs/:id/sports",
   requireClubAdmin,
@@ -434,7 +541,7 @@ router.patch(
   },
 );
 
-// POST /admin/clubs/:id/users — Club Admin o Super Admin
+// POST /admin/clubs/:id/users
 router.post(
   "/admin/clubs/:id/users",
   requireClubAdmin,
@@ -446,7 +553,7 @@ router.post(
     try {
       const [updated] = await db
         .update(usersTable)
-        .set({ clubId, isAdmin: isAdmin ? 1 : 0 })
+        .set({ clubId, isClubAdmin: isAdmin ? 1 : 0 })
         .where(eq(usersTable.id, userId))
         .returning();
       if (!updated) {
@@ -476,14 +583,19 @@ router.get(
   },
 );
 
-// --- GASTOS Y OTROS (Solo Super Admins) ---
+// --- GASTOS Y OTROS ---
 
 router.get(
   "/admin/sports",
   requireSuperAdmin,
   async (_req, res): Promise<void> => {
-    const sports = await db.select().from(sportsTable).orderBy(sportsTable.id);
-    res.json(sports);
+    try {
+      const sports = await db.select().from(sportsTable).orderBy(sportsTable.id);
+      res.json(sports);
+    } catch (error) {
+      console.error("Error al obtener deportes:", error);
+      res.status(500).json({ error: "Error al obtener deportes" });
+    }
   },
 );
 
@@ -491,24 +603,47 @@ router.get(
   "/admin/gastos",
   requireSuperAdmin,
   async (_req, res): Promise<void> => {
-    const gastos = await db.select().from(gastosTable).orderBy(gastosTable.id);
-    res.json(gastos);
+    try {
+      const gastos = await db.select().from(gastosTable).orderBy(gastosTable.id);
+      res.json(gastos);
+    } catch (error) {
+      console.error("Error al obtener gastos:", error);
+      res.status(500).json({ error: "Error al obtener los gastos" });
+    }
   },
 );
 
 router.post(
-  // @ts-ignore
   "/admin/gastos",
   requireSuperAdmin,
   async (req, res): Promise<void> => {
-    const [nuevoGasto] = await db
-      .insert(gastosTable)
-      .values({
-        ...req.body,
-        creadoPor: (req.user as any)?.name || "Admin",
-      })
-      .returning();
-    res.status(201).json(nuevoGasto);
+    try {
+      // Extraemos solo los campos válidos del body para evitar errores 500 por columnas extra
+      const {
+        encuentroId, clubId, arriendo, implementos, bebidas,
+        alimentos, otros, descripcionOtros, total,
+      } = req.body;
+
+      const [nuevoGasto] = await db
+        .insert(gastosTable)
+        .values({
+          encuentroId: encuentroId ?? null,
+          clubId: clubId ?? null,
+          arriendo: Number(arriendo ?? 0),
+          implementos: Number(implementos ?? 0),
+          bebidas: Number(bebidas ?? 0),
+          alimentos: Number(alimentos ?? 0),
+          otros: Number(otros ?? 0),
+          descripcionOtros: descripcionOtros ?? null,
+          total: Number(total ?? 0),
+          creadoPor: (req.user as any)?.firstName || (req.user as any)?.name || "Admin",
+        })
+        .returning();
+      res.status(201).json(nuevoGasto);
+    } catch (error: any) {
+      console.error("Error al crear gasto:", error);
+      res.status(500).json({ error: "Error al crear el gasto", detalle: error?.message });
+    }
   },
 );
 
