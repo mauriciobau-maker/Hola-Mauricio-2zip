@@ -10,6 +10,13 @@ export const clubsTable = pgTable("clubs", {
   plan: text("plan").notNull().default("basic"),
   active: boolean("active").notNull().default(true),
   inviteCode: text("invite_code").unique(),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color"),
+  secondaryColor: text("secondary_color"),
+  address: text("address"),
+  // --- CAMBIO SEGURO ---
+  // Mantenemos integer para el admin, pero sin la referencia circular
+  adminId: integer("admin_id"), 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

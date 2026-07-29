@@ -22,6 +22,7 @@ export const usersTable = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   playerId: integer("player_id"),
   isAdmin: integer("is_admin").notNull().default(0),
+  isClubAdmin: integer("is_club_admin").notNull().default(0),
   clubId: integer("club_id").references(() => clubsTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

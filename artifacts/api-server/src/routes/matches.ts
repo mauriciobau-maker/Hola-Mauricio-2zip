@@ -1,19 +1,21 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable, sportsTable, clubSportsTable } from "@workspace/db";
 import { calculateMatchEloChanges, STARTING_ELO } from "../elo";
 
 const router: IRouter = Router();
 
 /**
- * Recalcula todo el Elo desde cero, agrupado por deporte.
- * Soporta equipos de tamaño variable via match_players.
+ * Recalcula todo el Elo desde cero considerando ÚNICAMENTE partidos confirmados.
  */
 async function recalculateAllElo(): Promise<void> {
   await db.update(playersTable).set({ elo: STARTING_ELO });
   await db.delete(eloHistoryTable);
 
-  const matches = await db.select().from(matchesTable).orderBy(asc(matchesTable.playedAt));
+  // Obtener solo partidos con resultado confirmado/oficial
+  const allMatches = await db.select().from(matchesTable).orderBy(asc(matchesTable.playedAt));
+  const matches = allMatches.filter((m: any) => !m.status || m.status === "confirmed");
+
   if (matches.length === 0) return;
 
   const players = await db.select().from(playersTable);
@@ -39,7 +41,6 @@ async function recalculateAllElo(): Promise<void> {
     const team1Won = match.result === "team1";
     const isDraw = match.result === "draw";
 
-    // Para empate usamos 0.5 como resultado
     const changes = isDraw
       ? calculateMatchEloChanges(team1, team2, false, true)
       : calculateMatchEloChanges(team1, team2, team1Won);
@@ -77,16 +78,6 @@ async function enrichMatch(m: typeof matchesTable.$inferSelect) {
     .from(matchPlayersTable)
     .where(eq(matchPlayersTable.matchId, m.id));
 
-  const playerIds = matchPlayers.map((mp) => mp.playerId);
-  const players = playerIds.length > 0
-    ? await db.select().from(playersTable).where(
-        playerIds.length === 1
-          ? eq(playersTable.id, playerIds[0])
-          : eq(playersTable.id, playerIds[0]) // fallback — se mapea abajo
-      )
-    : [];
-
-  // Cargamos todos los jugadores para el mapa
   const allPlayers = await db.select().from(playersTable);
   const playerMap: Record<number, string> = {};
   for (const p of allPlayers) playerMap[p.id] = p.name;
@@ -125,6 +116,9 @@ async function enrichMatch(m: typeof matchesTable.$inferSelect) {
     team2Score: m.team2Score,
     sets: m.sets,
     result: m.result,
+    status: (m as any).status || "confirmed",
+    reportedBy: (m as any).reportedBy || null,
+    encuentroId: (m as any).encuentroId || null,
     playedAt: m.playedAt.toISOString(),
     createdAt: m.createdAt.toISOString(),
     eloChanges,
@@ -141,9 +135,9 @@ router.get("/matches", async (req, res): Promise<void> => {
   res.json(result);
 });
 
-// POST /matches
+// POST /matches - Carga inicial del partido (estado por defecto: pending_confirmation)
 router.post("/matches", async (req, res): Promise<void> => {
-  const { sportId, team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt } = req.body;
+  const { sportId, team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt, encuentroId, autoConfirm } = req.body;
 
   if (!sportId || !team1PlayerIds || !team2PlayerIds || !playedAt) {
     res.status(400).json({ error: "Faltan campos requeridos: sportId, team1PlayerIds, team2PlayerIds, playedAt" });
@@ -161,14 +155,12 @@ router.post("/matches", async (req, res): Promise<void> => {
     return;
   }
 
-  // Verificar deporte existe
   const [sport] = await db.select().from(sportsTable).where(eq(sportsTable.id, sportId));
   if (!sport) {
     res.status(404).json({ error: "Deporte no encontrado" });
     return;
   }
 
-  // Calcular resultado
   const t1Score = team1Score ?? 0;
   const t2Score = team2Score ?? 0;
   let result = "draw";
@@ -176,8 +168,8 @@ router.post("/matches", async (req, res): Promise<void> => {
   else if (t2Score > t1Score) result = "team2";
 
   const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId ?? null;
+  const status = autoConfirm ? "confirmed" : "pending_confirmation";
 
-  // Insertar partido
   const [match] = await db
     .insert(matchesTable)
     .values({
@@ -187,20 +179,43 @@ router.post("/matches", async (req, res): Promise<void> => {
       team2Score: t2Score,
       sets: sets ?? null,
       result,
+      status,
+      encuentroId: encuentroId ?? null,
       playedAt: new Date(playedAt),
-    })
+    } as any)
     .returning();
 
-  // Insertar jugadores del partido
   const matchPlayerValues = [
     ...team1PlayerIds.map((pid: number) => ({ matchId: match.id, playerId: pid, team: "team1" })),
     ...team2PlayerIds.map((pid: number) => ({ matchId: match.id, playerId: pid, team: "team2" })),
   ];
   await db.insert(matchPlayersTable).values(matchPlayerValues);
 
-  await recalculateAllElo();
+  // Solo recalculamos ELO si nació como confirmado
+  if (status === "confirmed") {
+    await recalculateAllElo();
+  }
 
   res.status(201).json(await enrichMatch(match));
+});
+
+// POST /matches/:id/confirm - Confirmación por parte de los participantes
+router.post("/matches/:id/confirm", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [existing] = await db.select().from(matchesTable).where(eq(matchesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Partido no encontrado" }); return; }
+
+  const [updated] = await db
+    .update(matchesTable)
+    .set({ status: "confirmed" } as any)
+    .where(eq(matchesTable.id, id))
+    .returning();
+
+  // Al confirmar el partido, se impacta en la tabla global de ELO y parejas
+  await recalculateAllElo();
+  res.json(await enrichMatch(updated));
 });
 
 // GET /matches/:id
@@ -222,15 +237,15 @@ router.patch("/matches/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(matchesTable).where(eq(matchesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Partido no encontrado" }); return; }
 
-  const { team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt } = req.body;
+  const { team1PlayerIds, team2PlayerIds, team1Score, team2Score, sets, playedAt, status } = req.body;
 
   const updates: Record<string, unknown> = {};
   if (team1Score !== undefined) updates.team1Score = team1Score;
   if (team2Score !== undefined) updates.team2Score = team2Score;
   if (sets !== undefined) updates.sets = sets;
   if (playedAt !== undefined) updates.playedAt = new Date(playedAt);
+  if (status !== undefined) updates.status = status;
 
-  // Recalcular resultado si cambian scores
   const t1 = team1Score ?? existing.team1Score;
   const t2 = team2Score ?? existing.team2Score;
   updates.result = t1 > t2 ? "team1" : t2 > t1 ? "team2" : "draw";
@@ -241,7 +256,6 @@ router.patch("/matches/:id", async (req, res): Promise<void> => {
     .where(eq(matchesTable.id, id))
     .returning();
 
-  // Actualizar jugadores si se envían
   if (team1PlayerIds || team2PlayerIds) {
     await db.delete(matchPlayersTable).where(eq(matchPlayersTable.matchId, id));
     const t1Ids = team1PlayerIds ?? [];
@@ -274,7 +288,7 @@ router.delete("/matches/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-// GET /sports — lista deportes disponibles del club (o todos si sin club)
+// GET /sports
 router.get("/sports", async (req, res): Promise<void> => {
   const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Building2, ArrowRight, UserPlus, Check } from "lucide-react";
@@ -32,6 +32,29 @@ export function Onboarding() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [newPlayerNickname, setNewPlayerNickname] = useState("");
 
+  // 🚀 SI EL USUARIO YA TIENE clubId (ej. Admin de club creado por Super Admin)
+  // Saltamos automáticamente el Paso 1 de ingresar código
+  useEffect(() => {
+    if (user && (user as any).clubId) {
+      setLoading(true);
+      Promise.all([
+        fetch("/api/club", { credentials: "include" }).then((res) => res.json()),
+        fetch("/api/players", { credentials: "include" }).then((res) => res.json()),
+      ])
+        .then(([clubData, playersData]) => {
+          if (clubData && !clubData.error) {
+            setClub(clubData);
+          }
+          if (Array.isArray(playersData)) {
+            setPlayers(playersData);
+          }
+          setStep("jugador");
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
   const handleJoinClub = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -52,7 +75,9 @@ export function Onboarding() {
       // Cargar jugadores del club
       const playersRes = await fetch("/api/players", { credentials: "include" });
       const playersData = await playersRes.json();
-      setPlayers(playersData);
+      if (Array.isArray(playersData)) {
+        setPlayers(playersData);
+      }
       setStep("jugador");
     } catch {
       setError("Error de conexión. Intenta de nuevo.");
@@ -72,7 +97,7 @@ export function Onboarding() {
       });
       if (res.ok) {
         setStep("done");
-        // Forzar recarga completa para que useAuth() lea el nuevo clubId
+        // Forzar recarga completa para que useAuth() lea el nuevo clubId/playerId
         setTimeout(() => {
           window.location.href = "/";
         }, 1500);
@@ -192,7 +217,7 @@ export function Onboarding() {
 
           {!creatingNew ? (
             <div className="space-y-3">
-              {players.map((player) => (
+              {(Array.isArray(players) ? players : []).map((player) => (
                 <button
                   key={player.id}
                   onClick={() => handleLinkPlayer(player.id)}

@@ -1,6 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
+// Imprimir la URL exacta de la base de datos para depuración
+console.log("🚀 CONECTADO A LA BASE DE DATOS:", process.env.DATABASE_URL);
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

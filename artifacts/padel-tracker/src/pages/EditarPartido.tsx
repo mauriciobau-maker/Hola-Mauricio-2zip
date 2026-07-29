@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Minus, X, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage, Language } from "@/context/LanguageContext";
 
 interface SetData {
   setNumber: number;
@@ -20,11 +21,70 @@ interface SetData {
   team2Games: number;
 }
 
+const TRANSLATIONS = {
+  es: {
+    title: "Editar Partido",
+    subtitle: "Corrige jugadores, sets o fecha",
+    notFound: "Partido no encontrado",
+    backToMatches: "Volver a partidos",
+    team1: "Equipo 1",
+    team2: "Equipo 2",
+    sets: "Sets",
+    addSet: "Agregar set",
+    matchDate: "Fecha del partido",
+    cancel: "Cancelar",
+    save: "Guardar cambios",
+    saving: "Guardando...",
+    errorSelect4: "Selecciona los 4 jugadores.",
+    errorUnique4: "Los 4 jugadores deben ser diferentes.",
+    errorSave: "Error al guardar los cambios. Verifica los datos.",
+    eloNotice: "El ranking y las estadísticas de todos los jugadores involucrados se recalcularán automáticamente.",
+  },
+  en: {
+    title: "Edit Match",
+    subtitle: "Correct players, sets, or date",
+    notFound: "Match not found",
+    backToMatches: "Back to matches",
+    team1: "Team 1",
+    team2: "Team 2",
+    sets: "Sets",
+    addSet: "Add set",
+    matchDate: "Match Date",
+    cancel: "Cancel",
+    save: "Save changes",
+    saving: "Saving...",
+    errorSelect4: "Select all 4 players.",
+    errorUnique4: "All 4 players must be unique.",
+    errorSave: "Error saving changes. Please check data.",
+    eloNotice: "Rankings and statistics for all players involved will be recalculated automatically.",
+  },
+  pt: {
+    title: "Editar Partida",
+    subtitle: "Corrija jogadores, sets ou data",
+    notFound: "Partida não encontrada",
+    backToMatches: "Voltar para partidas",
+    team1: "Equipe 1",
+    team2: "Equipe 2",
+    sets: "Sets",
+    addSet: "Adicionar set",
+    matchDate: "Data da partida",
+    cancel: "Cancelar",
+    save: "Salvar alterações",
+    saving: "Salvando...",
+    errorSelect4: "Selecione os 4 jogadores.",
+    errorUnique4: "Os 4 jogadores devem ser diferentes.",
+    errorSave: "Erro ao salvar alterações. Verifique os dados.",
+    eloNotice: "O ranking e as estatísticas de todos os jogadores envolvidos serão recalculados automaticamente.",
+  },
+};
+
 export default function EditarPartido() {
   const params = useParams();
   const id = parseInt(params.id ?? "0", 10);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { language } = useLanguage();
+  const t = TRANSLATIONS[(language as Language) || "es"] || TRANSLATIONS.es;
 
   const { data: match, isLoading: loadingMatch } = useGetMatch(id, {
     query: { enabled: !!id, queryKey: getGetMatchQueryKey(id) },
@@ -42,36 +102,38 @@ export default function EditarPartido() {
 
   useEffect(() => {
     if (match && !initialized) {
-      setTeam1P1(match.team1Player1Id);
-      setTeam1P2(match.team1Player2Id);
-      setTeam2P1(match.team2Player1Id);
-      setTeam2P2(match.team2Player2Id);
-      const setsData = match.sets as SetData[];
-      setSets(setsData.length > 0 ? setsData : [{ setNumber: 1, team1Games: 0, team2Games: 0 }]);
-      setPlayedAt(new Date(match.playedAt).toISOString().split("T")[0]);
+      const matchAny = match as any;
+      const t1 = matchAny.team1Players || [];
+      const t2 = matchAny.team2Players || [];
+
+      setTeam1P1(t1[0]?.id ?? null);
+      setTeam1P2(t1[1]?.id ?? null);
+      setTeam2P1(t2[0]?.id ?? null);
+      setTeam2P2(t2[1]?.id ?? null);
+
+      const setsData = matchAny.sets as SetData[];
+      setSets(setsData && setsData.length > 0 ? setsData : [{ setNumber: 1, team1Games: 0, team2Games: 0 }]);
+      setPlayedAt(new Date(matchAny.playedAt).toISOString().split("T")[0]);
       setInitialized(true);
     }
   }, [match, initialized]);
 
   const updateMutation = useUpdateMatch({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetMatchQueryKey(id) });
         queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-        // Invalidate stats for all affected players
-        const playerIds = [
-          data.team1Player1Id, data.team1Player2Id,
-          data.team2Player1Id, data.team2Player2Id,
-        ];
+
+        const playerIds = [team1P1, team1P2, team2P1, team2P2].filter(Boolean) as number[];
         for (const pid of playerIds) {
           queryClient.invalidateQueries({ queryKey: getGetPlayerStatsQueryKey(pid) });
         }
         navigate("/partidos");
       },
       onError: () => {
-        setError("Error al guardar los cambios. Verifica los datos.");
+        setError(t.errorSave);
       },
     },
   });
@@ -98,23 +160,22 @@ export default function EditarPartido() {
     e.preventDefault();
     setError("");
     if (!team1P1 || !team1P2 || !team2P1 || !team2P2) {
-      setError("Selecciona los 4 jugadores.");
+      setError(t.errorSelect4);
       return;
     }
     if (new Set([team1P1, team1P2, team2P1, team2P2]).size !== 4) {
-      setError("Los 4 jugadores deben ser diferentes.");
+      setError(t.errorUnique4);
       return;
     }
+
     updateMutation.mutate({
       id,
       data: {
-        team1Player1Id: team1P1,
-        team1Player2Id: team1P2,
-        team2Player1Id: team2P1,
-        team2Player2Id: team2P2,
+        team1PlayerIds: [team1P1, team1P2],
+        team2PlayerIds: [team2P1, team2P2],
         sets,
         playedAt: new Date(playedAt).toISOString(),
-      },
+      } as any,
     });
   };
 
@@ -131,9 +192,9 @@ export default function EditarPartido() {
   if (!match) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Partido no encontrado</p>
+        <p className="text-muted-foreground">{t.notFound}</p>
         <Link href="/partidos" className="text-primary hover:underline text-sm mt-2 block">
-          Volver a partidos
+          {t.backToMatches}
         </Link>
       </div>
     );
@@ -155,16 +216,15 @@ export default function EditarPartido() {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold">Editar Partido</h1>
-          <p className="text-sm text-muted-foreground">Corrige jugadores, sets o fecha</p>
+          <h1 className="text-xl font-bold">{t.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Teams */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-center text-primary">Equipo 1</h3>
+            <h3 className="text-sm font-semibold text-center text-primary">{t.team1}</h3>
             <PlayerSelect
               label="Jugador 1"
               value={team1P1}
@@ -179,7 +239,7 @@ export default function EditarPartido() {
             />
           </div>
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-center text-accent">Equipo 2</h3>
+            <h3 className="text-sm font-semibold text-center text-accent">{t.team2}</h3>
             <PlayerSelect
               label="Jugador 1"
               value={team2P1}
@@ -195,22 +255,20 @@ export default function EditarPartido() {
           </div>
         </div>
 
-        {/* Sets */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Sets</h3>
+            <h3 className="text-sm font-semibold">{t.sets}</h3>
             {sets.length < 5 && (
               <button
                 type="button"
                 onClick={addSet}
                 className="flex items-center gap-1 text-xs text-primary hover:underline"
               >
-                <Plus size={12} /> Agregar set
+                <Plus size={12} /> {t.addSet}
               </button>
             )}
           </div>
 
-          {/* Score preview */}
           <div className="flex items-center justify-center gap-3 py-2 bg-muted/30 rounded-lg">
             <span className="text-3xl font-bold text-primary tabular-nums">{team1Wins}</span>
             <span className="text-muted-foreground font-medium">-</span>
@@ -250,9 +308,8 @@ export default function EditarPartido() {
           </div>
         </div>
 
-        {/* Date */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-1.5">
-          <label className="text-sm font-medium">Fecha del partido</label>
+          <label className="text-sm font-medium">{t.matchDate}</label>
           <input
             type="date"
             value={playedAt}
@@ -272,7 +329,7 @@ export default function EditarPartido() {
             href="/partidos"
             className="flex-1 text-center border border-border rounded-lg py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
           >
-            Cancelar
+            {t.cancel}
           </Link>
           <button
             type="submit"
@@ -280,13 +337,13 @@ export default function EditarPartido() {
             className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={14} />
-            {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
+            {updateMutation.isPending ? t.saving : t.save}
           </button>
         </div>
       </form>
 
       <p className="text-xs text-muted-foreground text-center">
-        El ranking y las estadísticas de todos los jugadores involucrados se recalcularán automáticamente.
+        {t.eloNotice}
       </p>
     </div>
   );
@@ -336,7 +393,7 @@ function GamesInput({
     <div className="flex items-center gap-1 flex-1">
       <button
         type="button"
-        onClick={() => onChange(value - 1)}
+        onClick={() => onChange(Math.max(0, value - 1))}
         className="w-7 h-7 rounded-md bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
       >
         <Minus size={12} />

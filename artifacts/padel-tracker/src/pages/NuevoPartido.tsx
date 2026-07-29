@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   useListPlayers,
+  useCreateMatch,
   getListMatchesQueryKey,
   getGetRankingQueryKey,
   getGetDashboardQueryKey,
@@ -9,6 +10,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Minus, X, Shuffle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage, Language } from "@/context/LanguageContext";
 
 interface SetData {
   setNumber: number;
@@ -31,13 +33,11 @@ interface Player {
   elo: number;
 }
 
-// Algoritmo de balanceo por Elo
 function balanceTeams(players: Player[]): [Player[], Player[]] {
   const sorted = [...players].sort((a, b) => b.elo - a.elo);
   const team1: Player[] = [];
   const team2: Player[] = [];
   sorted.forEach((p, i) => {
-    // Distribución en serpiente: 0→T1, 1→T2, 2→T2, 3→T1, 4→T1...
     const pos = i % 4;
     if (pos === 0 || pos === 3) team1.push(p);
     else team2.push(p);
@@ -47,39 +47,119 @@ function balanceTeams(players: Player[]): [Player[], Player[]] {
 
 type Mode = "manual" | "balance";
 
+const TRANSLATIONS = {
+  es: {
+    title: "Registrar Partido",
+    needPlayers: "Necesitas jugadores registrados",
+    createPlayers: "Crear jugadores",
+    sport: "Deporte",
+    mode: "Modo de armado",
+    manual: "Manual",
+    balanceElo: "Balancear por ELO",
+    team1: "Equipo 1",
+    team2: "Equipo 2",
+    selectPlayers: "Selecciona jugadores",
+    balanceButton: "Balancear equipos",
+    balancedTitle: "Equipos balanceados",
+    reshuffle: "Mezclar de nuevo",
+    eloDiff: "Diferencia de ELO promedio:",
+    setsPlayed: "Sets jugados",
+    addSet: "Agregar set",
+    matchDate: "Fecha del partido",
+    save: "Guardar Partido",
+    saving: "Guardando...",
+    errorBalanceCount: "Selecciona la cantidad exacta de jugadores para balancear.",
+    errorFirstBalance: "Primero balancea los equipos.",
+    errorTeamSize: "Selecciona los jugadores requeridos por equipo.",
+    errorDuplicatePlayer: "Un jugador no puede estar en ambos equipos.",
+    errorSave: "Error al registrar el partido. Inténtalo de nuevo.",
+  },
+  en: {
+    title: "Register Match",
+    needPlayers: "Registered players required",
+    createPlayers: "Create players",
+    sport: "Sport",
+    mode: "Setup Mode",
+    manual: "Manual",
+    balanceElo: "Balance by ELO",
+    team1: "Team 1",
+    team2: "Team 2",
+    selectPlayers: "Select players",
+    balanceButton: "Balance teams",
+    balancedTitle: "Balanced Teams",
+    reshuffle: "Reshuffle",
+    eloDiff: "Avg ELO difference:",
+    setsPlayed: "Sets played",
+    addSet: "Add set",
+    matchDate: "Match Date",
+    save: "Save Match",
+    saving: "Saving...",
+    errorBalanceCount: "Select the exact number of players to balance.",
+    errorFirstBalance: "Balance teams first.",
+    errorTeamSize: "Select all required players for each team.",
+    errorDuplicatePlayer: "A player cannot be on both teams.",
+    errorSave: "Error registering match. Please try again.",
+  },
+  pt: {
+    title: "Registrar Partida",
+    needPlayers: "Jogadores registrados necessários",
+    createPlayers: "Criar jogadores",
+    sport: "Esporte",
+    mode: "Modo de montagem",
+    manual: "Manual",
+    balanceElo: "Balancear por ELO",
+    team1: "Equipe 1",
+    team2: "Equipe 2",
+    selectPlayers: "Selecionar jogadores",
+    balanceButton: "Balancear equipes",
+    balancedTitle: "Equipes balanceadas",
+    reshuffle: "Embaralhar novamente",
+    eloDiff: "Diferença média de ELO:",
+    setsPlayed: "Sets jogados",
+    addSet: "Adicionar set",
+    matchDate: "Data da partida",
+    save: "Salvar Partida",
+    saving: "Salvando...",
+    errorBalanceCount: "Selecione a quantidade exata de jogadores para balancear.",
+    errorFirstBalance: "Balanceie as equipes primeiro.",
+    errorTeamSize: "Selecione os jogadores necessários por equipe.",
+    errorDuplicatePlayer: "Um jogador não pode estar em ambas as equipes.",
+    errorSave: "Erro ao registrar a partida. Tente novamente.",
+  },
+};
+
 export default function NuevoPartido() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { data: players } = useListPlayers();
+  const createMatchMutation = useCreateMatch();
+
+  const { language } = useLanguage();
+  const t = TRANSLATIONS[(language as Language) || "es"] || TRANSLATIONS.es;
 
   const [sports, setSports] = useState<Sport[]>([]);
   const [sportsLoaded, setSportsLoaded] = useState(false);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const [mode, setMode] = useState<Mode>("manual");
 
-  // Estado modo manual
   const [team1Players, setTeam1Players] = useState<(number | null)[]>([null, null]);
   const [team2Players, setTeam2Players] = useState<(number | null)[]>([null, null]);
 
-  // Estado modo balanceo
   const [selectedForBalance, setSelectedForBalance] = useState<number[]>([]);
   const [balancedTeam1, setBalancedTeam1] = useState<Player[]>([]);
   const [balancedTeam2, setBalancedTeam2] = useState<Player[]>([]);
   const [balanceConfirmed, setBalanceConfirmed] = useState(false);
 
-  // Estado compartido
   const [sets, setSets] = useState<SetData[]>([{ setNumber: 1, team1Games: 0, team2Games: 0 }]);
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
   const [playedAt, setPlayedAt] = useState(new Date().toISOString().split("T")[0]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/sports")
       .then((r) => r.json())
       .then((data: Sport[]) => {
-        // Solo pádel y tenis para balanceo/encuentros
         setSports(data);
         if (data.length > 0) {
           setSelectedSport(data[0]);
@@ -129,7 +209,7 @@ export default function NuevoPartido() {
   const handleBalance = () => {
     const teamSize = selectedSport?.teamSize ?? 2;
     if (selectedForBalance.length !== teamSize * 2) {
-      setError(`Selecciona exactamente ${teamSize * 2} jugadores para balancear.`);
+      setError(t.errorBalanceCount);
       return;
     }
     setError("");
@@ -141,7 +221,6 @@ export default function NuevoPartido() {
   };
 
   const handleReshuffle = () => {
-    // Rebalancear con aleatoriedad
     const selectedPlayers = (players as Player[] ?? []).filter((p) => selectedForBalance.includes(p.id));
     const shuffled = [...selectedPlayers].sort(() => Math.random() - 0.5);
     const [t1, t2] = balanceTeams(shuffled);
@@ -180,12 +259,12 @@ export default function NuevoPartido() {
       t1Ids = team1Players.filter(Boolean) as number[];
       t2Ids = team2Players.filter(Boolean) as number[];
       if (t1Ids.length !== teamSize || t2Ids.length !== teamSize) {
-        setError(`Selecciona ${teamSize} jugador${teamSize !== 1 ? "es" : ""} por equipo.`);
+        setError(t.errorTeamSize);
         return;
       }
     } else {
       if (!balanceConfirmed || balancedTeam1.length === 0) {
-        setError("Primero balancea los equipos.");
+        setError(t.errorFirstBalance);
         return;
       }
       t1Ids = balancedTeam1.map((p) => p.id);
@@ -193,19 +272,16 @@ export default function NuevoPartido() {
     }
 
     if (new Set([...t1Ids, ...t2Ids]).size !== t1Ids.length + t2Ids.length) {
-      setError("Un jugador no puede estar en ambos equipos.");
+      setError(t.errorDuplicatePlayer);
       return;
     }
 
     const t1Score = useSets ? team1SetsWon : team1Score;
     const t2Score = useSets ? team2SetsWon : team2Score;
 
-    setIsSubmitting(true);
     try {
-      const res = await fetch("/api/matches", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await createMatchMutation.mutateAsync({
+        data: {
           sportId: selectedSport?.id,
           team1PlayerIds: t1Ids,
           team2PlayerIds: t2Ids,
@@ -213,28 +289,20 @@ export default function NuevoPartido() {
           team2Score: t2Score,
           sets: useSets ? sets : null,
           playedAt: new Date(playedAt).toISOString(),
-        }),
+        } as any,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Error al registrar el partido.");
-        return;
-      }
 
       queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       navigate("/partidos");
     } catch {
-      setError("Error de conexión. Intenta de nuevo.");
-    } finally {
-      setIsSubmitting(false);
+      setError(t.errorSave);
     }
   };
 
   if (!sportsLoaded) {
-    return <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Cargando...</div>;
+    return <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">...</div>;
   }
 
   const eloAvg = (ps: Player[]) => ps.length ? Math.round(ps.reduce((s, p) => s + p.elo, 0) / ps.length) : 0;
@@ -246,26 +314,24 @@ export default function NuevoPartido() {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold">Registrar Partido</h1>
+          <h1 className="text-xl font-bold">{t.title}</h1>
           <p className="text-sm text-muted-foreground">
-            {selectedSport ? `${selectedSport.name} · ${teamSize}v${teamSize}` : "Selecciona un deporte"}
+            {selectedSport ? `${selectedSport.name} · ${teamSize}v${teamSize}` : ""}
           </p>
         </div>
       </div>
 
       {!players?.length ? (
         <div className="bg-card border border-border rounded-xl p-6 text-center space-y-3">
-          <p className="text-sm font-medium">Necesitas jugadores registrados</p>
+          <p className="text-sm font-medium">{t.needPlayers}</p>
           <Link href="/jugadores/nuevo" className="inline-block bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
-            Crear jugadores
+            {t.createPlayers}
           </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* Deporte */}
           <div className="bg-card border border-border rounded-xl p-4 space-y-2">
-            <label className="text-sm font-semibold">Deporte</label>
+            <label className="text-sm font-semibold">{t.sport}</label>
             <div className="flex gap-2 flex-wrap">
               {sports.map((sport) => (
                 <button key={sport.id} type="button" onClick={() => handleSportChange(sport.id)}
@@ -278,32 +344,30 @@ export default function NuevoPartido() {
             </div>
           </div>
 
-          {/* Modo — solo para pádel y tenis */}
           {canBalance && (
             <div className="bg-card border border-border rounded-xl p-4 space-y-2">
-              <label className="text-sm font-semibold">Modo de armado</label>
+              <label className="text-sm font-semibold">{t.mode}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => handleModeChange("manual")}
                   className={cn("flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors",
                     mode === "manual" ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:border-primary/50"
                   )}>
-                  <Users size={15} /> Manual
+                  <Users size={15} /> {t.manual}
                 </button>
                 <button type="button" onClick={() => handleModeChange("balance")}
                   className={cn("flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors",
                     mode === "balance" ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:border-primary/50"
                   )}>
-                  <Shuffle size={15} /> Balancear por ELO
+                  <Shuffle size={15} /> {t.balanceElo}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Modo Manual — equipos */}
           {mode === "manual" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-center text-primary">Equipo 1</h3>
+                <h3 className="text-sm font-semibold text-center text-primary">{t.team1}</h3>
                 {team1Players.map((val, idx) => (
                   <PlayerSelect key={idx}
                     label={teamSize === 1 ? "Jugador" : `Jugador ${idx + 1}`}
@@ -314,7 +378,7 @@ export default function NuevoPartido() {
                 ))}
               </div>
               <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-center text-accent">Equipo 2</h3>
+                <h3 className="text-sm font-semibold text-center text-accent">{t.team2}</h3>
                 {team2Players.map((val, idx) => (
                   <PlayerSelect key={idx}
                     label={teamSize === 1 ? "Jugador" : `Jugador ${idx + 1}`}
@@ -327,14 +391,13 @@ export default function NuevoPartido() {
             </div>
           )}
 
-          {/* Modo Balanceo */}
           {mode === "balance" && (
             <div className="space-y-3">
               <div className="bg-card border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Selecciona jugadores</h3>
+                  <h3 className="text-sm font-semibold">{t.selectPlayers}</h3>
                   <span className="text-xs text-muted-foreground">
-                    {selectedForBalance.length} / {teamSize * 2} seleccionados
+                    {selectedForBalance.length} / {teamSize * 2}
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -369,24 +432,23 @@ export default function NuevoPartido() {
                 <button type="button" onClick={handleBalance}
                   disabled={selectedForBalance.length !== teamSize * 2}
                   className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity">
-                  <Shuffle size={15} /> Balancear equipos
+                  <Shuffle size={15} /> {t.balanceButton}
                 </button>
               </div>
 
-              {/* Resultado del balanceo */}
               {balanceConfirmed && balancedTeam1.length > 0 && (
                 <div className="bg-card border border-primary/20 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-primary">Equipos balanceados</h3>
+                    <h3 className="text-sm font-semibold text-primary">{t.balancedTitle}</h3>
                     <button type="button" onClick={handleReshuffle}
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                      <Shuffle size={12} /> Mezclar de nuevo
+                      <Shuffle size={12} /> {t.reshuffle}
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-semibold text-primary">Equipo 1</p>
+                        <p className="text-xs font-semibold text-primary">{t.team1}</p>
                         <span className="text-xs text-muted-foreground font-mono">~{eloAvg(balancedTeam1)} ELO</span>
                       </div>
                       {balancedTeam1.map((p) => (
@@ -397,7 +459,7 @@ export default function NuevoPartido() {
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-semibold text-accent">Equipo 2</p>
+                        <p className="text-xs font-semibold text-accent">{t.team2}</p>
                         <span className="text-xs text-muted-foreground font-mono">~{eloAvg(balancedTeam2)} ELO</span>
                       </div>
                       {balancedTeam2.map((p) => (
@@ -408,23 +470,22 @@ export default function NuevoPartido() {
                     </div>
                   </div>
                   <div className="text-center text-xs text-muted-foreground">
-                    Diferencia de ELO promedio: <span className="font-mono font-medium">{Math.abs(eloAvg(balancedTeam1) - eloAvg(balancedTeam2))} pts</span>
+                    {t.eloDiff} <span className="font-mono font-medium">{Math.abs(eloAvg(balancedTeam1) - eloAvg(balancedTeam2))} pts</span>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Resultado */}
           {(mode === "manual" ? allSelectedIds.length === teamSize * 2 : balanceConfirmed) && (
             <>
               {useSets ? (
                 <div className="bg-card border border-border rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Sets jugados</h3>
+                    <h3 className="text-sm font-semibold">{t.setsPlayed}</h3>
                     {sets.length < 5 && (
                       <button type="button" onClick={addSet} className="flex items-center gap-1 text-xs text-primary hover:underline">
-                        <Plus size={12} /> Agregar set
+                        <Plus size={12} /> {t.addSet}
                       </button>
                     )}
                   </div>
@@ -453,15 +514,15 @@ export default function NuevoPartido() {
                 </div>
               ) : (
                 <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold">Resultado (goles)</h3>
+                  <h3 className="text-sm font-semibold">Resultado</h3>
                   <div className="flex items-center justify-center gap-4">
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Equipo 1</span>
+                      <span className="text-xs text-muted-foreground">{t.team1}</span>
                       <GamesInput value={team1Score} onChange={setTeam1Score} color="primary" />
                     </div>
                     <span className="text-2xl font-bold text-muted-foreground">-</span>
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Equipo 2</span>
+                      <span className="text-xs text-muted-foreground">{t.team2}</span>
                       <GamesInput value={team2Score} onChange={setTeam2Score} color="accent" />
                     </div>
                   </div>
@@ -469,7 +530,7 @@ export default function NuevoPartido() {
               )}
 
               <div className="bg-card border border-border rounded-xl p-4 space-y-1.5">
-                <label className="text-sm font-medium">Fecha del partido</label>
+                <label className="text-sm font-medium">{t.matchDate}</label>
                 <input type="date" value={playedAt} onChange={(e) => setPlayedAt(e.target.value)}
                   className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
@@ -483,9 +544,9 @@ export default function NuevoPartido() {
           )}
 
           <button type="submit"
-            disabled={isSubmitting || (mode === "manual" ? allSelectedIds.length < teamSize * 2 : !balanceConfirmed)}
+            disabled={createMatchMutation.isPending || (mode === "manual" ? allSelectedIds.length < teamSize * 2 : !balanceConfirmed)}
             className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSubmitting ? "Guardando..." : "Guardar Partido"}
+            {createMatchMutation.isPending ? t.saving : t.save}
           </button>
         </form>
       )}

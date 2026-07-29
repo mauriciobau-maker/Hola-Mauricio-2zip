@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { sportsTable } from "./sports";
 import { encuentrosTable } from "./encuentros";
+import { clubsTable } from "./clubs";
 
 export const setScoreSchema = z.object({
   setNumber: z.number().int(),
@@ -13,7 +14,9 @@ export type SetScore = z.infer<typeof setScoreSchema>;
 
 export const matchesTable = pgTable("matches", {
   id: serial("id").primaryKey(),
-  sportId: integer("sport_id").notNull().references(() => sportsTable.id),
+  // Añadimos onDelete: "cascade" para mantener la integridad
+  clubId: integer("club_id").references(() => clubsTable.id, { onDelete: "cascade" }), 
+  sportId: integer("sport_id").notNull().references(() => sportsTable.id, { onDelete: "cascade" }),
   encuentroId: integer("encuentro_id").references(() => encuentrosTable.id, { onDelete: "set null" }),
   team1Score: integer("team1_score").notNull().default(0),
   team2Score: integer("team2_score").notNull().default(0),

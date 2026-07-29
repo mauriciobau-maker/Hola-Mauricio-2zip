@@ -1,6 +1,7 @@
 import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { clubsTable } from "./clubs";
 import { sportsTable } from "./sports";
+import { playersTable } from "./players"; // Importamos para la integridad de asistencia
 
 export const encuentrosTable = pgTable("encuentros", {
   id: serial("id").primaryKey(),
@@ -21,8 +22,8 @@ export const encuentrosTable = pgTable("encuentros", {
 
 export const asistenciaTable = pgTable("asistencia", {
   id: serial("id").primaryKey(),
-  encuentroId: integer("encuentro_id").notNull(),
-  playerId: integer("player_id").notNull(),
+  encuentroId: integer("encuentro_id").notNull().references(() => encuentrosTable.id, { onDelete: "cascade" }),
+  playerId: integer("player_id").notNull().references(() => playersTable.id, { onDelete: "cascade" }), // Integridad asegurada
   status: text("status").notNull().default("pending"),
   respondedAt: timestamp("responded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -30,7 +31,7 @@ export const asistenciaTable = pgTable("asistencia", {
 
 export const notificationSubscriptionsTable = pgTable("notification_subscriptions", {
   id: serial("id").primaryKey(),
-  playerId: integer("player_id").notNull(),
+  playerId: integer("player_id").notNull().references(() => playersTable.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   value: text("value").notNull(),
   active: boolean("active").notNull().default(true),

@@ -1,6 +1,15 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and } from "drizzle-orm";
-import { db, playersTable, matchesTable, eloHistoryTable, matchPlayersTable } from "@workspace/db";
+import { 
+  db, 
+  playersTable, 
+  matchesTable, 
+  eloHistoryTable, 
+  matchPlayersTable, 
+  playerCategoriesTable, 
+  clubSportCategoriesTable, 
+  clubsTable 
+} from "@workspace/db";
 import {
   CreatePlayerBody,
   GetPlayerParams,
@@ -12,14 +21,45 @@ import {
 
 const router: IRouter = Router();
 
-function toPlayerResponse(p: typeof playersTable.$inferSelect) {
+// Helper para formatear nombres en Title Case y limpiar espacios de más
+function formatName(input: string): string {
+  return input
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/(?:^|\s|-)\S/g, (a) => a.toUpperCase());
+}
+
+// Helper enriquecido para incluir las categorías del jugador de forma segura
+async function enrichPlayer(player: typeof playersTable.$inferSelect) {
+  let categories: any[] = [];
+  try {
+    categories = await db
+      .select({
+        id: clubSportCategoriesTable.id,
+        clubSportId: clubSportCategoriesTable.clubSportId,
+        name: clubSportCategoriesTable.name,
+      })
+      .from(playerCategoriesTable)
+      .innerJoin(clubSportCategoriesTable, eq(playerCategoriesTable.categoryId, clubSportCategoriesTable.id))
+      .where(eq(playerCategoriesTable.playerId, player.id));
+  } catch (err) {
+    categories = [];
+  }
+
   return {
-    id: p.id,
-    name: p.name,
-    nickname: p.nickname ?? null,
-    elo: p.elo,
-    avatarInitials: p.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
-    createdAt: p.createdAt.toISOString(),
+    id: player.id,
+    name: player.name,
+    nickname: player.nickname ?? null,
+    elo: player.elo,
+    phone: player.phone ?? null,
+    waId: player.waId ?? null,
+    wspConsent: player.wspConsent ?? false,
+    language: player.language ?? "es",
+    clubId: player.clubId ?? null,
+    avatarInitials: player.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2),
+    createdAt: player.createdAt.toISOString(),
+    categories, 
   };
 }
 
@@ -28,18 +68,71 @@ router.get("/players", async (req, res): Promise<void> => {
   const players = clubId
     ? await db.select().from(playersTable).where(eq(playersTable.clubId, clubId)).orderBy(playersTable.name)
     : await db.select().from(playersTable).orderBy(playersTable.name);
-  res.json(players.map(toPlayerResponse));
+
+  const enriched = await Promise.all(players.map(enrichPlayer));
+  res.json(enriched);
 });
 
 router.post("/players", async (req, res): Promise<void> => {
-  const parsed = CreatePlayerBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
+  try {
+    const bodyData = req.body?.data ? req.body.data : req.body;
+
+    const parsed = CreatePlayerBody.safeParse(bodyData);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const user = req.user as { role?: string; clubId?: number | null } | undefined;
+    const isSuperAdmin = user?.role === "superadmin" || user?.role === "admin";
+
+    let targetClubId = user?.clubId ?? null;
+
+    if (isSuperAdmin) {
+      const clubIdInput = bodyData.clubId ?? req.body.clubId;
+      const clubCodeInput = bodyData.clubCode ?? req.body.clubCode;
+
+      if (clubIdInput) {
+        targetClubId = Number(clubIdInput);
+      } else if (clubCodeInput) {
+        const [foundClub] = await db
+          .select()
+          .from(clubsTable)
+          .where(eq(clubsTable.slug, String(clubCodeInput).trim().toLowerCase()));
+        if (foundClub) {
+          targetClubId = foundClub.id;
+        }
+      }
+    }
+
+    const nameFormatted = formatName(parsed.data.name);
+    const nicknameFormatted = parsed.data.nickname ? formatName(parsed.data.nickname) : null;
+
+    const { clubCode, categoryIds: parsedCategoryIds, ...restParsedData } = parsed.data as Record<string, unknown>;
+
+    const [player] = await db.insert(playersTable).values({ 
+      ...restParsedData, 
+      name: nameFormatted,
+      nickname: nicknameFormatted,
+      clubId: targetClubId 
+    }).returning();
+
+    const categoryIds = (parsedCategoryIds as number[]) || (bodyData.categoryIds as number[]) || (req.body.categoryIds as number[]) || [];
+    if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+      await db.insert(playerCategoriesTable).values(
+        categoryIds.map((catId) => ({
+          playerId: player.id,
+          categoryId: Number(catId),
+        }))
+      );
+    }
+
+    const responseObj = await enrichPlayer(player);
+    res.status(201).json(responseObj);
+  } catch (error: any) {
+    console.error("🔥 ERROR DETALLADO AL CREAR JUGADOR:", error);
+    res.status(500).json({ error: error.message || "Error interno al crear el jugador" });
   }
-  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId ?? null;
-  const [player] = await db.insert(playersTable).values({ ...parsed.data, clubId }).returning();
-  res.status(201).json(toPlayerResponse(player));
 });
 
 router.get("/players/:id", async (req, res): Promise<void> => {
@@ -58,7 +151,8 @@ router.get("/players/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
-  res.json(toPlayerResponse(player));
+  const responseObj = await enrichPlayer(player);
+  res.json(responseObj);
 });
 
 router.patch("/players/:id", async (req, res): Promise<void> => {
@@ -73,20 +167,57 @@ router.patch("/players/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const updates: Record<string, unknown> = {};
-  if (body.data.name !== undefined) updates.name = body.data.name;
-  if ("nickname" in body.data) updates.nickname = body.data.nickname ?? null;
 
-  const [updated] = await db
+  const user = req.user as { role?: string; playerId?: number; clubId?: number | null } | undefined;
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+
+  const updates: Record<string, unknown> = {};
+
+  if (isAdmin) {
+    if (body.data.name !== undefined && body.data.name.trim() !== "") {
+      updates.name = formatName(body.data.name);
+    }
+    if ("nickname" in body.data) {
+      updates.nickname = body.data.nickname ? formatName(body.data.nickname) : null;
+    }
+  }
+
+  const { phone, waId, wspConsent, language, categoryIds } = req.body;
+  if (phone !== undefined) updates.phone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+  if (waId !== undefined) updates.waId = typeof waId === "string" && waId.trim() ? waId.trim() : null;
+  if (wspConsent !== undefined) updates.wspConsent = Boolean(wspConsent);
+  if (language !== undefined && typeof language === "string") updates.language = language;
+
+  const clubId = user?.clubId;
+  const whereClause = clubId
+    ? and(eq(playersTable.id, params.data.id), eq(playersTable.clubId, clubId))
+    : eq(playersTable.id, params.data.id);
+
+  const [updatedRecord] = await db
     .update(playersTable)
     .set(updates)
-    .where(eq(playersTable.id, params.data.id))
+    .where(whereClause)
     .returning();
-  if (!updated) {
+
+  if (!updatedRecord) {
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
-  res.json(toPlayerResponse(updated));
+
+  if (Array.isArray(categoryIds)) {
+    await db.delete(playerCategoriesTable).where(eq(playerCategoriesTable.playerId, updatedRecord.id));
+    if (categoryIds.length > 0) {
+      await db.insert(playerCategoriesTable).values(
+        categoryIds.map((catId: number) => ({
+          playerId: updatedRecord.id,
+          categoryId: catId,
+        }))
+      );
+    }
+  }
+
+  const responseObj = await enrichPlayer(updatedRecord);
+  res.json(responseObj);
 });
 
 router.delete("/players/:id", async (req, res): Promise<void> => {
@@ -118,7 +249,6 @@ router.get("/players/:id/stats", async (req, res): Promise<void> => {
     return;
   }
 
-  // Obtener entradas de match_players para este jugador
   const playerMatchEntries = await db
     .select()
     .from(matchPlayersTable)

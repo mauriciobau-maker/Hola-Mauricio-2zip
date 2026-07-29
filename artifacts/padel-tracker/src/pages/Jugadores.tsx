@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { useListPlayers, useDeletePlayer, getListPlayersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, ChevronRight, Users, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, Search, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function initials(name: string) {
@@ -19,6 +20,8 @@ const avatarColors = [
 
 export default function Jugadores() {
   const { data: players, isLoading } = useListPlayers();
+  const [search, setSearch] = useState("");
+
   const queryClient = useQueryClient();
   const deleteMutation = useDeletePlayer({
     mutation: {
@@ -28,10 +31,21 @@ export default function Jugadores() {
     },
   });
 
+  const filteredPlayers = players?.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.nickname && p.nickname.toLowerCase().includes(search.toLowerCase()))
+  );
+
   const handleDelete = (id: number, name: string) => {
-    if (confirm(`Eliminar a ${name}? Esta accion no se puede deshacer.`)) {
+    if (confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) {
       deleteMutation.mutate({ id });
     }
+  };
+
+  const openWhatsApp = (phone: string) => {
+    // Limpia el número quitando caracteres no numéricos
+    const cleanPhone = phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${cleanPhone}`, "_blank");
   };
 
   return (
@@ -40,7 +54,7 @@ export default function Jugadores() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Jugadores</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {players?.length ?? 0} jugador{(players?.length ?? 0) !== 1 ? "es" : ""} registrado{(players?.length ?? 0) !== 1 ? "s" : ""}
+            {players?.length ?? 0} registrados
           </p>
         </div>
         <Link
@@ -52,6 +66,17 @@ export default function Jugadores() {
         </Link>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-3 text-muted-foreground" size={16} />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o apodo..."
+          className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => (
@@ -59,57 +84,52 @@ export default function Jugadores() {
           ))}
         </div>
       ) : !players?.length ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <Users size={28} className="text-muted-foreground" />
-          </div>
-          <div>
-            <p className="font-semibold">Sin jugadores aun</p>
-            <p className="text-sm text-muted-foreground">Crea el primer jugador para empezar</p>
-          </div>
-          <Link
-            href="/jugadores/nuevo"
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            Crear jugador
-          </Link>
-        </div>
+        <div className="text-center py-20 text-muted-foreground">Sin jugadores registrados</div>
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
-          {players.map((player, idx) => (
-            <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
-              <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0",
-                avatarColors[idx % avatarColors.length]
-              )}>
-                {initials(player.name)}
-              </div>
-              <Link href={`/jugadores/${player.id}`} className="flex-1 min-w-0">
-                <p className="font-medium text-sm">{player.name}</p>
-                {player.nickname && (
-                  <p className="text-xs text-muted-foreground">&quot;{player.nickname}&quot;</p>
-                )}
-              </Link>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Link
-                  href={`/jugadores/${player.id}/editar`}
-                  className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Pencil size={14} />
+          {filteredPlayers?.map((player: any, idx) => {
+            const points = player.elo ?? 1500;
+
+            return (
+              <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
+                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0", avatarColors[idx % avatarColors.length])}>
+                  {initials(player.name)}
+                </div>
+
+                <Link href={`/jugadores/${player.id}`} className="flex-1 min-w-0 flex items-center justify-between group-hover:scale-[1.005] transition-transform">
+                  <div>
+                    <p className="font-semibold text-sm truncate">{player.name}</p>
+                    {player.nickname && <p className="text-[11px] text-muted-foreground uppercase tracking-wide">&quot;{player.nickname}&quot;</p>}
+                  </div>
+                  <div className="text-right mr-2">
+                    <span className="text-lg font-black text-primary tracking-tighter">{points}</span>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold -mt-1">Pts</p>
+                  </div>
                 </Link>
-                <button
-                  onClick={() => handleDelete(player.id, player.name)}
-                  className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 size={14} />
-                </button>
-                <Link href={`/jugadores/${player.id}`} className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
-                  <ChevronRight size={14} />
-                </Link>
+
+                <div className="flex items-center gap-1">
+                  {player.phone && (
+                    <button
+                      onClick={() => openWhatsApp(player.phone)}
+                      title="Enviar WhatsApp"
+                      className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-500 transition-colors"
+                    >
+                      <MessageCircle size={15} />
+                    </button>
+                  )}
+                  <Link href={`/jugadores/${player.id}/editar`} className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors">
+                    <Pencil size={14} />
+                  </Link>
+                  <button onClick={() => handleDelete(player.id, player.name)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+          {filteredPlayers?.length === 0 && (
+            <div className="p-8 text-center text-sm text-muted-foreground">No se encontraron jugadores</div>
+          )}
         </div>
       )}
     </div>

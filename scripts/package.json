@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "next dev",
     "hello": "tsx ./src/hello.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",

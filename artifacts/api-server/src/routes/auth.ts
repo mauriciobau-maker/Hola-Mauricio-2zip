@@ -70,7 +70,6 @@ async function upsertUser(claims: Record<string, unknown>) {
     profileImageUrl: (claims.profile_image_url || claims.picture) as string | null,
   };
 
-  // Solo actualiza campos de perfil — nunca sobreescribe clubId ni isAdmin
   const [user] = await db
     .insert(usersTable)
     .values(userData)
@@ -113,7 +112,6 @@ router.get("/auth/user", async (req: Request, res: Response) => {
     res.json({ user: null });
     return;
   }
-
   const userWithClub = await getUserWithClub(req.user.id);
   res.json({ user: userWithClub });
 });
@@ -135,7 +133,7 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     .returning();
   res.json({ user: updated });
 });
-// POST /auth/join-club — usuario ingresa código de invitación
+
 router.post("/auth/join-club", async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
@@ -167,8 +165,8 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     .where(eq(usersTable.id, req.user.id))
     .returning();
 
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     club: { id: club.id, name: club.name, slug: club.slug },
     user: updated,
   });
@@ -257,6 +255,7 @@ router.get("/callback", async (req: Request, res: Response) => {
       profileImageUrl: dbUser.profileImageUrl,
       clubId: dbUser.clubId ?? null,
       isAdmin: dbUser.isAdmin,
+      isClubAdmin: dbUser.isClubAdmin,
     },
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -325,6 +324,7 @@ router.post("/mobile-auth/token-exchange", async (req: Request, res: Response) =
         profileImageUrl: dbUser.profileImageUrl,
         clubId: dbUser.clubId ?? null,
         isAdmin: dbUser.isAdmin,
+        isClubAdmin: dbUser.isClubAdmin,
       },
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useGetDashboard, useGetRanking } from "@workspace/api-client-react";
-import { Users, Calendar, Trophy, TrendingUp, Plus, ChevronRight } from "lucide-react";
+import { Users, Calendar, Trophy, TrendingUp, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
@@ -35,13 +35,6 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Resumen general del club</p>
         </div>
-        <Link
-          href="/partidos/nuevo"
-          className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus size={15} />
-          Partido
-        </Link>
       </div>
 
       {/* Stats cards */}

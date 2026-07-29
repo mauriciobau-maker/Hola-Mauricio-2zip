@@ -21,6 +21,10 @@ import { VincularJugador } from "@/pages/VincularJugador";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { Onboarding } from "@/pages/Onboarding";
+import Cobros from "@/pages/Cobros";
+
+// Importamos el proveedor de idiomas que creamos
+import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +53,7 @@ function Router() {
         <Route path="/encuentros" component={Encuentros} />
         <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
         <Route path="/encuentros/:id" component={EncuentroDetalle} />
+        <Route path="/cobros" component={Cobros} />
         <Route path="/onboarding" component={Onboarding} />
         <Route path="/vincular" component={VincularJugador} />
         <Route path="/admin" component={Admin} />
@@ -61,12 +66,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <LanguageProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

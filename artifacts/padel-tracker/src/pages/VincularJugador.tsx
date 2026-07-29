@@ -3,7 +3,7 @@ import { useListPlayers } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "lucide-react";
+import { Link, Shield } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +27,25 @@ export function VincularJugador() {
     return (
       <div className="max-w-md mx-auto mt-16 text-center">
         <p className="text-muted-foreground">Debes iniciar sesión para vincular tu cuenta.</p>
+      </div>
+    );
+  }
+
+  // 🛡️ VISTA ESPECIAL PARA SUPER ADMIN
+  const isSuperAdmin = (user as any)?.role === "superadmin" || (user as any)?.role === "super_admin";
+  if (isSuperAdmin) {
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="p-3 bg-primary/10 rounded-full text-primary">
+            <Shield className="h-8 w-8" />
+          </div>
+        </div>
+        <h1 className="text-xl font-bold">Modo Super Admin</h1>
+        <p className="text-muted-foreground text-sm">
+          Como administrador global de la plataforma no necesitas estar vinculado a un perfil de jugador para gestionar el sistema.
+        </p>
+        <Button onClick={() => navigate("/admin")}>Ir al Panel de Administración</Button>
       </div>
     );
   }
