@@ -1,45 +1,43 @@
-# [Project name]
+# Padel Tracker IA
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
-
-## Run & Operate
-
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+A full-stack padel club management app with Elo rankings, match tracking, player management, encounters (encuentros), and billing (cobros).
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui (`artifacts/padel-tracker`)
+- **Backend**: Express API server (`artifacts/api-server`)
+- **Database**: PostgreSQL via Drizzle ORM (`lib/db`)
+- **Auth**: Replit Auth (OpenID Connect)
+- **Shared libs**: `lib/api-client-react`, `lib/api-spec`, `lib/api-zod`, `lib/replit-auth-web`
 
-## Where things live
+## How to run
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+Three workflows are configured and should all be running:
 
-## Architecture decisions
+| Workflow | Command |
+|---|---|
+| `artifacts/api-server: API Server` | `pnpm --filter @workspace/api-server run dev` |
+| `artifacts/padel-tracker: web` | `pnpm --filter @workspace/padel-tracker run dev` |
+| `artifacts/mockup-sandbox: Component Preview Server` | `pnpm --filter @workspace/mockup-sandbox run dev` |
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+The frontend proxies `/api` requests to the API server on port 8080.
 
-## Product
+## Database
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Schema lives in `lib/db/src/schema/`. To push schema changes to the database:
+
+```bash
+DATABASE_URL="$DATABASE_URL" pnpm drizzle-kit push --config drizzle.config.ts
+```
+
+Migrations/snapshots are in `./drizzle/`.
+
+## Environment variables
+
+- `DATABASE_URL` — PostgreSQL connection string (already configured in Replit)
+- `SESSION_SECRET` — Session signing secret (already configured as a Replit secret)
+- `PORT` / `BASE_PATH` — Set automatically per artifact by Replit
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Language: Spanish (the app UI is in Spanish)
