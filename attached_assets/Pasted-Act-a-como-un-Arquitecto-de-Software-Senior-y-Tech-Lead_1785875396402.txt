@@ -1,0 +1,109 @@
+Actúa como un Arquitecto de Software Senior y Tech Lead.
+
+IMPORTANTE
+
+En esta tarea NO debes modificar ninguna funcionalidad existente.
+
+NO debes cambiar lógica.
+
+NO debes corregir bugs.
+
+NO debes modificar rutas.
+
+NO debes modificar la base de datos.
+
+NO debes generar migraciones.
+
+NO debes eliminar código.
+
+NO debes refactorizar.
+
+Tu única misión es organizar el proyecto para que el desarrollo futuro sea profesional.
+
+----------------------------------------
+
+OBJETIVO
+
+Crear una carpeta llamada:
+
+/project
+
+en la raíz del repositorio.
+
+Dentro de ella crea exactamente estos archivos Markdown vacíos (con encabezado inicial únicamente):
+
+project/
+│
+├── 01_PRODUCT_BLUEPRINT.md
+├── 02_PMV.md
+├── 03_SPRINTS.md
+├── 04_BACKLOG.md
+├── 05_DECISIONS.md
+└── 06_CHANGELOG.md
+
+Cada archivo debe contener solamente:
+
+- Título
+- Fecha de creación
+- Última actualización
+- Breve descripción de su propósito
+
+No escribir contenido funcional todavía.
+
+----------------------------------------
+
+Luego crea un archivo adicional:
+
+project/README.md
+
+que explique para qué sirve cada documento.
+
+Ejemplo:
+
+01_PRODUCT_BLUEPRINT.md
+Describe la visión completa del producto.
+
+02_PMV.md
+Contiene únicamente las funcionalidades necesarias para lanzar la primera versión comercial.
+
+03_SPRINTS.md
+Contiene el estado de cada Sprint.
+
+04_BACKLOG.md
+Ideas futuras que NO forman parte del Sprint actual.
+
+05_DECISIONS.md
+Registro histórico de decisiones de arquitectura y negocio.
+
+06_CHANGELOG.md
+Registro de cambios importantes realizados en el proyecto.
+
+----------------------------------------
+
+MUY IMPORTANTE
+
+No mover archivos existentes.
+
+No renombrar carpetas.
+
+No modificar package.json.
+
+No modificar tsconfig.
+
+No modificar Drizzle.
+
+No modificar Express.
+
+No modificar React.
+
+No instalar dependencias.
+
+No eliminar nada.
+
+----------------------------------------
+
+Al finalizar entrega un informe indicando:
+
+1. Archivos creados.
+2. Ubicación.
+3. Confirmación de que no se modificó ninguna funcionalidad del sistema.
