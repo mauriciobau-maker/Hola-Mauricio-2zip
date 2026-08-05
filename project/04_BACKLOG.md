@@ -1,3 +1,11 @@
+> **Importante**
+>
+> Este documento contiene únicamente funcionalidades del producto.
+>
+> Las correcciones técnicas, arquitectura, seguridad, rendimiento y deuda técnica se gestionan en:
+>
+> **08_TECHNICAL_BACKLOG.md**
+
 # 04 — Backlog
 
 - **Creado:** 2026-08-03
