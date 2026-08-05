@@ -400,14 +400,14 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
           .where(eq(matchPlayersTable.matchId, match.id));
 
         const team1 = matchPlayers
-          .filter((mp) => Number(mp.team) === 1)
+          .filter((mp) => mp.team === "team1")
           .map((mp) => ({
             id: mp.playerId,
             name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}`,
           }));
 
         const team2 = matchPlayers
-          .filter((mp) => Number(mp.team) === 2)
+          .filter((mp) => mp.team === "team2")
           .map((mp) => ({
             id: mp.playerId,
             name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}`,
@@ -553,16 +553,16 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
         await db.insert(matchPlayersTable).values({
           matchId: newMatch.id,
           playerId: pId,
-          team: 1,
-        } as any);
+          team: "team1",
+        });
       }
 
       for (const pId of cruce.team2) {
         await db.insert(matchPlayersTable).values({
           matchId: newMatch.id,
           playerId: pId,
-          team: 2,
-        } as any);
+          team: "team2",
+        });
       }
 
       partidosCreados.push(newMatch);
