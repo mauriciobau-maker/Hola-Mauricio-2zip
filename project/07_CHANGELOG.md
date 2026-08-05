@@ -52,3 +52,31 @@ Se implementó la inicialización automática de la tabla sports.
 ### Auditoría
 
 Cambio aprobado tras revisión técnica.
+
+# P0-002 — Corrección match_players.team
+
+Fecha:
+2026-08-04
+
+Estado:
+🟢 Completado
+
+Descripción:
+
+Se corrigió la inconsistencia del campo match_players.team.
+
+El sistema ahora utiliza exclusivamente:
+
+- team1
+- team2
+
+Se eliminó el uso de valores numéricos y casts forzados.
+
+Impacto:
+
+Los partidos generados desde encuentros ahora son compatibles con:
+
+- Ranking
+- Elo
+- Parejas
+- Estadísticas

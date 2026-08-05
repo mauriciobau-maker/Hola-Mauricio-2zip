@@ -317,7 +317,7 @@ Resultados inconsistentes.
 
 Estado:
 
-Pendiente.
+🟢 COMPLETADO
 
 ---
 

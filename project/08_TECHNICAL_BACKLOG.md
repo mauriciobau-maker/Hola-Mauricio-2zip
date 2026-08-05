@@ -86,7 +86,10 @@ Título:
 Unificación del modelo match_players.team
 
 Estado:
-⬜ Pendiente
+🟢 Completado
+
+Fecha:
+2026-08-04
 
 Objetivo:
 
@@ -98,8 +101,18 @@ Impacto:
 - Ranking
 - Parejas
 - Match Players
+Resultado:
 
----
+✔ Se unificó match_players.team al formato canónico team1/team2.
+
+✔ Se eliminaron valores numéricos 1/2.
+
+✔ Se eliminó uso de as any.
+
+✔ No fue necesaria migración de datos porque la tabla no tenía registros.
+
+✔ Cambio limitado exclusivamente a encuentros.ts.
+
 
 ## P0-003
 
