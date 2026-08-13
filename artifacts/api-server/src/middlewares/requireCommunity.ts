@@ -1,5 +1,17 @@
 import type { Request, Response, NextFunction } from "express";
 
+export function isSuperAdminUser(
+  user: { isAdmin?: number | boolean | null; role?: string | null } | undefined,
+): boolean {
+  return (
+    user?.isAdmin === 1 ||
+    user?.isAdmin === true ||
+    user?.role === "superadmin" ||
+    user?.role === "admin" ||
+    user?.role === "SUPER_ADMIN"
+  );
+}
+
 /**
  * requireAuth
  *
@@ -34,6 +46,34 @@ export function requireClub(
     res.status(403).json({ error: "Community membership required" });
     return;
   }
+  next();
+}
+
+/**
+ * Requires authentication and a community scope, except for Super Admins.
+ * Super Admins intentionally keep global access without a clubId.
+ */
+export function requireCommunityAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  if (isSuperAdminUser(req.user)) {
+    next();
+    return;
+  }
+
+  const clubId = (req.user as { clubId?: number | null }).clubId;
+  if (clubId == null) {
+    res.status(403).json({ error: "Community membership required" });
+    return;
+  }
+
   next();
 }
 

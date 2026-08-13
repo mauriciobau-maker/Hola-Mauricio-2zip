@@ -18,6 +18,10 @@ import {
   DeletePlayerParams,
   GetPlayerStatsParams,
 } from "@workspace/api-zod";
+import {
+  isSuperAdminUser,
+  requireCommunityAccess,
+} from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -109,6 +113,7 @@ async function enrichPlayer(
 
 router.get(
   "/players",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const clubId = (
       req.user as {
@@ -366,6 +371,7 @@ router.post(
 
 router.get(
   "/players/:id",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -665,6 +671,7 @@ router.patch(
 
 router.delete(
   "/players/:id",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -689,16 +696,22 @@ router.delete(
       return;
     }
 
-    const [deleted] =
-      await db
-        .delete(playersTable)
-        .where(
-          eq(
-            playersTable.id,
-            params.data.id
-          )
-        )
-        .returning();
+    const user = req.user as {
+      clubId?: number | null;
+      isAdmin?: number | boolean | null;
+      role?: string | null;
+    };
+    const ownershipClause = isSuperAdminUser(user)
+      ? eq(playersTable.id, params.data.id)
+      : and(
+          eq(playersTable.id, params.data.id),
+          eq(playersTable.clubId, user.clubId!),
+        );
+
+    const [deleted] = await db
+      .delete(playersTable)
+      .where(ownershipClause)
+      .returning();
 
     if (!deleted) {
       res.status(404).json({
