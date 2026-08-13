@@ -17,8 +17,8 @@ import {
 } from "../elo";
 import { recalculateSportElo } from "../lib/recalculateElo";
 import {
-  requireAuth,
-  requireClub,
+  isSuperAdminUser,
+  requireCommunityAccess,
 } from "../middlewares/requireCommunity";
 import { getSportModality, validatePlayersForClub } from "../lib/modalities";
 
@@ -447,30 +447,13 @@ async function enrichMatch(
 
 router.get(
   "/matches",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
-    const clubId =
-      (
-        req.user as {
-          clubId: number;
-        }
-      ).clubId;
-
-    const matches = await db
-      .select()
-      .from(matchesTable)
-      .where(
-        eq(
-          matchesTable.clubId,
-          clubId
-        )
-      )
-      .orderBy(
-        desc(
-          matchesTable.playedAt
-        )
-      );
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+    const clubId = isSuperAdminUser(user) ? null : user.clubId!;
+    const matches = clubId == null
+      ? await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt))
+      : await db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)).orderBy(desc(matchesTable.playedAt));
 
     const result =
       await Promise.all(
@@ -490,8 +473,7 @@ router.get(
 
 router.post(
   "/matches",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const {
       sportId,
@@ -605,12 +587,13 @@ router.post(
     // Club actual
     // ----------------------------------------------------------
 
-    const clubId =
-      (
-        req.user as {
-          clubId: number;
-        }
-      ).clubId;
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+    const requestedClubId = req.body.clubId === undefined ? null : Number(req.body.clubId);
+    const clubId = isSuperAdminUser(user) ? requestedClubId : user.clubId!;
+    if (!Number.isInteger(clubId) || clubId! <= 0) {
+      res.status(400).json({ error: "Los Super Admin deben indicar clubId para crear un partido" });
+      return;
+    }
 
     // ----------------------------------------------------------
     // Verificar jugadores del club
@@ -812,8 +795,7 @@ router.post(
 
 router.post(
   "/matches/:id/confirm",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const rawId =
       Array.isArray(req.params.id)
@@ -863,8 +845,8 @@ router.post(
     }
 
     if (
-      existing.clubId !==
-      clubId
+      !isSuperAdminUser(req.user) &&
+      existing.clubId !== clubId
     ) {
       res.status(403).json({
         error:
@@ -982,8 +964,7 @@ router.post(
 
 router.get(
   "/matches/:id",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const rawId =
       Array.isArray(req.params.id)
@@ -1033,8 +1014,8 @@ router.get(
     }
 
     if (
-      match.clubId !==
-      clubId
+      !isSuperAdminUser(req.user) &&
+      match.clubId !== clubId
     ) {
       res.status(403).json({
         error:
@@ -1058,8 +1039,7 @@ router.get(
 
 router.patch(
   "/matches/:id",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const rawId =
       Array.isArray(req.params.id)
@@ -1109,8 +1089,8 @@ router.patch(
     }
 
     if (
-      existing.clubId !==
-      clubId
+      !isSuperAdminUser(req.user) &&
+      existing.clubId !== clubId
     ) {
       res.status(403).json({
         error:
@@ -1468,8 +1448,7 @@ router.patch(
 
 router.delete(
   "/matches/:id",
-  requireAuth,
-  requireClub,
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const rawId =
       Array.isArray(req.params.id)
@@ -1519,8 +1498,8 @@ router.delete(
     }
 
     if (
-      existing.clubId !==
-      clubId
+      !isSuperAdminUser(req.user) &&
+      existing.clubId !== clubId
     ) {
       res.status(403).json({
         error:
