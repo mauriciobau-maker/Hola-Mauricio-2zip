@@ -26,6 +26,16 @@ interface Sport {
   useSets: boolean;
 }
 
+interface Modality {
+  id: number;
+  sportId: number;
+  name: string;
+  slug: string;
+  teamSize: number;
+  useSets: boolean;
+  active: boolean;
+}
+
 interface Player {
   id: number;
   name: string;
@@ -140,6 +150,8 @@ export default function NuevoPartido() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [sportsLoaded, setSportsLoaded] = useState(false);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [modalities, setModalities] = useState<Modality[]>([]);
+  const [selectedModality, setSelectedModality] = useState<Modality | null>(null);
   const [mode, setMode] = useState<Mode>("manual");
 
   const [team1Players, setTeam1Players] = useState<(number | null)[]>([null, null]);

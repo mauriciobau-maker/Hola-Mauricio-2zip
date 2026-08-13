@@ -857,3 +857,324 @@ La prioridad será:
 Motivo:
 
 El producto debe crecer basado en usuarios reales y no solamente en desarrollo.
+
+Sistema de Rating Deportivo
+Fecha: Agosto 2026
+Estado: Aprobado
+Versión: 1.0
+1. Decisión
+La plataforma no utilizará un único sistema universal de ELO.
+El rendimiento deportivo se determinará mediante un Rating Engine, capaz de seleccionar el sistema de valoración apropiado según:
+Comunidad.
+Deporte.
+Modalidad.
+Tipo de competición.
+Tamaño de los equipos.
+El rating será una propiedad de la participación deportiva del jugador, no una propiedad universal del deportista.
+2. Principio fundamental
+Un deportista puede tener distintos ratings simultáneamente.
+Ejemplo:
+Mauricio
+
+Comunidad A
+└── Pádel / Dobles
+    Rating: 1582
+
+Comunidad A
+└── Tenis / Singles
+    Rating: 1510
+
+Comunidad A
+└── Tenis / Dobles
+    Rating: 1478
+Estos ratings no se mezclan.
+3. Rating independiente por comunidad
+Cada rating estará asociado obligatoriamente a una comunidad.
+Conceptualmente:
+Community
+   +
+Player
+   +
+Sport
+   +
+Modality
+   =
+Player Rating
+Un jugador puede tener diferentes niveles en distintas comunidades.
+Ejemplo:
+Mauricio
+
+Los Parry Padel
+└── Pádel / Dobles
+    1600
+
+Ciudad del Valle
+└── Pádel / Dobles
+    1515
+Esto mantiene la decisión establecida en DEC-016.
+4. Rating independiente por deporte
+Cada deporte tendrá su propio sistema de valoración.
+Los ratings de diferentes deportes nunca se compararán directamente.
+Incorrecto:
+Pádel: 1600
+Tenis: 1500
+
+"El jugador es mejor en pádel."
+Los valores pertenecen a sistemas deportivos diferentes.
+5. Rating independiente por modalidad
+Cuando un deporte tenga modalidades competitivas suficientemente diferentes, cada modalidad tendrá su propio rating.
+Tenis
+Tenis
+├── Singles
+│   └── ELO
+│
+└── Dobles
+    └── ELO
+Un jugador podría tener:
+Singles: 1620
+Dobles: 1485
+No se utilizará automáticamente el rating de singles para calcular partidos de dobles.
+6. Pádel
+La modalidad principal de V1 será:
+Pádel
+└── Dobles
+    └── 2 vs 2
+El rating será individual.
+La pareja no se convertirá en un jugador permanente.
+Ejemplo:
+Equipo A
+Mauricio 1540
+Pedro    1490
+
+vs
+
+Equipo B
+Juan     1510
+Carlos   1560
+El Rating Engine calculará el resultado considerando la fuerza de ambos equipos.
+7. Rating individual en deportes por equipos
+En deportes con equipos, el sistema deberá distinguir entre:
+resultado del equipo
+y
+rendimiento individual.
+Esto es especialmente importante en fútbol.
+8. Fútbol
+Fútbol queda explícitamente excluido del ELO en V1.
+No se utilizará ELO individual tradicional para determinar el nivel de un futbolista.
+Motivo:
+El resultado colectivo de un partido de fútbol no representa suficientemente el rendimiento individual.
+Ejemplo:
+Equipo pierde 0-3
+
+Arquero → excelente
+Defensa → regular
+Mediocampo → bueno
+Delantero → malo
+Un simple resultado 0-3 no permite atribuir correctamente el rendimiento a cada jugador.
+9. Sistema de Football Performance Rating
+El fútbol utilizará posteriormente un sistema de Performance Rating.
+Inicialmente podrá considerar:
+resultado del equipo;
+posición;
+participación;
+minutos jugados;
+estadísticas individuales;
+rendimiento;
+nivel de competición.
+Sin embargo:
+Performance Rating de fútbol no forma parte del desarrollo prioritario de V1.
+En V1 se registrarán principalmente estadísticas y resultados.
+El motor podrá incorporarse posteriormente sin modificar la arquitectura general.
+10. Sistemas de Rating disponibles
+El Rating Engine podrá soportar diferentes estrategias.
+Conceptualmente:
+RatingEngine
+│
+├── EloSinglesStrategy
+│
+├── EloDoublesStrategy
+│
+├── TeamPerformanceStrategy
+│
+└── Future strategies
+Esto permite incorporar posteriormente otros sistemas sin modificar el núcleo deportivo.
+11. Regla de selección
+El sistema determinará automáticamente la estrategia mediante:
+Sport
++
+Modality
++
+Competition Type
+Ejemplo:
+Pádel + Dobles
+        ↓
+EloDoublesStrategy
+Tenis + Singles
+        ↓
+EloSinglesStrategy
+Tenis + Dobles
+        ↓
+EloDoublesStrategy
+Fútbol + Equipo
+        ↓
+TeamPerformanceStrategy
+12. La pareja es temporal
+Una pareja no será considerada una entidad deportiva permanente para el rating.
+Ejemplo:
+Mauricio + Pedro
+representa una combinación de jugadores para un partido determinado.
+El rating pertenece a:
+Mauricio
+Pedro
+individualmente.
+Esto evita crear miles de ratings independientes para cada combinación de pareja.
+13. Estadísticas de pareja
+Aunque la pareja no tenga un rating permanente, el sistema podrá registrar estadísticas históricas.
+Ejemplo:
+Mauricio + Pedro
+
+Partidos: 18
+Victorias: 13
+Derrotas: 5
+Win Rate: 72%
+Estas estadísticas serán independientes del rating individual.
+Esto será especialmente útil para Parryn.
+14. Historial de Rating
+Todo cambio de rating deberá generar un registro histórico.
+Ejemplo:
+Partido #182
+
+Mauricio
+
+Rating anterior: 1540
+Cambio: +18
+Rating posterior: 1558
+El historial deberá permitir reconstruir cómo evolucionó el rating.
+15. Resultados pendientes
+Un partido pendiente o no confirmado:
+NO modifica el rating.
+Solamente un resultado confirmado podrá producir cambios oficiales.
+Esto mantiene DEC-015.
+16. Cierre del encuentro
+El rating oficial se procesará según DEC-018.
+Cuando corresponda:
+Partidos
+   ↓
+Resultados confirmados
+   ↓
+Encuentro finalizado
+   ↓
+Rating Engine
+   ↓
+Actualización de ratings
+   ↓
+Historial
+   ↓
+Ranking
+17. El rating no será calculado por el frontend
+El frontend solamente mostrará:
+Rating actual
+Historial
+Ranking
+Estadísticas
+Nunca decidirá cuánto gana o pierde un jugador.
+El cálculo será exclusivamente responsabilidad del backend/Rating Engine.
+18. IA y Rating
+Parryn podrá:
+analizar ratings;
+detectar tendencias;
+recomendar parejas;
+recomendar rivales;
+detectar desequilibrios;
+sugerir partidos;
+explicar cambios.
+Pero:
+Parryn no podrá modificar directamente un rating.
+El Rating Engine será la única autoridad para modificarlo.
+Esto mantiene DEC-004 y DEC-020.
+19. Rating vs Ranking
+Se establece una diferencia conceptual:
+Rating
+Mide el nivel/rendimiento deportivo de un jugador.
+Ejemplo:
+Rating = 1582
+Ranking
+Ordena jugadores dentro de un contexto.
+Ejemplo:
+1. Mauricio — 1582
+2. Pedro    — 1554
+3. Juan     — 1520
+El ranking es una vista del rating, no el sistema de cálculo.
+20. Modelo conceptual futuro
+La estructura será:
+PLAYER
+   │
+   └── PLAYER_RATING
+          │
+          ├── COMMUNITY
+          ├── SPORT
+          ├── MODALITY
+          ├── RATING_SYSTEM
+          ├── CURRENT_RATING
+          └── RATING_HISTORY
+Esto reemplazará conceptualmente la dependencia actual de:
+players.elo
+como fuente universal.
+21. Compatibilidad con la arquitectura técnica
+Esta decisión es compatible con el documento:
+TECHNICAL ARCHITECTURE
+porque el Rating Engine será un módulo independiente:
+/ratings
+    /engine
+    /strategies
+    /history
+    /ranking
+Y podrá utilizar PostgreSQL sin depender de Replit.
+22. V1 aprobada
+Para evitar sobreconstrucción, V1 tendrá:
+Pádel
+Dobles → ELO
+Tenis
+Singles → ELO
+Dobles → ELO independiente
+Fútbol
+Sin ELO
+Estadísticas + resultados
+Otros deportes
+Se incorporarán mediante nuevas estrategias cuando exista una necesidad real.
+23. Regla de evolución
+Agregar un nuevo deporte no deberá obligarnos a modificar el sistema completo.
+Por ejemplo, si posteriormente incorporamos:
+Básquetbol
+podremos definir:
+Basketball
+└── Team
+    └── BasketballPerformanceStrategy
+sin modificar:
+Pádel;
+Tenis;
+ELO;
+usuarios;
+comunidades;
+autenticación.
+24. Decisión final
+La plataforma no será un sistema de ELO.
+Será una:
+Plataforma deportiva con un Rating Engine extensible.
+
+ELO será solamente uno de los sistemas de rating disponibles.
+Cómo queda nuestra arquitectura después de DEC-026
+                    DEPORTISTA
+                         │
+                    COMUNIDAD
+                         │
+                      DEPORTE
+                         │
+                     MODALIDAD
+                         │
+                  RATING ENGINE
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+       ELO Singles   ELO Doubles   Performance
+          │              │              │

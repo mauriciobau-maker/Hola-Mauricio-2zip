@@ -8,3 +8,5 @@ export * from "./matches";
 export * from "./memberships";
 export * from "./players";
 export * from "./sports";
+export * from "./sport_modalities";
+export * from "./player_sport_ratings";

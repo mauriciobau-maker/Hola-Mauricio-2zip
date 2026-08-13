@@ -1,175 +1,197 @@
 import { Router, type IRouter } from "express";
-import { db, matchesTable, playersTable, matchPlayersTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import {
+  db,
+  matchPlayersTable,
+  matchesTable,
+  playerSportRatingsTable,
+  playersTable,
+  sportsTable,
+} from "@workspace/db";
+import { requireAuth, requireClub } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
-router.get("/ranking", async (req, res): Promise<void> => {
-  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
-  const [players, matches, allMatchPlayers] = await Promise.all([
-    clubId
-      ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
-      : db.select().from(playersTable),
-    clubId
-      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId))
-      : db.select().from(matchesTable),
-    db.select().from(matchPlayersTable),
-  ]);
-
-  const mpByMatchId: Record<number, typeof matchPlayersTable.$inferSelect[]> = {};
-  for (const mp of allMatchPlayers) {
-    if (!mpByMatchId[mp.matchId]) mpByMatchId[mp.matchId] = [];
-    mpByMatchId[mp.matchId].push(mp);
+async function getSelectedSportId(rawSportId: unknown): Promise<number | null> {
+  if (rawSportId !== undefined) {
+    const sportId = Number(rawSportId);
+    return Number.isInteger(sportId) && sportId > 0 ? sportId : null;
   }
+  const [sport] = await db
+    .select({ id: sportsTable.id })
+    .from(sportsTable)
+    .where(eq(sportsTable.active, true))
+    .orderBy(sportsTable.id)
+    .limit(1);
+  return sport?.id ?? null;
+}
 
-  const stats: Record<number, { wins: number; losses: number; draws: number; points: number }> = {};
-  for (const p of players) stats[p.id] = { wins: 0, losses: 0, draws: 0, points: 0 };
+function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
+  const grouped: Record<number, typeof rows> = {};
+  for (const row of rows) {
+    (grouped[row.matchId] ??= []).push(row);
+  }
+  return grouped;
+}
 
-  for (const m of matches) {
-    const matchPlayers = mpByMatchId[m.id] ?? [];
-    let team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
-    let team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
+router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void> => {
+  const sportId = await getSelectedSportId(req.query.sportId);
+  if (!sportId) {
+    res.status(400).json({ error: "sportId inválido" });
+    return;
+  }
+  const clubId = (req.user as { clubId: number }).clubId;
 
-    // Respaldo por si no se usó la tabla match_players
-    if (team1Ids.length === 0 && team2Ids.length === 0) {
-      team1Ids = [m.team1Player1Id, m.team1Player2Id].filter((id): id is number => id != null);
-      team2Ids = [m.team2Player1Id, m.team2Player2Id].filter((id): id is number => id != null);
-    }
+  const [players, matches] = await Promise.all([
+    db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
+    db
+      .select()
+      .from(matchesTable)
+      .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId))),
+  ]);
+  const matchIds = matches.map((match) => match.id);
+  const participants = matchIds.length
+    ? await db.select().from(matchPlayersTable).where(inArray(matchPlayersTable.matchId, matchIds))
+    : [];
+  const ratings = await db
+    .select()
+    .from(playerSportRatingsTable)
+    .where(
+      and(
+        eq(playerSportRatingsTable.sportId, sportId),
+        inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
+      ),
+    );
+  const ratingMap = new Map(ratings.map((rating) => [rating.playerId, rating.elo]));
+  const playersById = new Map(players.map((player) => [player.id, player]));
+  const grouped = groupMatchPlayers(participants);
+  const stats = new Map(players.map((player) => [
+    player.id,
+    { wins: 0, losses: 0, draws: 0, points: 0 },
+  ]));
 
-    if (m.result === "draw") {
-      for (const id of [...team1Ids, ...team2Ids]) {
-        if (stats[id]) { stats[id].draws++; stats[id].points += 1; }
+  for (const match of matches) {
+    if (
+      match.status !== "confirmed" ||
+      !["team1", "team2", "draw"].includes(match.result)
+    ) continue;
+    const rows = grouped[match.id] ?? [];
+    const team1 = rows.filter((row) => row.team === "team1").map((row) => row.playerId);
+    const team2 = rows.filter((row) => row.team === "team2").map((row) => row.playerId);
+    if (!team1.length || !team2.length) continue;
+    if (match.result === "draw") {
+      for (const playerId of [...team1, ...team2]) {
+        const playerStats = stats.get(playerId);
+        if (playerStats) {
+          playerStats.draws++;
+          playerStats.points++;
+        }
       }
     } else {
-      const winnerIds = m.result === "team1" ? team1Ids : team2Ids;
-      const loserIds = m.result === "team1" ? team2Ids : team1Ids;
-      for (const id of winnerIds) {
-        if (stats[id]) { stats[id].wins++; stats[id].points += 3; }
+      const winners = match.result === "team1" ? team1 : team2;
+      const losers = match.result === "team1" ? team2 : team1;
+      for (const playerId of winners) {
+        const playerStats = stats.get(playerId);
+        if (playerStats) {
+          playerStats.wins++;
+          playerStats.points += 3;
+        }
       }
-      for (const id of loserIds) {
-        if (stats[id]) stats[id].losses++;
+      for (const playerId of losers) {
+        const playerStats = stats.get(playerId);
+        if (playerStats) playerStats.losses++;
       }
     }
   }
 
   const ranking = players
-    .map((p) => {
-      const s = stats[p.id] ?? { wins: 0, losses: 0, draws: 0, points: 0 };
-      const totalMatches = s.wins + s.losses + s.draws;
-      const winRate = totalMatches > 0 ? Math.round((s.wins / totalMatches) * 100) : 0;
+    .map((player) => {
+      const playerStats = stats.get(player.id)!;
+      const elo = ratingMap.get(player.id) ?? 1500;
+      const totalMatches = playerStats.wins + playerStats.losses + playerStats.draws;
       return {
-        playerId: p.id,
-        playerName: p.name,
-        nickname: p.nickname ?? null,
-        elo: p.elo,
-        points: s.points,
-        wins: s.wins,
-        losses: s.losses,
-        draws: s.draws,
+        playerId: player.id,
+        playerName: player.name,
+        nickname: player.nickname ?? null,
+        sportId,
+        elo,
+        points: playerStats.points,
+        wins: playerStats.wins,
+        losses: playerStats.losses,
+        draws: playerStats.draws,
         totalMatches,
-        winRate,
+        winRate: totalMatches ? Math.round((playerStats.wins / totalMatches) * 100) : 0,
       };
     })
     .sort((a, b) => b.elo - a.elo || b.wins - a.wins || a.losses - b.losses)
-    .map((entry, i) => ({ ...entry, rank: i + 1 }));
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   res.json(ranking);
 });
 
-router.get("/dashboard", async (req, res): Promise<void> => {
-  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
-  const [players, allMatches, allMatchPlayers] = await Promise.all([
-    clubId
-      ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
-      : db.select().from(playersTable),
-    clubId
-      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)).orderBy(desc(matchesTable.playedAt))
-      : db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)),
-    db.select().from(matchPlayersTable),
+router.get("/dashboard", requireAuth, requireClub, async (req, res): Promise<void> => {
+  const sportId = await getSelectedSportId(req.query.sportId);
+  if (!sportId) {
+    res.status(400).json({ error: "sportId inválido" });
+    return;
+  }
+  const clubId = (req.user as { clubId: number }).clubId;
+  const [players, matches] = await Promise.all([
+    db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
+    db
+      .select()
+      .from(matchesTable)
+      .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId)))
+      .orderBy(desc(matchesTable.playedAt)),
   ]);
+  const matchIds = matches.map((match) => match.id);
+  const participants = matchIds.length
+    ? await db.select().from(matchPlayersTable).where(inArray(matchPlayersTable.matchId, matchIds))
+    : [];
+  const ratings = await db
+    .select()
+    .from(playerSportRatingsTable)
+    .where(
+      and(
+        eq(playerSportRatingsTable.sportId, sportId),
+        inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
+      ),
+    );
+  const ratingMap = new Map(ratings.map((rating) => [rating.playerId, rating.elo]));
+  const playersById = new Map(players.map((player) => [player.id, player]));
+  const grouped = groupMatchPlayers(participants);
+  const confirmed = matches.filter(
+    (match) =>
+      match.status === "confirmed" &&
+      ["team1", "team2", "draw"].includes(match.result),
+  );
+  const top = [...players]
+    .map((player) => ({ id: player.id, name: player.name, elo: ratingMap.get(player.id) ?? 1500 }))
+    .sort((a, b) => b.elo - a.elo)[0];
 
-  const mpByMatchId: Record<number, typeof matchPlayersTable.$inferSelect[]> = {};
-  for (const mp of allMatchPlayers) {
-    if (!mpByMatchId[mp.matchId]) mpByMatchId[mp.matchId] = [];
-    mpByMatchId[mp.matchId].push(mp);
-  }
-
-  const stats: Record<number, { wins: number; losses: number; draws: number; points: number }> = {};
-  for (const p of players) stats[p.id] = { wins: 0, losses: 0, draws: 0, points: 0 };
-
-  for (const m of allMatches) {
-    const matchPlayers = mpByMatchId[m.id] ?? [];
-    let team1Ids = matchPlayers.filter((mp) => mp.team === "team1").map((mp) => mp.playerId);
-    let team2Ids = matchPlayers.filter((mp) => mp.team === "team2").map((mp) => mp.playerId);
-
-    if (team1Ids.length === 0 && team2Ids.length === 0) {
-      team1Ids = [m.team1Player1Id, m.team1Player2Id].filter((id): id is number => id != null);
-      team2Ids = [m.team2Player1Id, m.team2Player2Id].filter((id): id is number => id != null);
-    }
-
-    if (m.result === "draw") {
-      for (const id of [...team1Ids, ...team2Ids]) {
-        if (stats[id]) { stats[id].draws++; stats[id].points += 1; }
-      }
-    } else {
-      const winnerIds = m.result === "team1" ? team1Ids : team2Ids;
-      const loserIds = m.result === "team1" ? team2Ids : team1Ids;
-      for (const id of winnerIds) {
-        if (stats[id]) { stats[id].wins++; stats[id].points += 3; }
-      }
-      for (const id of loserIds) {
-        if (stats[id]) stats[id].losses++;
-      }
-    }
-  }
-
-  let topPlayer: { id: number; name: string; elo: number } | null = null;
-  let maxElo = -1;
-  for (const p of players) {
-    if (p.elo > maxElo) { maxElo = p.elo; topPlayer = { id: p.id, name: p.name, elo: p.elo }; }
-  }
-
-  const playerMap: Record<number, string> = {};
-  for (const p of players) playerMap[p.id] = p.name;
-
-  const recentMatches = allMatches.slice(0, 5).map((m) => {
-    const matchPlayers = mpByMatchId[m.id] ?? [];
-    let team1Players = matchPlayers
-      .filter((mp) => mp.team === "team1")
-      .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
-    let team2Players = matchPlayers
-      .filter((mp) => mp.team === "team2")
-      .map((mp) => ({ id: mp.playerId, name: playerMap[mp.playerId] ?? "Desconocido" }));
-
-    if (team1Players.length === 0) {
-      team1Players = [m.team1Player1Id, m.team1Player2Id]
-        .filter((id): id is number => id != null)
-        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
-    }
-
-    if (team2Players.length === 0) {
-      team2Players = [m.team2Player1Id, m.team2Player2Id]
-        .filter((id): id is number => id != null)
-        .map((id) => ({ id, name: playerMap[id] ?? "Desconocido" }));
-    }
-
+  const recentMatches = confirmed.slice(0, 5).map((match) => {
+    const rows = grouped[match.id] ?? [];
+    const toPlayer = (row: typeof rows[number]) => ({
+      id: row.playerId,
+      name: playersById.get(row.playerId)?.name ?? "Desconocido",
+    });
     return {
-      id: m.id,
-      team1Players,
-      team2Players,
-      team1Score: m.team1Score,
-      team2Score: m.team2Score,
-      result: m.result,
-      sets: m.sets,
-      playedAt: m.playedAt.toISOString(),
-      createdAt: m.createdAt.toISOString(),
+      id: match.id,
+      team1Players: rows.filter((row) => row.team === "team1").map(toPlayer),
+      team2Players: rows.filter((row) => row.team === "team2").map(toPlayer),
+      team1Score: match.team1Score,
+      team2Score: match.team2Score,
+      result: match.result,
+      sets: match.sets,
+      playedAt: match.playedAt.toISOString(),
+      createdAt: match.createdAt.toISOString(),
     };
   });
 
   res.json({
     totalPlayers: players.length,
-    totalMatches: allMatches.length,
-    topPlayer: topPlayer && topPlayer.elo > 1500 ? topPlayer : null,
+    totalMatches: confirmed.length,
+    topPlayer: top && top.elo > 1500 ? top : null,
     recentMatches,
   });
 });

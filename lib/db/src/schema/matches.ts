@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { sportsTable } from "./sports";
 import { encuentrosTable } from "./encuentros";
 import { clubsTable } from "./clubs";
+import { sportModalitiesTable } from "./sport_modalities";
 
 export const setScoreSchema = z.object({
   setNumber: z.number().int(),
@@ -17,6 +18,7 @@ export const matchesTable = pgTable("matches", {
   // Añadimos onDelete: "cascade" para mantener la integridad
   clubId: integer("club_id").references(() => clubsTable.id, { onDelete: "cascade" }), 
   sportId: integer("sport_id").notNull().references(() => sportsTable.id, { onDelete: "cascade" }),
+  modalityId: integer("modality_id").notNull().references(() => sportModalitiesTable.id, { onDelete: "restrict" }),
   encuentroId: integer("encuentro_id").references(() => encuentrosTable.id, { onDelete: "set null" }),
   team1Score: integer("team1_score").notNull().default(0),
   team2Score: integer("team2_score").notNull().default(0),

@@ -6,6 +6,7 @@ import {
   playersTable,
   matchesTable,
   matchPlayersTable,
+  sportModalitiesTable,
 } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -473,13 +474,24 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
   try {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const { formato, sportId, teamSize } = req.body;
+    const { formato, sportId, teamSize, modalityId } = req.body;
 
     const asistencia = await getAsistenciaList(encuentroId);
     const confirmados = asistencia.filter((a) => a.status === "confirmed");
 
     const idDeDeporte = sportId ? Number(sportId) : 1;
     const sizePorEquipo = teamSize ? Number(teamSize) : (idDeDeporte === 2 ? 5 : 2);
+    const modalityRows = await db
+      .select()
+      .from(sportModalitiesTable)
+      .where(eq(sportModalitiesTable.sportId, idDeDeporte));
+    const modality = modalityId
+      ? modalityRows.find((row) => row.id === Number(modalityId))
+      : modalityRows.find((row) => row.teamSize === sizePorEquipo && row.active);
+    if (!modality) {
+      res.status(400).json({ message: "No existe una modalidad válida para el deporte seleccionado." });
+      return;
+    }
     const minJugadores = sizePorEquipo * 2;
 
     if (confirmados.length < minJugadores) {
@@ -542,6 +554,7 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
         .values({
           encuentroId,
           sportId: idDeDeporte,
+          modalityId: modality.id,
           team1Score: 0,
           team2Score: 0,
           result: "pending",

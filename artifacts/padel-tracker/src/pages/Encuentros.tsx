@@ -1,8 +1,14 @@
 import { useListEncuentros } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MapPin, Users, Plus, ChevronRight } from "lucide-react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CalendarDays,
+  MapPin,
+  Users,
+  Plus,
+  ChevronRight,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { format, isPast, isValid } from "date-fns";
 import type { Locale } from "date-fns";
@@ -10,7 +16,7 @@ import { es, enUS, ptBR } from "date-fns/locale";
 import { useLanguage, Language } from "@/context/LanguageContext";
 
 const LOCALES = {
-  es: es,
+  es,
   en: enUS,
   pt: ptBR,
 };
@@ -48,16 +54,56 @@ const TRANSLATIONS = {
   },
 };
 
+type NormalizedEncuentro = {
+  id: string | number | undefined;
+  title: string;
+  dateTime: string | number | Date | undefined;
+  location: string;
+  maxSpots: number | null;
+};
+
 // 🛠️ Función utilitaria para normalizar campos heterogéneos de la API
-function normalizeEncuentro(raw: any) {
+function normalizeEncuentro(raw: any): NormalizedEncuentro {
   const item = raw?.encuentro ?? raw?.data ?? raw?.item ?? raw ?? {};
 
   return {
-    id: item?.id ?? item?._id ?? item?.encuentroId ?? item?.id_encuentro ?? raw?.id,
-    title: item?.title ?? item?.titulo ?? item?.nombre ?? item?.name ?? raw?.title ?? "Encuentro sin título",
-    dateTime: item?.dateTime ?? item?.fecha ?? item?.date ?? item?.fechaHora ?? item?.date_time ?? raw?.dateTime,
-    location: item?.location ?? item?.ubicacion ?? item?.lugar ?? raw?.location ?? "Lugar a confirmar",
-    maxSpots: item?.maxSpots ?? item?.max_spots ?? item?.cupos ?? item?.maxJugadores ?? raw?.maxSpots ?? null,
+    id:
+      item?.id ??
+      item?._id ??
+      item?.encuentroId ??
+      item?.id_encuentro ??
+      raw?.id,
+
+    title:
+      item?.title ??
+      item?.titulo ??
+      item?.nombre ??
+      item?.name ??
+      raw?.title ??
+      "Encuentro sin título",
+
+    dateTime:
+      item?.dateTime ??
+      item?.fecha ??
+      item?.date ??
+      item?.fechaHora ??
+      item?.date_time ??
+      raw?.dateTime,
+
+    location:
+      item?.location ??
+      item?.ubicacion ??
+      item?.lugar ??
+      raw?.location ??
+      "Lugar a confirmar",
+
+    maxSpots:
+      item?.maxSpots ??
+      item?.max_spots ??
+      item?.cupos ??
+      item?.maxJugadores ??
+      raw?.maxSpots ??
+      null,
   };
 }
 
@@ -75,36 +121,55 @@ export function Encuentros() {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-28 rounded-xl bg-white/5 animate-pulse" />
+          <div
+            key={i}
+            className="h-28 rounded-xl bg-white/5 animate-pulse"
+          />
         ))}
       </div>
     );
   }
 
-  // Normalizamos todos los elementos recibidos desempacando la lista en caso de contenedor superior
-  const rawList = Array.isArray(rawEncuentros)
+  // Normalizamos todos los elementos recibidos.
+  const rawList: any[] = Array.isArray(rawEncuentros)
     ? rawEncuentros
-    : (rawEncuentros as any)?.encuentros ?? (rawEncuentros as any)?.data ?? [];
+    : ((rawEncuentros as any)?.encuentros ??
+      (rawEncuentros as any)?.data ??
+      []);
 
-  const encuentros = rawList.map(normalizeEncuentro);
+  // Tipado explícito para evitar que TypeScript infiera any[].
+  const encuentros: NormalizedEncuentro[] = rawList.map(
+    (raw: any): NormalizedEncuentro => normalizeEncuentro(raw),
+  );
 
-  const upcoming = encuentros.filter((e) => {
-    if (!e.dateTime) return true;
-    const d = new Date(e.dateTime);
-    return isValid(d) ? !isPast(d) : true;
-  });
+  const upcoming: NormalizedEncuentro[] = encuentros.filter(
+    (e: NormalizedEncuentro) => {
+      if (!e.dateTime) return true;
 
-  const past = encuentros.filter((e) => {
-    if (!e.dateTime) return false;
-    const d = new Date(e.dateTime);
-    return isValid(d) && isPast(d);
-  });
+      const d = new Date(e.dateTime);
+
+      return isValid(d) ? !isPast(d) : true;
+    },
+  );
+
+  const past: NormalizedEncuentro[] = encuentros.filter(
+    (e: NormalizedEncuentro) => {
+      if (!e.dateTime) return false;
+
+      const d = new Date(e.dateTime);
+
+      return isValid(d) && isPast(d);
+    },
+  );
 
   const handleCardClick = (id: string | number | undefined) => {
     if (id !== undefined && id !== null) {
       navigate(`/encuentros/${id}`);
     } else {
-      console.warn("No se pudo obtener un ID válido para navegar al encuentro:", id);
+      console.warn(
+        "No se pudo obtener un ID válido para navegar al encuentro:",
+        id,
+      );
     }
   };
 
@@ -112,6 +177,7 @@ export function Encuentros() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t.title}</h1>
+
         {user ? (
           <Button
             size="sm"
@@ -147,15 +213,18 @@ export function Encuentros() {
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             {t.upcoming}
           </h2>
-          {upcoming.map((e, index) => (
-            <EncuentroCard
-              key={e.id ?? `upcoming-${index}`}
-              encuentro={e}
-              onClick={() => handleCardClick(e.id)}
-              dateLocale={dateLocale}
-              t={t}
-            />
-          ))}
+
+          {upcoming.map(
+            (e: NormalizedEncuentro, index: number) => (
+              <EncuentroCard
+                key={e.id ?? `upcoming-${index}`}
+                encuentro={e}
+                onClick={() => handleCardClick(e.id)}
+                dateLocale={dateLocale}
+                t={t}
+              />
+            ),
+          )}
         </section>
       )}
 
@@ -164,16 +233,19 @@ export function Encuentros() {
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             {t.past}
           </h2>
-          {past.map((e, index) => (
-            <EncuentroCard
-              key={e.id ?? `past-${index}`}
-              encuentro={e}
-              onClick={() => handleCardClick(e.id)}
-              faded
-              dateLocale={dateLocale}
-              t={t}
-            />
-          ))}
+
+          {past.map(
+            (e: NormalizedEncuentro, index: number) => (
+              <EncuentroCard
+                key={e.id ?? `past-${index}`}
+                encuentro={e}
+                onClick={() => handleCardClick(e.id)}
+                faded
+                dateLocale={dateLocale}
+                t={t}
+              />
+            ),
+          )}
         </section>
       )}
     </div>
@@ -187,16 +259,24 @@ function EncuentroCard({
   dateLocale,
   t,
 }: {
-  encuentro: ReturnType<typeof normalizeEncuentro>;
+  encuentro: NormalizedEncuentro;
   onClick: () => void;
   faded?: boolean;
   dateLocale: Locale;
   t: typeof TRANSLATIONS.es;
 }) {
-  const date = encuentro.dateTime ? new Date(encuentro.dateTime) : null;
-  const formattedDate = date && isValid(date)
-    ? format(date, "EEEE d MMM, HH:mm", { locale: dateLocale })
-    : encuentro.dateTime || "Fecha a confirmar";
+  const date = encuentro.dateTime
+    ? new Date(encuentro.dateTime)
+    : null;
+
+  const formattedDate =
+    date && isValid(date)
+      ? format(date, "EEEE d MMM, HH:mm", {
+          locale: dateLocale,
+        })
+      : encuentro.dateTime
+        ? String(encuentro.dateTime)
+        : "Fecha a confirmar";
 
   return (
     <Card
@@ -208,24 +288,31 @@ function EncuentroCard({
       <CardHeader className="py-3 px-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-base truncate">{encuentro.title}</CardTitle>
+            <CardTitle className="text-base truncate">
+              {encuentro.title}
+            </CardTitle>
+
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <CalendarDays className="h-3 w-3" />
                 {formattedDate}
               </span>
+
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
                 {encuentro.location}
               </span>
-              {encuentro.maxSpots && (
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  {t.maxSpots(encuentro.maxSpots)}
-                </span>
-              )}
+
+              {encuentro.maxSpots !== null &&
+                encuentro.maxSpots !== undefined && (
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {t.maxSpots(encuentro.maxSpots)}
+                  </span>
+                )}
             </div>
           </div>
+
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         </div>
       </CardHeader>

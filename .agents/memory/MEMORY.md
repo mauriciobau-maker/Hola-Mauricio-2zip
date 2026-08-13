@@ -2,3 +2,4 @@
 - [Orval hook naming](orval-hook-naming.md) — orval generates useListX for collections, not useGetX; always verify after codegen or renames break the frontend.
 - [Replit Auth + Encuentros](replit-auth-encuentros.md) — full auth implemented (sessions+users+replit-auth-web); encuentros/asistencia/notification_subscriptions tables; zod must be direct dep of api-server; replit-auth-web must NOT use import.meta.env (no vite types in lib context).
 - [DB schema sync history](schema-db-sync.md) — drizzle push needs TTY; apply unique constraints via SQL first; information_schema columns query needs no schema filter; RBAC bug (club admins as super-admins) fixed.
+- [Migration audit guardrails](migration-audit-guardrails.md) — never rerun the modalities migration blindly; it deletes match data, and frontend builds require PORT plus BASE_PATH.

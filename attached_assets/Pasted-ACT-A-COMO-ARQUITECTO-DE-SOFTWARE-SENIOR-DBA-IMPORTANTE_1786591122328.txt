@@ -1,0 +1,102 @@
+ACTÚA COMO ARQUITECTO DE SOFTWARE SENIOR + DBA.
+
+IMPORTANTE:
+NO desarrolles nuevas funcionalidades.
+NO cambies la autenticación.
+NO migres a Clerk.
+NO borres datos.
+NO hagas cambios destructivos en la base de datos.
+NO modifiques los datos reales del usuario mbau73@hotmail.com (id 60741545).
+
+CONTEXTO DEL PROYECTO:
+Estamos estabilizando Padel Tracker IA antes de continuar el desarrollo.
+
+El usuario real es:
+- email: mbau73@hotmail.com
+- id: 60741545
+- debe quedar como SUPER ADMIN
+- actualmente clubId = null y playerId = null
+
+El resto de los usuarios/datos existentes son datos de prueba.
+
+La autenticación actual usa:
+- sesiones propias
+- /api/auth/user
+- authMiddleware
+- usersTable.isAdmin
+- usersTable.isClubAdmin
+- @workspace/replit-auth-web en frontend
+
+Clerk está instalado en frontend, pero NO debe migrarse todavía.
+
+OBJETIVO DE ESTA TAREA:
+
+1. Audita el repositorio completo y determina:
+   - estado real del esquema DB
+   - estado de las migraciones
+   - diferencias entre schema Drizzle y DB real
+   - estado actual de autenticación
+   - estado de roles Super Admin / Club Admin
+   - posibles inconsistencias entre frontend, backend y DB
+   - archivos modificados y no comprometidos
+   - riesgos técnicos antes de continuar desarrollando
+
+2. Comprueba específicamente que:
+   - usersTable realmente contiene al usuario 60741545
+   - mbau73@hotmail.com puede ser identificado como Super Admin
+   - ningún cambio automático convierte al usuario de prueba JP@JP.CL en Super Admin
+   - el código reconoce isAdmin=1 como SUPER_ADMIN
+   - las rutas protegidas de administración utilizan correctamente ese rol
+
+3. NO hagas una migración general.
+
+4. NO elimines tablas ni columnas.
+
+5. NO borres datos.
+
+6. NO cambies los datos del usuario real salvo que sea estrictamente necesario para garantizar:
+   isAdmin = 1
+   y conservar clubId/playerId sin alterarlos.
+
+7. Si para dejar al usuario real como Super Admin basta una actualización SQL segura, indícalo y ejecútala SOLO sobre:
+   id = '60741545'
+   email = 'mbau73@hotmail.com'
+
+8. Haz una copia/backup antes de cualquier modificación de DB.
+
+9. Ejecuta:
+   - typecheck
+   - build del frontend
+   - build/typecheck del API
+   - cualquier validación de schema que sea segura y no destructiva
+
+10. NO soluciones automáticamente los problemas que encuentres si eso implica cambios arquitectónicos.
+   Primero documenta los problemas.
+
+11. Crea o actualiza:
+   project/17_TECHNICAL_MIGRATION_AUDIT.md
+
+El informe debe contener:
+
+A. Estado actual
+B. DB real vs Drizzle
+C. Autenticación actual
+D. Roles y permisos
+E. Usuario Super Admin
+F. Migraciones pendientes
+G. Riesgos
+H. Errores encontrados
+I. Cambios realizados, si hubo alguno
+J. Cambios que NO deben hacerse todavía
+K. Recomendación de próximos pasos, ordenados por prioridad
+
+MUY IMPORTANTE:
+Al finalizar NO implementes los próximos pasos.
+Solo deja el proyecto estable, validado y documentado.
+
+Entrega al final un resumen muy breve:
+- qué verificaste
+- qué cambiaste
+- qué quedó pendiente
+- si frontend y backend compilan correctamente
+- si el usuario 60741545 quedó como Super Admin
