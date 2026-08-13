@@ -156,6 +156,7 @@ router.get(
 
 router.post(
   "/players",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     try {
       const bodyData =
@@ -181,9 +182,7 @@ router.post(
         clubId?: number | null;
       } | undefined;
 
-      const isSuperAdmin =
-        user?.role === "superadmin" ||
-        user?.role === "admin";
+      const isSuperAdmin = isSuperAdminUser(user);
 
       let targetClubId =
         user?.clubId ?? null;
@@ -450,6 +449,7 @@ router.get(
 
 router.patch(
   "/players/:id",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -493,10 +493,7 @@ router.patch(
       clubId?: number | null;
     } | undefined;
 
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.role ===
-        "superadmin";
+    const isAdmin = isSuperAdminUser(user);
 
     const updates: Record<
       string,
@@ -731,6 +728,7 @@ router.delete(
 
 router.get(
   "/players/:id/stats",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -764,15 +762,15 @@ router.get(
       } | undefined
     )?.clubId;
 
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
     const [player] =
       await db
         .select()
         .from(playersTable)
         .where(
-          eq(
-            playersTable.id,
-            playerId
-          )
+          isSuperAdminUser(user)
+            ? eq(playersTable.id, playerId)
+            : and(eq(playersTable.id, playerId), eq(playersTable.clubId, user.clubId!))
         );
 
     if (!player) {
