@@ -1,8 +1,9 @@
 import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as z from "zod";
-import { eq } from "drizzle-orm";
-import { db, usersTable, clubsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { db, usersTable, clubsTable, playersTable } from "@workspace/db";
+import { isSuperAdminUser } from "../middlewares/requireCommunity";
 import {
   clearSession,
   getOidcConfig,
@@ -126,6 +127,21 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     res.status(400).json({ error: "playerId requerido" });
     return;
   }
+  const sessionUser = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+  const [player] = await db
+    .select({ id: playersTable.id })
+    .from(playersTable)
+    .where(
+      isSuperAdminUser(sessionUser)
+        ? eq(playersTable.id, playerId)
+        : and(eq(playersTable.id, playerId), eq(playersTable.clubId, sessionUser.clubId!)),
+    );
+  if (!player) {
+    // Do not reveal whether the requested player exists in another community.
+    res.status(404).json({ error: "Jugador no encontrado" });
+    return;
+  }
+
   const [updated] = await db
     .update(usersTable)
     .set({ playerId, updatedAt: new Date() })
