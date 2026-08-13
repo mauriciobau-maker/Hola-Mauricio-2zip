@@ -362,6 +362,18 @@ router.patch(
       const adminName = body.adminName || body.admin_name || admin?.name || body.nombreAdmin;
       const adminPhone = body.adminPhone || body.admin_phone || admin?.phone || body.phone;
       const adminNickname = body.adminNickname || body.nickname || body.apodo;
+      const currentUser = req.user as any;
+      const isSuperAdmin =
+        currentUser?.isAdmin === 1 ||
+        currentUser?.role === "superadmin" ||
+        currentUser?.role === "admin";
+
+      if (adminEmail && !isSuperAdmin) {
+        res.status(403).json({
+          error: "Solo un Super Admin puede modificar privilegios administrativos",
+        });
+        return;
+      }
 
       // 2. Extraer ÚNICAMENTE campos nativos de la tabla `clubsTable`
       const clubUpdate: Record<string, any> = {};
@@ -544,7 +556,7 @@ router.patch(
 // POST /admin/clubs/:id/users
 router.post(
   "/admin/clubs/:id/users",
-  requireClubAdmin,
+  requireSuperAdmin,
   async (req, res): Promise<void> => {
     const rawId = req.params.id;
     const clubId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
@@ -648,7 +660,7 @@ router.post(
 );
 
 // --- DEV ONLY ---
-router.get("/admin/hacer-admin", async (req, res): Promise<void> => {
+router.get("/admin/hacer-admin", requireSuperAdmin, async (req, res): Promise<void> => {
   const user = req.user as any;
   if (!user) {
     res.status(400).send("No autenticado");

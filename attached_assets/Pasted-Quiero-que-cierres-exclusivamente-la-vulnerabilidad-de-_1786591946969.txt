@@ -1,0 +1,78 @@
+Quiero que cierres exclusivamente la vulnerabilidad de escalamiento de privilegios detectada en la auditoría.
+
+Problema identificado:
+La ruta /admin/hacer-admin permite potencialmente otorgar privilegios administrativos sin una protección adecuada.
+
+OBJETIVO:
+Garantizar que SOLO un usuario que ya sea SUPER_ADMIN pueda otorgar o modificar privilegios administrativos.
+
+REGLAS IMPORTANTES:
+
+1. NO cambies la autenticación.
+2. NO migres a Clerk.
+3. NO cambies el esquema de la base de datos.
+4. NO hagas migraciones.
+5. NO borres datos.
+6. NO modifiques jugadores, partidos, encuentros ni Elo.
+7. NO cambies el usuario real mbau73@hotmail.com / id 60741545.
+8. Debe permanecer:
+   isAdmin = 1
+   clubId = NULL
+   playerId = NULL
+
+9. JP@JP.CL debe permanecer:
+   isAdmin = 0
+
+10. Revisa también si existen otras rutas equivalentes que puedan:
+    - convertir un usuario en Super Admin
+    - cambiar isAdmin
+    - cambiar isClubAdmin
+    - modificar roles
+    - crear privilegios administrativos
+
+11. Si encuentras otra ruta vulnerable al mismo problema, corrígela de la misma manera.
+
+12. La protección debe estar en BACKEND.
+    No confíes solamente en ocultar botones o controles del frontend.
+
+13. Utiliza el mecanismo de autorización existente del proyecto siempre que sea posible.
+    No inventes un sistema paralelo de roles.
+
+14. Un CLUB_ADMIN NO debe poder convertirse a sí mismo ni a otro usuario en SUPER_ADMIN.
+
+15. Un usuario normal tampoco debe poder hacerlo.
+
+16. Un SUPER_ADMIN sí debe poder administrar estos privilegios.
+
+17. No hagas ningún cambio adicional fuera de esta tarea.
+
+ANTES DE CAMBIAR:
+- inspecciona todas las rutas que modifican isAdmin/isClubAdmin
+- identifica exactamente cuáles están expuestas
+- crea un backup si necesitas modificar DB, aunque idealmente esto debe resolverse solo mediante código
+
+DESPUÉS:
+- ejecuta API typecheck
+- ejecuta API build
+- ejecuta frontend typecheck
+- ejecuta frontend build
+- ejecuta git diff --check
+
+PRUEBAS:
+Comprueba mediante tests o una validación equivalente que:
+A) usuario no autenticado → rechazado
+B) usuario normal → rechazado
+C) CLUB_ADMIN → rechazado
+D) SUPER_ADMIN → permitido
+E) 60741545 sigue siendo SUPER_ADMIN
+F) JP@JP.CL sigue siendo isAdmin=0
+
+NO IMPLEMENTES NINGUNA OTRA TAREA.
+
+Al terminar, dime:
+- archivos modificados
+- rutas protegidas
+- pruebas realizadas
+- resultado de typecheck/build
+- confirmación de que 60741545 sigue siendo SUPER_ADMIN
+- cualquier otra vulnerabilidad de roles que hayas encontrado pero NO hayas corregido.
