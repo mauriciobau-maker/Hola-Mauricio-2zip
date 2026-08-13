@@ -1,18 +1,19 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable } from "@workspace/db";
+import { isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
-// GET /club — devuelve el club + deportes activos del usuario autenticado con todos los campos
-router.get("/club", async (req, res): Promise<void> => {
-  try {
-    if (!req.isAuthenticated() || !req.user) {
-      res.status(401).json({ error: "No autenticado" });
-      return;
-    }
+function currentClubId(req: Request): number | null {
+  if (isSuperAdminUser(req.user)) return null;
+  return (req.user as { clubId?: number | null }).clubId ?? null;
+}
 
-    const clubId = (req.user as { clubId?: number | null }).clubId;
+// GET /club — devuelve el club + deportes activos del usuario autenticado con todos los campos
+router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
+  try {
+    const clubId = currentClubId(req);
     if (!clubId) {
       res.status(403).json({ error: "El usuario no pertenece a ningún club" });
       return;
@@ -54,7 +55,6 @@ router.get("/club", async (req, res): Promise<void> => {
       active: club.active,
       createdAt: club.createdAt ? (club.createdAt as Date).toISOString() : null,
       sports: clubSports,
-      // Campos estéticos, marca blanca, contacto y ubicación completos:
       inviteCode: (club as any).inviteCode || null,
       logoUrl: (club as any).logoUrl || null,
       country: (club as any).country || "Chile",
@@ -74,43 +74,22 @@ router.get("/club", async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/current — Devuelve el club actual respetando estrictamente los roles de usuario
-router.get("/clubs/current", async (req, res): Promise<void> => {
+// GET /clubs/current — devuelve únicamente el club explícitamente asociado al usuario.
+// Un Super Admin sin clubId no recibe arbitrariamente el primer club de la BD.
+router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
-    const user = req.user as any;
-
-    // Si no hay sesión iniciada, responder null
-    if (!user) {
+    const clubId = (req.user as { clubId?: number | null }).clubId ?? null;
+    if (!clubId) {
       res.json(null);
       return;
     }
 
-    // 1. Si el usuario (sea quien sea) tiene un clubId explícito asignado
-    if (user.clubId) {
-      const [club] = await db
-        .select()
-        .from(clubsTable)
-        .where(eq(clubsTable.id, user.clubId));
+    const [club] = await db
+      .select()
+      .from(clubsTable)
+      .where(eq(clubsTable.id, clubId));
 
-      if (club) {
-        res.json(club);
-        return;
-      }
-    }
-
-    // 2. EXCLUSIVO SUPER ADMIN: Si eres Super Admin y no tienes clubId asignado,
-    // se carga el primer club registrado para permitir la carga del panel general.
-    const isSuperAdmin = user.isAdmin === 1 || user.role === "SUPER_ADMIN";
-
-    if (isSuperAdmin) {
-      const [firstClub] = await db.select().from(clubsTable).limit(1);
-      res.json(firstClub || null);
-      return;
-    }
-
-    // 3. Usuarios normales / Club Admins sin club asignado:
-    // Retorna null de forma limpia sin exponer datos de otros clubes.
-    res.json(null);
+    res.json(club || null);
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
     res.json(null);
@@ -118,13 +97,8 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
 });
 
 // PATCH /club/sports — activa o desactiva un deporte para el club
-router.patch("/club/sports", async (req, res): Promise<void> => {
-  if (!req.isAuthenticated() || !req.user) {
-    res.status(401).json({ error: "No autenticado" });
-    return;
-  }
-
-  const clubId = (req.user as { clubId?: number | null }).clubId;
+router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<void> => {
+  const clubId = currentClubId(req);
   if (!clubId) {
     res.status(403).json({ error: "El usuario no pertenece a ningún club" });
     return;
@@ -164,12 +138,7 @@ router.patch("/club/sports", async (req, res): Promise<void> => {
         .values({ clubId, sportId, active });
     }
 
-    res.json({
-      clubId,
-      sportId,
-      sportName: sport.name,
-      active,
-    });
+    res.json({ clubId, sportId, sportName: sport.name, active });
   } catch (error) {
     console.error("Error en PATCH /club/sports:", error);
     res.status(500).json({ error: "Error interno al actualizar deportes" });
@@ -177,13 +146,8 @@ router.patch("/club/sports", async (req, res): Promise<void> => {
 });
 
 // GET /club/categories — devuelve todas las categorías creadas para los deportes del club
-router.get("/club/categories", async (req, res): Promise<void> => {
-  if (!req.isAuthenticated() || !req.user) {
-    res.status(401).json({ error: "No autenticado" });
-    return;
-  }
-
-  const clubId = (req.user as { clubId?: number | null }).clubId;
+router.get("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
+  const clubId = currentClubId(req);
   if (!clubId) {
     res.status(403).json({ error: "El usuario no pertenece a ningún club" });
     return;
@@ -208,13 +172,8 @@ router.get("/club/categories", async (req, res): Promise<void> => {
 });
 
 // POST /club/categories — permite al administrador crear una categoría para un deporte del club
-router.post("/club/categories", async (req, res): Promise<void> => {
-  if (!req.isAuthenticated() || !req.user) {
-    res.status(401).json({ error: "No autenticado" });
-    return;
-  }
-
-  const clubId = (req.user as { clubId?: number | null }).clubId;
+router.post("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
+  const clubId = currentClubId(req);
   if (!clubId) {
     res.status(403).json({ error: "El usuario no pertenece a ningún club" });
     return;
@@ -228,7 +187,6 @@ router.post("/club/categories", async (req, res): Promise<void> => {
   }
 
   try {
-    // Validar que el clubSport pertenece al club actual
     const [clubSport] = await db
       .select()
       .from(clubSportsTable)
