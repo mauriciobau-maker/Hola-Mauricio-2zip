@@ -1,15 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 
 export function isSuperAdminUser(
-  user: { isAdmin?: number | boolean | null; role?: string | null } | undefined,
+  user: { isAdmin?: number | boolean | null } | undefined,
 ): boolean {
-  return (
-    user?.isAdmin === 1 ||
-    user?.isAdmin === true ||
-    user?.role === "superadmin" ||
-    user?.role === "admin" ||
-    user?.role === "SUPER_ADMIN"
-  );
+  // Global access is intentionally tied only to the persisted super-admin flag.
+  // Roles are not part of the authenticated user contract and must not grant it.
+  return user?.isAdmin === 1 || user?.isAdmin === true;
 }
 
 /**
@@ -41,6 +37,11 @@ export function requireClub(
   res: Response,
   next: NextFunction,
 ): void {
+  if (isSuperAdminUser(req.user)) {
+    next();
+    return;
+  }
+
   const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
   if (clubId == null) {
     res.status(403).json({ error: "Community membership required" });
