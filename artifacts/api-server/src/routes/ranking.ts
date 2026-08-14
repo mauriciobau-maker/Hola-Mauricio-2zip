@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
@@ -8,7 +8,10 @@ import {
   playersTable,
   sportsTable,
 } from "@workspace/db";
-import { requireAuth, requireClub } from "../middlewares/requireCommunity";
+import {
+  isSuperAdminUser,
+  requireCommunityAccess,
+} from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -17,12 +20,14 @@ async function getSelectedSportId(rawSportId: unknown): Promise<number | null> {
     const sportId = Number(rawSportId);
     return Number.isInteger(sportId) && sportId > 0 ? sportId : null;
   }
+
   const [sport] = await db
     .select({ id: sportsTable.id })
     .from(sportsTable)
     .where(eq(sportsTable.active, true))
     .orderBy(sportsTable.id)
     .limit(1);
+
   return sport?.id ?? null;
 }
 
@@ -34,13 +39,42 @@ function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
   return grouped;
 }
 
-router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void> => {
+function getTargetClubId(req: Request): number | null {
+  const user = req.user as {
+    clubId?: number | null;
+    isAdmin?: number | boolean | null;
+  };
+
+  if (!isSuperAdminUser(user)) {
+    return user.clubId ?? null;
+  }
+
+  const requestedClubId = Number(req.query.clubId);
+  return Number.isInteger(requestedClubId) && requestedClubId > 0
+    ? requestedClubId
+    : null;
+}
+
+function requireTargetClub(req: Request, res: any): number | null {
+  const clubId = getTargetClubId(req);
+  if (!clubId) {
+    res.status(400).json({
+      error: "Los Super Admin deben indicar clubId para consultar este panel",
+    });
+    return null;
+  }
+  return clubId;
+}
+
+router.get("/ranking", requireCommunityAccess, async (req, res): Promise<void> => {
+  const clubId = requireTargetClub(req, res);
+  if (!clubId) return;
+
   const sportId = await getSelectedSportId(req.query.sportId);
   if (!sportId) {
     res.status(400).json({ error: "sportId inválido" });
     return;
   }
-  const clubId = (req.user as { clubId: number }).clubId;
 
   const [players, matches] = await Promise.all([
     db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
@@ -49,21 +83,24 @@ router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void>
       .from(matchesTable)
       .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId))),
   ]);
+
   const matchIds = matches.map((match) => match.id);
   const participants = matchIds.length
     ? await db.select().from(matchPlayersTable).where(inArray(matchPlayersTable.matchId, matchIds))
     : [];
-  const ratings = await db
-    .select()
-    .from(playerSportRatingsTable)
-    .where(
-      and(
-        eq(playerSportRatingsTable.sportId, sportId),
-        inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
-      ),
-    );
+  const ratings = players.length
+    ? await db
+        .select()
+        .from(playerSportRatingsTable)
+        .where(
+          and(
+            eq(playerSportRatingsTable.sportId, sportId),
+            inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
+          ),
+        )
+    : [];
+
   const ratingMap = new Map(ratings.map((rating) => [rating.playerId, rating.elo]));
-  const playersById = new Map(players.map((player) => [player.id, player]));
   const grouped = groupMatchPlayers(participants);
   const stats = new Map(players.map((player) => [
     player.id,
@@ -75,10 +112,12 @@ router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void>
       match.status !== "confirmed" ||
       !["team1", "team2", "draw"].includes(match.result)
     ) continue;
+
     const rows = grouped[match.id] ?? [];
     const team1 = rows.filter((row) => row.team === "team1").map((row) => row.playerId);
     const team2 = rows.filter((row) => row.team === "team2").map((row) => row.playerId);
     if (!team1.length || !team2.length) continue;
+
     if (match.result === "draw") {
       for (const playerId of [...team1, ...team2]) {
         const playerStats = stats.get(playerId);
@@ -129,13 +168,16 @@ router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void>
   res.json(ranking);
 });
 
-router.get("/dashboard", requireAuth, requireClub, async (req, res): Promise<void> => {
+router.get("/dashboard", requireCommunityAccess, async (req, res): Promise<void> => {
+  const clubId = requireTargetClub(req, res);
+  if (!clubId) return;
+
   const sportId = await getSelectedSportId(req.query.sportId);
   if (!sportId) {
     res.status(400).json({ error: "sportId inválido" });
     return;
   }
-  const clubId = (req.user as { clubId: number }).clubId;
+
   const [players, matches] = await Promise.all([
     db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
     db
@@ -144,19 +186,23 @@ router.get("/dashboard", requireAuth, requireClub, async (req, res): Promise<voi
       .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId)))
       .orderBy(desc(matchesTable.playedAt)),
   ]);
+
   const matchIds = matches.map((match) => match.id);
   const participants = matchIds.length
     ? await db.select().from(matchPlayersTable).where(inArray(matchPlayersTable.matchId, matchIds))
     : [];
-  const ratings = await db
-    .select()
-    .from(playerSportRatingsTable)
-    .where(
-      and(
-        eq(playerSportRatingsTable.sportId, sportId),
-        inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
-      ),
-    );
+  const ratings = players.length
+    ? await db
+        .select()
+        .from(playerSportRatingsTable)
+        .where(
+          and(
+            eq(playerSportRatingsTable.sportId, sportId),
+            inArray(playerSportRatingsTable.playerId, players.map((player) => player.id)),
+          ),
+        )
+    : [];
+
   const ratingMap = new Map(ratings.map((rating) => [rating.playerId, rating.elo]));
   const playersById = new Map(players.map((player) => [player.id, player]));
   const grouped = groupMatchPlayers(participants);
