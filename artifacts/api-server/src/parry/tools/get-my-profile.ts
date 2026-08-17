@@ -7,7 +7,7 @@ import type {
 
 export type ParryProfileReader = {
   getProfile: (input: {
-    userId: number;
+    userId: string;
     playerId: number;
     clubId: number;
   }) => Promise<ParryProfile | null>;

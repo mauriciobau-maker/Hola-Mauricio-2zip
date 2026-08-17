@@ -3,7 +3,7 @@ import { buildParryContext } from "./parry.context";
 import { ParryToolRegistry } from "./parry.tool-registry";
 
 export type ParryUser = {
-  id?: number;
+  id?: string;
   playerId?: number | null;
   clubId?: number | null;
   role?: string | null;

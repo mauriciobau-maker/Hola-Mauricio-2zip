@@ -1,7 +1,7 @@
 import type { ParryContext } from "./parry.types";
 
 type ContextUser = {
-  id?: number;
+  id?: string;
   playerId?: number | null;
   clubId?: number | null;
   role?: string | null;

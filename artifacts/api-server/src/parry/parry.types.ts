@@ -1,5 +1,5 @@
 export type ParryContext = {
-  userId: number;
+  userId: string;
   playerId: number | null;
   clubId: number | null;
   role: string | null;
