@@ -10,6 +10,7 @@ import {
   clubSportsTable,
   sportModalitiesTable,
   playerSportRatingsTable,
+  encuentrosTable,
 } from "@workspace/db";
 import {
   calculateMatchEloChanges,
@@ -593,6 +594,42 @@ router.post(
     if (!Number.isInteger(clubId) || clubId! <= 0) {
       res.status(400).json({ error: "Los Super Admin deben indicar clubId para crear un partido" });
       return;
+    }
+
+    // ----------------------------------------------------------
+    // Validación de encuentroId
+    // ----------------------------------------------------------
+
+    if (encuentroId !== undefined && encuentroId !== null) {
+      // Si viene encuentroId, validar que sea numérico
+      const parsedEncuentroId = Number(encuentroId);
+      if (isNaN(parsedEncuentroId) || !Number.isInteger(parsedEncuentroId) || parsedEncuentroId <= 0) {
+        res.status(400).json({
+          error: "encuentroId debe ser un número válido",
+        });
+        return;
+      }
+
+      // Buscar el encuentro
+      const [encuentro] = await db
+        .select()
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, parsedEncuentroId));
+
+      if (!encuentro) {
+        res.status(404).json({
+          error: "Encuentro no encontrado",
+        });
+        return;
+      }
+
+      // Verificar que el encuentro pertenece al club correcto
+      if (encuentro.clubId !== clubId) {
+        res.status(403).json({
+          error: "El encuentro no pertenece al club autorizado",
+        });
+        return;
+      }
     }
 
     // ----------------------------------------------------------
