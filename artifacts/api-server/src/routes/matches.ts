@@ -294,16 +294,26 @@ async function enrichMatch(
       )
     );
 
-  const allPlayers = await db
+  // ----------------------------------------------------------
+  // P0-2: Obtener solo jugadores del club del partido
+  // ----------------------------------------------------------
+
+  const clubPlayers = await db
     .select()
-    .from(playersTable);
+    .from(playersTable)
+    .where(
+      eq(
+        playersTable.clubId,
+        m.clubId
+      )
+    );
 
   const playerMap: Record<
     number,
     string
   > = {};
 
-  for (const player of allPlayers) {
+  for (const player of clubPlayers) {
     playerMap[player.id] = player.name;
   }
 
