@@ -590,7 +590,14 @@ router.post(
     const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
     const requestedClubId = req.body.clubId === undefined ? null : Number(req.body.clubId);
     const clubId = isSuperAdminUser(user) ? requestedClubId : user.clubId!;
-    if (!Number.isInteger(clubId) || clubId! <= 0) {
+
+    // CORRECCIÓN: comprobación explícita de null para que
+    // TypeScript pueda tratar clubId como number a partir de aquí.
+    if (
+      clubId == null ||
+      !Number.isInteger(clubId) ||
+      clubId <= 0
+    ) {
       res.status(400).json({ error: "Los Super Admin deben indicar clubId para crear un partido" });
       return;
     }
@@ -1115,10 +1122,12 @@ router.patch(
       modalityId === undefined
         ? existing.modalityId
         : Number(modalityId);
+
     const modality = await getSportModality(
       existing.sportId,
       resultingModalityId,
     );
+
     if (!modality) {
       res.status(400).json({
         error: "La modalidad no pertenece al deporte seleccionado",
@@ -1249,6 +1258,7 @@ router.patch(
 
         return;
       }
+
       if (!(await validatePlayersForClub(allIds, clubId))) {
         res.status(400).json({
           error: "Uno o más jugadores no pertenecen al club actual",
