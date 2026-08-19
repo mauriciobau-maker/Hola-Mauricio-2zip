@@ -317,6 +317,18 @@ async function enrichMatch(
     playerMap[player.id] = player.name;
   }
 
+  // Conjunto de IDs de jugadores del club del partido.
+  const clubPlayerIds = new Set(
+    clubPlayers.map((p) => p.id)
+  );
+
+  // Filtrar los matchPlayers para excluir cualquier entrada cuyo playerId
+  // no pertenezca al club del partido. Esto evita exponer IDs de otros clubes
+  // (incluso como "Desconocido").
+  const filteredMatchPlayers = matchPlayers.filter((mp) =>
+    clubPlayerIds.has(mp.playerId)
+  );
+
   const [sport] = await db
     .select()
     .from(sportsTable)
@@ -342,7 +354,12 @@ async function enrichMatch(
       )
     );
 
-  const eloChanges = history.map(
+  // Filtrar el historial para incluir solo cambios de jugadores del club.
+  const filteredHistory = history.filter((h) =>
+    clubPlayerIds.has(h.playerId)
+  );
+
+  const eloChanges = filteredHistory.map(
     (historyItem) => ({
       playerId:
         historyItem.playerId,
@@ -364,7 +381,7 @@ async function enrichMatch(
   );
 
   const team1Players =
-    matchPlayers
+    filteredMatchPlayers
       .filter(
         (player) =>
           player.team === "team1"
@@ -378,7 +395,7 @@ async function enrichMatch(
       }));
 
   const team2Players =
-    matchPlayers
+    filteredMatchPlayers
       .filter(
         (player) =>
           player.team === "team2"
