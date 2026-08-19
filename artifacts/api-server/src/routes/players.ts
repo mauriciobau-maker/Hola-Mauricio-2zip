@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import {
   db,
   playersTable,
@@ -8,6 +8,7 @@ import {
   matchPlayersTable,
   playerCategoriesTable,
   clubSportCategoriesTable,
+  clubSportsTable,
   clubsTable,
 } from "@workspace/db";
 import {
@@ -297,14 +298,7 @@ router.post(
           restParsedData.language;
       }
 
-      const [player] =
-        await db
-          .insert(playersTable)
-          .values(
-            insertValues as any
-          )
-          .returning();
-
+      // Extraer categoryIds ANTES de crear el jugador
       const categoryIds =
         (parsedCategoryIds as
           | number[]
@@ -317,28 +311,75 @@ router.post(
           | undefined) ||
         [];
 
-      if (
-        Array.isArray(
-          categoryIds
-        ) &&
-        categoryIds.length > 0
-      ) {
-        await db
-          .insert(
-            playerCategoriesTable
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        // Validar formato de IDs
+        const requestedIds = categoryIds.map(Number);
+        const badFormat = requestedIds.filter(
+          (id) => !Number.isInteger(id) || id <= 0
+        );
+
+        if (badFormat.length > 0) {
+          res.status(400).json({
+            error: "categoryIds contiene IDs con formato inválido",
+            invalidCategoryIds: badFormat,
+          });
+          return;
+        }
+
+        if (!targetClubId) {
+          res.status(400).json({
+            error:
+              "Club objetivo inválido para validar categorías",
+          });
+          return;
+        }
+
+        // Una sola consulta con IN (...) usando inArray y JOIN clubSportCategories -> clubSports
+        const foundRows = await db
+          .select({ id: clubSportCategoriesTable.id })
+          .from(clubSportCategoriesTable)
+          .innerJoin(
+            clubSportsTable,
+            eq(
+              clubSportCategoriesTable.clubSportId,
+              clubSportsTable.id
+            )
           )
-          .values(
-            categoryIds.map(
-              (categoryId) => ({
-                playerId:
-                  player.id,
-                categoryId:
-                  Number(
-                    categoryId
-                  ),
-              })
+          .where(
+            and(
+              eq(clubSportsTable.clubId, targetClubId),
+              inArray(clubSportCategoriesTable.id, requestedIds)
             )
           );
+
+        const foundIds = foundRows.map((r: any) => r.id);
+        const invalidIds = requestedIds.filter((id) => !foundIds.includes(id));
+
+        if (invalidIds.length > 0) {
+          res.status(400).json({
+            error:
+              "Algunas categorías no pertenecen al club objetivo o no existen",
+            invalidCategoryIds: invalidIds,
+          });
+          return;
+        }
+      }
+
+      // Todas las categoryIds (si las hubo) son válidas — crear jugador
+      const [player] =
+        await db
+          .insert(playersTable)
+          .values(insertValues as any)
+          .returning();
+
+      // Si había categoryIds y eran válidas, insertar las categorías (una sola inserción)
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        await db.insert(playerCategoriesTable).values(
+          categoryIds.map((categoryId) => ({
+            playerId: player.id,
+            categoryId: Number(categoryId),
+          }))
+        );
       }
 
       const responseObj =
@@ -619,6 +660,63 @@ router.patch(
         categoryIds
       )
     ) {
+      // Antes de borrar/insertar, validar que todas las
+      // categoryIds pertenezcan al club del jugador (updatedRecord.clubId)
+      const targetClubId =
+        updatedRecord.clubId;
+
+      if (!targetClubId) {
+        res.status(400).json({
+          error:
+            "Club objetivo inválido para validar categorías",
+        });
+        return;
+      }
+
+      // Validar formato y luego en una sola consulta con inArray
+      const requestedIds = categoryIds.map(Number);
+      const badFormat = requestedIds.filter(
+        (id) => !Number.isInteger(id) || id <= 0
+      );
+
+      if (badFormat.length > 0) {
+        res.status(400).json({
+          error: "categoryIds contiene IDs con formato inválido",
+          invalidCategoryIds: badFormat,
+        });
+        return;
+      }
+
+      const foundRows = await db
+        .select({ id: clubSportCategoriesTable.id })
+        .from(clubSportCategoriesTable)
+        .innerJoin(
+          clubSportsTable,
+          eq(
+            clubSportCategoriesTable.clubSportId,
+            clubSportsTable.id
+          )
+        )
+        .where(
+          and(
+            eq(clubSportsTable.clubId, targetClubId),
+            inArray(clubSportCategoriesTable.id, requestedIds)
+          )
+        );
+
+      const foundIds = foundRows.map((r: any) => r.id);
+      const invalidIds = requestedIds.filter((id) => !foundIds.includes(id));
+
+      if (invalidIds.length > 0) {
+        res.status(400).json({
+          error:
+            "Algunas categorías no pertenecen al club objetivo o no existen",
+          invalidCategoryIds: invalidIds,
+        });
+        return;
+      }
+
+      // Si todas son válidas, conservar comportamiento actual
       await db
         .delete(
           playerCategoriesTable
