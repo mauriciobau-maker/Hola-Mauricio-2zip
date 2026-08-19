@@ -193,7 +193,7 @@ const TRANSLATIONS = {
     selectedCount: (n: number) => `${n} selecionados`,
     spotsFull: "Vagas esgotadas",
     addSet: "Adicionar Set",
-    removeSet: "Remover Set",
+    removeSet: "Eliminar Set",
     setLabel: (idx: number) => `Set ${idx}`,
     groupMessage: {
       invitation: "CONVOCAÇÃO",
@@ -214,25 +214,25 @@ const TRANSLATIONS = {
 };
 
 const STATUS_CONFIG = {
-  confirmed: { 
-    labelKey: "attending" as const, 
-    icon: Check, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30" 
+  confirmed: {
+    labelKey: "attending" as const,
+    icon: Check, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30"
   },
-  declined: { 
-    labelKey: "cantGo" as const, 
-    icon: X, color: "text-red-400", bg: "bg-red-500/10 border-red-500/30" 
+  declined: {
+    labelKey: "cantGo" as const,
+    icon: X, color: "text-red-400", bg: "bg-red-500/10 border-red-500/30"
   },
-  pending: { 
-    labelKey: "pending" as const, 
-    icon: Clock, color: "text-muted-foreground", bg: "bg-white/5 border-border" 
+  pending: {
+    labelKey: "pending" as const,
+    icon: Clock, color: "text-muted-foreground", bg: "bg-white/5 border-border"
   },
-  waitlist: { 
-    labelKey: "waitlist" as const, 
-    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" 
+  waitlist: {
+    labelKey: "waitlist" as const,
+    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30"
   },
-  reserva: { 
-    labelKey: "waitlist" as const, 
-    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" 
+  reserva: {
+    labelKey: "waitlist" as const,
+    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30"
   },
 };
 
@@ -633,6 +633,9 @@ export function EncuentroDetalle() {
       if (res.ok) {
         setEditingMatchId(null);
         reloadMatches();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setRsvpError(errorData.message || "No se pudo guardar el resultado.");
       }
     } finally {
       setSavingScore(false);
