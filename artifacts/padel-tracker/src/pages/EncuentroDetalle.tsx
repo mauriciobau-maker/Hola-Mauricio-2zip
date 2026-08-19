@@ -628,6 +628,7 @@ export function EncuentroDetalle() {
           team1Score,
           team2Score,
           sets: editSets,
+          status: "confirmed",
         }),
       });
       if (res.ok) {
@@ -793,7 +794,7 @@ export function EncuentroDetalle() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="flex gap-2">
-              {(["confirmed", "declined", "pending"] as const).map((status) => {
+              {( ["confirmed", "declined", "pending"] as const).map((status) => {
                 const cfg = STATUS_CONFIG[status];
                 const Icon = cfg.icon;
                 const isActive = myEntry?.status === status;
@@ -817,7 +818,7 @@ export function EncuentroDetalle() {
       ) : user && !user.playerId ? (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="py-3 px-4 text-sm text-amber-400">
-            {t.linkAccountMsg}{" "}
+            {t.linkAccountMsg} {" "}
             <button onClick={() => navigate("/vincular")} className="underline font-medium">
               {t.linkNow}
             </button>
@@ -1078,7 +1079,7 @@ export function EncuentroDetalle() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                {t.confirmedPlayersMsg(confirmedCount)}{" "}
+                {t.confirmedPlayersMsg(confirmedCount)} {" "}
                 {confirmedCount < 4 && <span className="text-destructive">{t.needAtLeast4}</span>}
               </p>
               <div className="flex gap-2">
@@ -1215,7 +1216,7 @@ export function EncuentroDetalle() {
                             <button
                               type="button"
                               onClick={handleAddSet}
-                              className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-1 font-medium"
+                              className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center g[...]
                             >
                               <Plus size={12} /> {t.addSet}
                             </button>
