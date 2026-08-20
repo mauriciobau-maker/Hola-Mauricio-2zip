@@ -1,26 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and } from "drizzle-orm";
-import {
-  db,
-  matchesTable,
-  playersTable,
-  eloHistoryTable,
-  matchPlayersTable,
-  sportsTable,
-  clubSportsTable,
-  sportModalitiesTable,
-  playerSportRatingsTable,
-  encuentrosTable,
-} from "@workspace/db";
-import {
-  calculateMatchEloChanges,
-  STARTING_ELO,
-} from "../elo";
+import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable, sportsTable, clubSportsTable, sportModalitiesTable, playerSportRatingsTable, encuentrosTable } from "@workspace/db";
+import { calculateMatchEloChanges, STARTING_ELO } from "../elo";
 import { recalculateSportElo } from "../lib/recalculateElo";
-import {
-  isSuperAdminUser,
-  requireCommunityAccess,
-} from "../middlewares/requireCommunity";
+import { isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
 import { getSportModality, validatePlayersForClub } from "../lib/modalities";
 
 const router: IRouter = Router();
@@ -29,12 +12,7 @@ async function legacyRecalculateAllElo(): Promise<void> {
   await db.update(playersTable).set({ elo: STARTING_ELO });
   await db.delete(eloHistoryTable);
   const allMatches = await db.select().from(matchesTable).orderBy(asc(matchesTable.playedAt));
-  const confirmedMatches = allMatches.filter((match: any) => {
-    if (match.status !== "confirmed") return false;
-    if (match.team1Score === 0 && match.team2Score === 0) return false;
-    if (match.result !== "team1" && match.result !== "team2" && match.result !== "draw") return false;
-    return true;
-  });
+  const confirmedMatches = allMatches.filter((match: any) => match.status === "confirmed" && !(match.team1Score === 0 && match.team2Score === 0) && ["team1", "team2", "draw"].includes(match.result));
   if (confirmedMatches.length === 0) return;
   const players = await db.select().from(playersTable);
   const eloByClub: Record<number, Record<number, number>> = {};
@@ -52,9 +30,7 @@ async function legacyRecalculateAllElo(): Promise<void> {
     const team1 = playersInMatch.filter((player) => player.team === "team1").map((player) => ({ id: player.playerId, elo: eloByClub[clubId][player.playerId] ?? STARTING_ELO }));
     const team2 = playersInMatch.filter((player) => player.team === "team2").map((player) => ({ id: player.playerId, elo: eloByClub[clubId][player.playerId] ?? STARTING_ELO }));
     if (team1.length === 0 || team2.length === 0) continue;
-    const team1Won = match.result === "team1";
-    const isDraw = match.result === "draw";
-    const changes = isDraw ? calculateMatchEloChanges(team1, team2, false, true) : calculateMatchEloChanges(team1, team2, team1Won);
+    const changes = match.result === "draw" ? calculateMatchEloChanges(team1, team2, false, true) : calculateMatchEloChanges(team1, team2, match.result === "team1");
     await db.insert(eloHistoryTable).values(changes.map((change) => ({ playerId: change.playerId, matchId: match.id, sportId: match.sportId, eloBefore: change.eloBefore, eloAfter: change.eloAfter, eloChange: change.eloChange })));
     for (const change of changes) eloByClub[clubId][change.playerId] = change.eloAfter;
   }
@@ -90,8 +66,7 @@ router.get("/matches", requireCommunityAccess, async (req, res): Promise<void> =
   const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
   const clubId = isSuperAdminUser(user) ? null : user.clubId!;
   const matches = clubId == null ? await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt)) : await db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)).orderBy(desc(matchesTable.playedAt));
-  const result = await Promise.all(matches.map((match) => enrichMatch(match)));
-  res.json(result);
+  res.json(await Promise.all(matches.map((match) => enrichMatch(match))));
 });
 
 router.post("/matches", requireCommunityAccess, async (req, res): Promise<void> => {
@@ -131,8 +106,7 @@ router.post("/matches", requireCommunityAccess, async (req, res): Promise<void> 
   const status = autoConfirm ? "confirmed" : "pending_confirmation";
   const [match] = await db.insert(matchesTable).values({ sportId, modalityId: modality.id, clubId, team1Score: t1Score, team2Score: t2Score, sets: sets ?? null, result, status, encuentroId: encuentroId ?? null, playedAt: new Date(playedAt) } as any).returning();
   await db.insert(playerSportRatingsTable).values(allIds.map((playerId: number) => ({ playerId, sportId: Number(sportId), elo: STARTING_ELO }))).onConflictDoNothing({ target: [playerSportRatingsTable.playerId, playerSportRatingsTable.sportId] });
-  const matchPlayerValues = [...normalizedTeam1Ids.map((playerId: number) => ({ matchId: match.id, playerId, team: "team1" })), ...normalizedTeam2Ids.map((playerId: number) => ({ matchId: match.id, playerId, team: "team2" }))];
-  await db.insert(matchPlayersTable).values(matchPlayerValues);
+  await db.insert(matchPlayersTable).values([...normalizedTeam1Ids.map((playerId: number) => ({ matchId: match.id, playerId, team: "team1" })), ...normalizedTeam2Ids.map((playerId: number) => ({ matchId: match.id, playerId, team: "team2" }))]);
   if (status === "confirmed") await recalculateAllElo();
   res.status(201).json(await enrichMatch(match));
 });
