@@ -573,7 +573,33 @@ router.patch(
       wspConsent,
       language,
       categoryIds,
+      clubId: requestedClubId,
     } = req.body;
+
+    if (isAdmin && requestedClubId !== undefined) {
+      const targetClubId = Number(requestedClubId);
+
+      if (!Number.isInteger(targetClubId) || targetClubId <= 0) {
+        res.status(400).json({
+          error: "clubId inválido",
+        });
+        return;
+      }
+
+      const [targetClub] = await db
+        .select({ id: clubsTable.id })
+        .from(clubsTable)
+        .where(eq(clubsTable.id, targetClubId));
+
+      if (!targetClub) {
+        res.status(400).json({
+          error: "El club indicado no existe",
+        });
+        return;
+      }
+
+      updates.clubId = targetClubId;
+    }
 
     if (
       phone !== undefined
