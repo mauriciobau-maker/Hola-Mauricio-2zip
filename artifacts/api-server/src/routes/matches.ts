@@ -25,6 +25,19 @@ import { getSportModality, validatePlayersForClub } from "../lib/modalities";
 
 const router: IRouter = Router();
 
+/**
+ * Recalcula todo el Elo desde cero.
+ *
+ * Reglas:
+ * 1. Todos los jugadores parten desde STARTING_ELO.
+ * 2. Solo partidos CONFIRMADOS afectan el Elo.
+ * 3. Partidos 0-0 no afectan el Elo.
+ * 4. Solo resultados válidos afectan el Elo.
+ * 5. El Elo se calcula independientemente por club.
+ * 6. El historial Elo se reconstruye completamente.
+ * 7. Los jugadores de cada partido provienen exclusivamente
+ *    de matchPlayersTable.
+ */
 async function legacyRecalculateAllElo(): Promise<void> {
   await db.update(playersTable).set({ elo: STARTING_ELO });
   await db.delete(eloHistoryTable);
@@ -67,9 +80,7 @@ async function legacyRecalculateAllElo(): Promise<void> {
   }
 }
 
-async function recalculateAllElo(): Promise<void> {
-  return recalculateSportElo();
-}
+async function recalculateAllElo(): Promise<void> { return recalculateSportElo(); }
 
 async function enrichMatch(m: typeof matchesTable.$inferSelect) {
   const matchPlayers = await db.select().from(matchPlayersTable).where(eq(matchPlayersTable.matchId, m.id));
