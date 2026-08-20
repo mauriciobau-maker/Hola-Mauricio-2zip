@@ -297,6 +297,29 @@ router.post("/matches", async (req, res): Promise<void> => {
       encuentroId,
     } = body;
 
+    if (encuentroId !== undefined && encuentroId !== null && encuentroId !== "") {
+      const resolvedEncuentroId = Number(encuentroId);
+      if (!Number.isInteger(resolvedEncuentroId) || resolvedEncuentroId <= 0) {
+        res.status(400).json({ error: "encuentroId inválido" });
+        return;
+      }
+
+      const [encuentro] = await db
+        .select({ id: encuentrosTable.id })
+        .from(encuentrosTable)
+        .where(
+          and(
+            eq(encuentrosTable.id, resolvedEncuentroId),
+            eq(encuentrosTable.clubId, clubId),
+          ),
+        );
+
+      if (!encuentro) {
+        res.status(400).json({ error: "El encuentro no pertenece al club actual" });
+        return;
+      }
+    }
+
     const resolvedSportId = Number(sportId ?? 1);
     const modality = await getSportModality(resolvedSportId, modalityId);
     if (!modality) {
