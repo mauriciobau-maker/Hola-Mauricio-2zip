@@ -601,6 +601,7 @@ export function EncuentroDetalle() {
 
   async function handleSaveScore(matchId: number) {
     setSavingScore(true);
+    setRsvpError(null);
     try {
       let t1Sets = 0;
       let t2Sets = 0;
@@ -628,15 +629,22 @@ export function EncuentroDetalle() {
           status: "confirmed",
         }),
       });
+
       if (res.ok) {
         setEditingMatchId(null);
         reloadMatches();
-      } else {
-        const errorData = await res.json().catch(() => null);
-        setRsvpError(
-          errorData?.message || "No se pudo guardar el resultado."
-        );
+        return;
       }
+
+      const errorData = await res.json().catch(() => null);
+      setRsvpError(
+        errorData?.message ||
+          errorData?.error ||
+          `No se pudo guardar el resultado (HTTP ${res.status}).`
+      );
+    } catch (err) {
+      console.error("Error guardando resultado:", err);
+      setRsvpError("Error de conexión al guardar el resultado.");
     } finally {
       setSavingScore(false);
     }
