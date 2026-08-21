@@ -1,0 +1,49 @@
+name: tmp fix Admin admin id
+
+on:
+  push:
+    branches:
+      - p0/parry-v01
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply exact Admin.tsx fix
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("artifacts/padel-tracker/src/pages/Admin.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          replacements = [
+              ('  id: number;\n  name: string;\n  nickname?: string;\n  email: string;\n  phone?: string;\n}\n\ninterface Club {', '  id: string;\n  name: string;\n  nickname?: string;\n  email: string;\n  phone?: string;\n}\n\ninterface Club {'),
+              ('    selectedAdminId: "" as string | number,', '    selectedAdminId: "" as string,'),
+              ('    const adminId = Number(adminIdStr);\n    const selected = existingAdmins.find(a => a.id === adminId);', '    const adminId = adminIdStr;\n    const selected = existingAdmins.find(a => a.id === adminId);')
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Expected block not found: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          grep -n -A5 -B2 'interface AdminUser' artifacts/padel-tracker/src/pages/Admin.tsx
+          grep -n -A5 'handleSelectExistingAdmin' artifacts/padel-tracker/src/pages/Admin.tsx
+          git diff --check
+          rm -f .github/workflows/tmp-fix-admin-id.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/padel-tracker/src/pages/Admin.tsx .github/workflows/tmp-fix-admin-id.yml
+          git commit -m "fix: preserve existing admin UUID" --no-verify
+          git push origin HEAD:p0/parry-v01
