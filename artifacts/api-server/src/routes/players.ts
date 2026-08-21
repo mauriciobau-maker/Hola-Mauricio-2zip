@@ -180,6 +180,7 @@ router.post(
       const user = req.user as {
         role?: string;
         clubId?: number | null;
+        isAdmin?: number | boolean | null;
       } | undefined;
 
       const isSuperAdmin = isSuperAdminUser(user);
@@ -491,6 +492,7 @@ router.patch(
       role?: string;
       playerId?: number;
       clubId?: number | null;
+      isAdmin?: number | boolean | null;
     } | undefined;
 
     const isAdmin = isSuperAdminUser(user);
