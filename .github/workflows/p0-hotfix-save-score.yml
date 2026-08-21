@@ -1,44 +1,83 @@
-name: P0 temporary Admin UUID fix
+name: P0 hotfix - Guardar resultado
 
 on:
-  push:
+  pull_request:
     branches:
-      - p0/parry-v01
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  patch:
+  patch-save-score:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@v4
 
-      - name: Apply exact Admin.tsx fix
+      - name: Apply frontend fix
         shell: python
         run: |
           from pathlib import Path
-          path = Path("artifacts/padel-tracker/src/pages/Admin.tsx")
+
+          path = Path("artifacts/padel-tracker/src/pages/EncuentroDetalle.tsx")
           text = path.read_text(encoding="utf-8")
-          replacements = [
-              ('  id: number;\n  name: string;\n  nickname?: string;\n  email: string;\n  phone?: string;\n}\n\ninterface Club {', '  id: string;\n  name: string;\n  nickname?: string;\n  email: string;\n  phone?: string;\n}\n\ninterface Club {'),
-              ('    selectedAdminId: "" as string | number,', '    selectedAdminId: "" as string,'),
-              ('    const adminId = Number(adminIdStr);\n    const selected = existingAdmins.find(a => a.id === adminId);', '    const adminId = adminIdStr;\n    const selected = existingAdmins.find(a => a.id === adminId);')
-          ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f"Expected block not found: {old[:80]!r}")
-              text = text.replace(old, new, 1)
-          path.write_text(text, encoding="utf-8")
+
+          old = '''      const res = await fetch(`/api/matches/${matchId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          team1Score,
+          team2Score,
+          sets: editSets,
+        }),
+      });
+      if (res.ok) {
+        setEditingMatchId(null);
+        reloadMatches();
+      }
+'''
+
+          new = '''      const res = await fetch(`/api/matches/${matchId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          team1Score,
+          team2Score,
+          sets: editSets,
+          status: "confirmed",
+        }),
+      });
+
+      const responseData = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const message =
+          responseData?.error ||
+          responseData?.message ||
+          `No se pudo guardar el resultado (HTTP ${res.status}).`;
+        setRsvpError(message);
+        return;
+      }
+
+      setEditingMatchId(null);
+      reloadMatches();
+'''
+
+          if old not in text:
+              raise SystemExit("No se encontró el bloque esperado de handleSaveScore; no se aplicó ningún cambio.")
+
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
       - name: Commit fix and remove temporary workflow
         shell: bash
         run: |
-          git diff --check
-          rm -f .github/workflows/p0-hotfix-save-score.yml .github/workflows/tmp-fix-admin-id.yml
+          rm -f .github/workflows/p0-hotfix-save-score.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add artifacts/padel-tracker/src/pages/Admin.tsx .github/workflows/p0-hotfix-save-score.yml .github/workflows/tmp-fix-admin-id.yml
-          git commit -m "fix: preserve existing admin UUID [skip ci]" --no-verify
-          git push origin HEAD:p0/parry-v01
+          git add artifacts/padel-tracker/src/pages/EncuentroDetalle.tsx .github/workflows/p0-hotfix-save-score.yml
+          git diff --cached --check
+          git commit -m "fix: confirm match when saving score"
+          git push origin HEAD:p0/community-isolation
