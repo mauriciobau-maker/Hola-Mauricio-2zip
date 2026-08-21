@@ -213,7 +213,9 @@ router.post(
       const defaultLanguage = req.body.defaultLanguage || "es";
 
       const adminMode = req.body.adminMode || "new";
-      const selectedAdminId = Number(req.body.selectedAdminId) || null;
+      const selectedAdminId = req.body.selectedAdminId
+        ? String(req.body.selectedAdminId)
+        : null;
       const adminEmail = req.body.adminEmail || req.body.admin?.email || null;
       const adminName = req.body.adminName || req.body.admin?.name || null;
       const adminNickname = req.body.adminNickname || null;
