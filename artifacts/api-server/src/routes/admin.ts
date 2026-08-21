@@ -212,6 +212,8 @@ router.post(
       const mapUrl = req.body.mapUrl || null;
       const defaultLanguage = req.body.defaultLanguage || "es";
 
+      const adminMode = req.body.adminMode || "new";
+      const selectedAdminId = Number(req.body.selectedAdminId) || null;
       const adminEmail = req.body.adminEmail || req.body.admin?.email || null;
       const adminName = req.body.adminName || req.body.admin?.name || null;
       const adminNickname = req.body.adminNickname || null;
@@ -281,7 +283,42 @@ router.post(
         }
       }
 
-      if (adminEmail) {
+      if (adminMode === "existing") {
+        if (!selectedAdminId) {
+          res.status(400).json({ error: "Debe seleccionar un administrador existente" });
+          return;
+        }
+
+        try {
+          const [existingUser] = await db
+            .select()
+            .from(usersTable)
+            .where(eq(usersTable.id, selectedAdminId));
+
+          if (!existingUser) {
+            res.status(404).json({ error: "El administrador seleccionado no existe" });
+            return;
+          }
+
+          await db
+            .update(usersTable)
+            .set({
+              clubId: club.id,
+              isClubAdmin: 1,
+              name: adminName || (existingUser as any).name || undefined,
+              nickname: adminNickname || (existingUser as any).nickname || undefined,
+              phone: adminPhone || (existingUser as any).phone || undefined,
+            } as any)
+            .where(eq(usersTable.id, selectedAdminId));
+        } catch (userErr: any) {
+          console.error("⚠️ Error asociando administrador existente:", userErr?.message);
+          res.status(500).json({
+            error: "Error al asociar el administrador seleccionado",
+            detalleTecnico: userErr?.message || String(userErr),
+          });
+          return;
+        }
+      } else if (adminEmail) {
         try {
           const [existingUser] = await db
             .select()
