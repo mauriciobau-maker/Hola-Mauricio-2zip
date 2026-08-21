@@ -35,7 +35,7 @@ interface Sport {
 }
 
 interface AdminUser {
-  id: number;
+  id: string;
   name: string;
   nickname?: string;
   email: string;
@@ -185,7 +185,7 @@ export default function Admin() {
     city: "Santiago",
     address: "",
     mapUrl: "",
-    selectedAdminId: "" as string | number,
+    selectedAdminId: "" as string,
     adminName: "",
     adminNickname: "",
     adminEmail: "",
@@ -381,7 +381,7 @@ export default function Admin() {
   };
 
   const handleSelectExistingAdmin = (adminIdStr: string) => {
-    const adminId = Number(adminIdStr);
+    const adminId = adminIdStr;
     const selected = existingAdmins.find(a => a.id === adminId);
     if (selected) {
       setNewClub(prev => ({
