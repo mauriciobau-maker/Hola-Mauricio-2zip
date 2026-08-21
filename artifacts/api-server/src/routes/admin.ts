@@ -212,10 +212,35 @@ router.post(
       const mapUrl = req.body.mapUrl || null;
       const defaultLanguage = req.body.defaultLanguage || "es";
 
+      const adminMode = req.body.adminMode === "existing" ? "existing" : "new";
+      const selectedAdminId =
+        req.body.selectedAdminId !== undefined && req.body.selectedAdminId !== null && req.body.selectedAdminId !== ""
+          ? String(req.body.selectedAdminId)
+          : null;
       const adminEmail = req.body.adminEmail || req.body.admin?.email || null;
       const adminName = req.body.adminName || req.body.admin?.name || null;
       const adminNickname = req.body.adminNickname || null;
       const adminPhone = req.body.adminPhone || req.body.phone || req.body.admin?.phone || null;
+
+      let selectedExistingAdmin = null;
+      if (adminMode === "existing") {
+        if (!selectedAdminId) {
+          res.status(400).json({ error: "Debe seleccionar un administrador existente" });
+          return;
+        }
+
+        const [existingUser] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, selectedAdminId));
+
+        if (!existingUser) {
+          res.status(404).json({ error: "Administrador seleccionado no encontrado" });
+          return;
+        }
+
+        selectedExistingAdmin = existingUser;
+      }
 
       const baseSlug =
         (rawSlug || clubName)
@@ -281,7 +306,24 @@ router.post(
         }
       }
 
-      if (adminEmail) {
+      if (adminMode === "existing") {
+        try {
+          await db
+            .update(usersTable)
+            .set({
+              clubId: club.id,
+              isClubAdmin: 1,
+            })
+            .where(eq(usersTable.id, String(selectedExistingAdmin!.id)));
+        } catch (userErr: any) {
+          console.error("⚠️ Error asociando usuario admin existente:", userErr?.message);
+          res.status(500).json({
+            error: "Error al asociar el administrador existente",
+            detalleTecnico: userErr?.message || String(userErr),
+          });
+          return;
+        }
+      } else if (adminEmail) {
         try {
           const [existingUser] = await db
             .select()
@@ -322,13 +364,13 @@ router.post(
         inviteCode: generatedInviteCode,
         invite_code: generatedInviteCode,
         slug: finalSlug,
-        adminName: adminName,
-        adminEmail: adminEmail,
-        adminPhone: adminPhone,
+        adminName: selectedExistingAdmin?.name || adminName,
+        adminEmail: selectedExistingAdmin?.email || adminEmail,
+        adminPhone: selectedExistingAdmin?.phone || adminPhone,
         admin: {
-          name: adminName,
-          email: adminEmail,
-          phone: adminPhone,
+          name: selectedExistingAdmin?.name || adminName,
+          email: selectedExistingAdmin?.email || adminEmail,
+          phone: selectedExistingAdmin?.phone || adminPhone,
         },
       });
     } catch (error: any) {
