@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable } from "@workspace/db";
+import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -54,7 +54,6 @@ router.get("/club", async (req, res): Promise<void> => {
       active: club.active,
       createdAt: club.createdAt ? (club.createdAt as Date).toISOString() : null,
       sports: clubSports,
-      // Campos estéticos, marca blanca, contacto y ubicación completos:
       inviteCode: (club as any).inviteCode || null,
       logoUrl: (club as any).logoUrl || null,
       country: (club as any).country || "Chile",
@@ -74,18 +73,97 @@ router.get("/club", async (req, res): Promise<void> => {
   }
 });
 
+// GET /clubs/public/:slug — perfil público del club, sin autenticación
+router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
+  try {
+    const slug = String(req.params.slug || "").trim().toLowerCase();
+    if (!slug) {
+      res.status(400).json({ error: "Slug de club requerido" });
+      return;
+    }
+
+    const [club] = await db
+      .select()
+      .from(clubsTable)
+      .where(and(eq(clubsTable.slug, slug), eq(clubsTable.active, true)));
+
+    if (!club) {
+      res.status(404).json({ error: "Club no encontrado" });
+      return;
+    }
+
+    let sports: any[] = [];
+    try {
+      sports = await db
+        .select({
+          id: sportsTable.id,
+          name: sportsTable.name,
+          slug: sportsTable.slug,
+          active: clubSportsTable.active,
+        })
+        .from(clubSportsTable)
+        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+        .where(eq(clubSportsTable.clubId, club.id));
+    } catch (e) {
+      console.error("⚠️ Error cargando deportes del club público:", e);
+    }
+
+    let admin: any = null;
+    try {
+      const [clubAdmin] = await db
+        .select({
+          name: usersTable.name,
+          nickname: usersTable.nickname,
+          email: usersTable.email,
+          phone: usersTable.phone,
+        })
+        .from(usersTable)
+        .where(and(eq(usersTable.clubId, club.id), eq(usersTable.isClubAdmin, 1)))
+        .limit(1);
+
+      if (clubAdmin) {
+        admin = clubAdmin;
+      }
+    } catch (e) {
+      console.error("⚠️ Error cargando contacto del administrador público:", e);
+    }
+
+    res.json({
+      id: club.id,
+      name: club.name,
+      slug: club.slug,
+      logoUrl: (club as any).logoUrl || null,
+      primaryColor: (club as any).primaryColor || null,
+      secondaryColor: (club as any).secondaryColor || null,
+      inviteCode: (club as any).inviteCode || null,
+      country: (club as any).country || "Chile",
+      state: (club as any).state || null,
+      city: (club as any).city || null,
+      address: (club as any).address || null,
+      mapUrl: (club as any).mapUrl || null,
+      defaultLanguage: (club as any).defaultLanguage || "es",
+      sports,
+      adminName: admin?.name || admin?.nickname || null,
+      adminEmail: admin?.email || null,
+      adminPhone: admin?.phone || null,
+      adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
+    });
+  } catch (error) {
+    console.error("Error en GET /clubs/public/:slug:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 // GET /clubs/current — Devuelve el club actual respetando estrictamente los roles de usuario
 router.get("/clubs/current", async (req, res): Promise<void> => {
   try {
     const user = req.user as any;
 
-    // Si no hay sesión iniciada, responder null
     if (!user) {
       res.json(null);
       return;
     }
 
-    // 1. Si el usuario (sea quien sea) tiene un clubId explícito asignado
     if (user.clubId) {
       const [club] = await db
         .select()
@@ -98,8 +176,6 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
       }
     }
 
-    // 2. EXCLUSIVO SUPER ADMIN: Si eres Super Admin y no tienes clubId asignado,
-    // se carga el primer club registrado para permitir la carga del panel general.
     const isSuperAdmin = user.isAdmin === 1 || user.role === "SUPER_ADMIN";
 
     if (isSuperAdmin) {
@@ -108,8 +184,6 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
       return;
     }
 
-    // 3. Usuarios normales / Club Admins sin club asignado:
-    // Retorna null de forma limpia sin exponer datos de otros clubes.
     res.json(null);
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
@@ -228,7 +302,6 @@ router.post("/club/categories", async (req, res): Promise<void> => {
   }
 
   try {
-    // Validar que el clubSport pertenece al club actual
     const [clubSport] = await db
       .select()
       .from(clubSportsTable)
