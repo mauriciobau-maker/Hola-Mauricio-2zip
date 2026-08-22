@@ -22,8 +22,8 @@ import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { Onboarding } from "@/pages/Onboarding";
 import Cobros from "@/pages/Cobros";
+import PublicClub from "@/pages/PublicClub";
 
-// Importamos el proveedor de idiomas que creamos
 import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({
@@ -57,6 +57,7 @@ function Router() {
         <Route path="/onboarding" component={Onboarding} />
         <Route path="/vincular" component={VincularJugador} />
         <Route path="/admin" component={Admin} />
+        <Route path="/:slug" component={PublicClub} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
