@@ -4,6 +4,7 @@ import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } fr
 import { Button } from "@/components/ui/button";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
+import type { CSSProperties } from "react";
 
 interface PublicClubData {
   id: number;
@@ -50,7 +51,7 @@ function hexToHsl(hex: string) {
 
 export default function PublicClub() {
   const [, params] = useRoute("/:slug");
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -61,6 +62,7 @@ export default function PublicClub() {
     if (!slug) return;
 
     setLoading(true);
+    setError(false);
     fetch(`/api/clubs/public/${encodeURIComponent(slug)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Club no encontrado");
@@ -86,12 +88,11 @@ export default function PublicClub() {
 
   const locationParts = [club.address, club.city, club.state, club.country].filter(Boolean);
   const publicMapUrl = club.mapUrl || (locationParts.length ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationParts.join(", "))}` : null);
-  const publicUrl = typeof window !== "undefined" ? window.location.href : "";
   const activeSports = club.sports.filter((sport) => sport.active !== false);
   const cssVars = {
     ...(club.primaryColor ? { "--primary": hexToHsl(club.primaryColor) } : {}),
     ...(club.secondaryColor ? { "--secondary": hexToHsl(club.secondaryColor) } : {}),
-  } as React.CSSProperties;
+  } as CSSProperties;
 
   const copyInviteCode = async () => {
     if (!club.inviteCode) return;
@@ -128,9 +129,15 @@ export default function PublicClub() {
           </div>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {!user && <Button onClick={() => window.location.assign("/onboarding")} className="gap-2"><UserPlus size={16} /> Registrarme</Button>}
-            {user && <Button onClick={() => window.location.assign("/")} className="gap-2"><LogIn size={16} /> Entrar al club</Button>}
-            {publicMapUrl && <Button asChild variant="outline" className="gap-2"><a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Ver ubicación</a></Button>}
+            <Button onClick={() => login()} className="gap-2">
+              {user ? <LogIn size={16} /> : <UserPlus size={16} />}
+              {user ? "Entrar al club" : "Entrar / Registrarme"}
+            </Button>
+            {publicMapUrl && (
+              <Button asChild variant="outline" className="gap-2">
+                <a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Ver ubicación</a>
+              </Button>
+            )}
           </div>
         </div>
       </section>
@@ -178,8 +185,6 @@ export default function PublicClub() {
           {!club.adminName && !club.adminEmail && !club.adminPhone && !club.adminWhatsappAlias && <p className="italic">El administrador aún no ha publicado datos de contacto.</p>}
         </div>
       </section>
-
-      <p className="text-center text-xs text-muted-foreground">{publicUrl}</p>
     </div>
   );
 }
