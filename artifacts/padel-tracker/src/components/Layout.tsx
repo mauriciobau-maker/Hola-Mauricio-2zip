@@ -45,6 +45,18 @@ const navItems: NavItem[] = [
   { href: "/cobros", key: "payments", icon: DollarSign },
 ];
 
+const reservedSingleSegmentRoutes = new Set([
+  "/admin",
+  "/onboarding",
+  "/vincular",
+  "/jugadores",
+  "/partidos",
+  "/ranking",
+  "/parejas",
+  "/encuentros",
+  "/cobros",
+]);
+
 function hexToHslChannels(hex: string): string {
   hex = hex.replace(/^#/, "");
   if (hex.length === 3) {
@@ -80,6 +92,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const { language, setLanguage, setClubDefaultLanguage, t } = useLanguage();
 
+  // Las URLs públicas de clubes usan directamente /<slug>, por ejemplo /rivera-padel.
+  // Deben ser accesibles sin autenticación y no deben activar el onboarding.
+  const isPublicClubRoute = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
+
   // BYPASS SUPER ADMIN Y CONTROL DE ADMIN
   const isSuperAdmin = !!(user && ((user as any).role === "superadmin" || (user as any).role === "super_admin"));
   const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0) || isSuperAdmin;
@@ -90,15 +106,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       user && 
       !(user as any).clubId && 
       !isAdmin &&
+      !isPublicClubRoute &&
       location !== "/onboarding" && 
       location !== "/vincular" && 
       location !== "/admin"
     ) {
       navigate("/onboarding");
     }
-  }, [user, isLoading, location, isAdmin, navigate]);
+  }, [user, isLoading, location, isAdmin, isPublicClubRoute, navigate]);
 
   useEffect(() => {
+    if (isPublicClubRoute) {
+      const slug = location.slice(1);
+      fetch(`/api/clubs/public/${encodeURIComponent(slug)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setClub(data);
+            if (data.defaultLanguage) {
+              setClubDefaultLanguage(data.defaultLanguage);
+            }
+          } else {
+            setClub(null);
+          }
+        })
+        .catch(() => setClub(null));
+      return;
+    }
+
     if (user && ((user as any).clubId || isAdmin)) {
       fetch("/api/clubs/current")
         .then((res) => (res.ok ? res.json() : null))
@@ -114,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     } else {
       setClub(null);
     }
-  }, [user, isAdmin, setClubDefaultLanguage]);
+  }, [user, isAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
 
   const dynamicStyles: Record<string, string> = {};
   if (club?.primaryColor) {
