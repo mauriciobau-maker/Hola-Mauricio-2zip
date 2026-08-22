@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import {
   db,
   playersTable,
@@ -8,6 +8,7 @@ import {
   matchPlayersTable,
   playerCategoriesTable,
   clubSportCategoriesTable,
+  clubSportsTable,
   clubsTable,
 } from "@workspace/db";
 import {
@@ -156,6 +157,7 @@ router.get(
 
 router.post(
   "/players",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     try {
       const bodyData =
@@ -181,9 +183,7 @@ router.post(
         clubId?: number | null;
       } | undefined;
 
-      const isSuperAdmin =
-        user?.role === "superadmin" ||
-        user?.role === "admin";
+      const isSuperAdmin = isSuperAdminUser(user);
 
       let targetClubId =
         user?.clubId ?? null;
@@ -298,14 +298,7 @@ router.post(
           restParsedData.language;
       }
 
-      const [player] =
-        await db
-          .insert(playersTable)
-          .values(
-            insertValues as any
-          )
-          .returning();
-
+      // Extraer categoryIds ANTES de crear el jugador
       const categoryIds =
         (parsedCategoryIds as
           | number[]
@@ -318,28 +311,75 @@ router.post(
           | undefined) ||
         [];
 
-      if (
-        Array.isArray(
-          categoryIds
-        ) &&
-        categoryIds.length > 0
-      ) {
-        await db
-          .insert(
-            playerCategoriesTable
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        // Validar formato de IDs
+        const requestedIds = categoryIds.map(Number);
+        const badFormat = requestedIds.filter(
+          (id) => !Number.isInteger(id) || id <= 0
+        );
+
+        if (badFormat.length > 0) {
+          res.status(400).json({
+            error: "categoryIds contiene IDs con formato inválido",
+            invalidCategoryIds: badFormat,
+          });
+          return;
+        }
+
+        if (!targetClubId) {
+          res.status(400).json({
+            error:
+              "Club objetivo inválido para validar categorías",
+          });
+          return;
+        }
+
+        // Una sola consulta con IN (...) usando inArray y JOIN clubSportCategories -> clubSports
+        const foundRows = await db
+          .select({ id: clubSportCategoriesTable.id })
+          .from(clubSportCategoriesTable)
+          .innerJoin(
+            clubSportsTable,
+            eq(
+              clubSportCategoriesTable.clubSportId,
+              clubSportsTable.id
+            )
           )
-          .values(
-            categoryIds.map(
-              (categoryId) => ({
-                playerId:
-                  player.id,
-                categoryId:
-                  Number(
-                    categoryId
-                  ),
-              })
+          .where(
+            and(
+              eq(clubSportsTable.clubId, targetClubId),
+              inArray(clubSportCategoriesTable.id, requestedIds)
             )
           );
+
+        const foundIds = foundRows.map((r: any) => r.id);
+        const invalidIds = requestedIds.filter((id) => !foundIds.includes(id));
+
+        if (invalidIds.length > 0) {
+          res.status(400).json({
+            error:
+              "Algunas categorías no pertenecen al club objetivo o no existen",
+            invalidCategoryIds: invalidIds,
+          });
+          return;
+        }
+      }
+
+      // Todas las categoryIds (si las hubo) son válidas — crear jugador
+      const [player] =
+        await db
+          .insert(playersTable)
+          .values(insertValues as any)
+          .returning();
+
+      // Si había categoryIds y eran válidas, insertar las categorías (una sola inserción)
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        await db.insert(playerCategoriesTable).values(
+          categoryIds.map((categoryId) => ({
+            playerId: player.id,
+            categoryId: Number(categoryId),
+          }))
+        );
       }
 
       const responseObj =
@@ -450,6 +490,7 @@ router.get(
 
 router.patch(
   "/players/:id",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -493,10 +534,7 @@ router.patch(
       clubId?: number | null;
     } | undefined;
 
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.role ===
-        "superadmin";
+    const isAdmin = isSuperAdminUser(user);
 
     const updates: Record<
       string,
@@ -535,7 +573,33 @@ router.patch(
       wspConsent,
       language,
       categoryIds,
+      clubId: requestedClubId,
     } = req.body;
+
+    if (isAdmin && requestedClubId !== undefined) {
+      const targetClubId = Number(requestedClubId);
+
+      if (!Number.isInteger(targetClubId) || targetClubId <= 0) {
+        res.status(400).json({
+          error: "clubId inválido",
+        });
+        return;
+      }
+
+      const [targetClub] = await db
+        .select({ id: clubsTable.id })
+        .from(clubsTable)
+        .where(eq(clubsTable.id, targetClubId));
+
+      if (!targetClub) {
+        res.status(400).json({
+          error: "El club indicado no existe",
+        });
+        return;
+      }
+
+      updates.clubId = targetClubId;
+    }
 
     if (
       phone !== undefined
@@ -622,6 +686,63 @@ router.patch(
         categoryIds
       )
     ) {
+      // Antes de borrar/insertar, validar que todas las
+      // categoryIds pertenezcan al club del jugador (updatedRecord.clubId)
+      const targetClubId =
+        updatedRecord.clubId;
+
+      if (!targetClubId) {
+        res.status(400).json({
+          error:
+            "Club objetivo inválido para validar categorías",
+        });
+        return;
+      }
+
+      // Validar formato y luego en una sola consulta con inArray
+      const requestedIds = categoryIds.map(Number);
+      const badFormat = requestedIds.filter(
+        (id) => !Number.isInteger(id) || id <= 0
+      );
+
+      if (badFormat.length > 0) {
+        res.status(400).json({
+          error: "categoryIds contiene IDs con formato inválido",
+          invalidCategoryIds: badFormat,
+        });
+        return;
+      }
+
+      const foundRows = await db
+        .select({ id: clubSportCategoriesTable.id })
+        .from(clubSportCategoriesTable)
+        .innerJoin(
+          clubSportsTable,
+          eq(
+            clubSportCategoriesTable.clubSportId,
+            clubSportsTable.id
+          )
+        )
+        .where(
+          and(
+            eq(clubSportsTable.clubId, targetClubId),
+            inArray(clubSportCategoriesTable.id, requestedIds)
+          )
+        );
+
+      const foundIds = foundRows.map((r: any) => r.id);
+      const invalidIds = requestedIds.filter((id) => !foundIds.includes(id));
+
+      if (invalidIds.length > 0) {
+        res.status(400).json({
+          error:
+            "Algunas categorías no pertenecen al club objetivo o no existen",
+          invalidCategoryIds: invalidIds,
+        });
+        return;
+      }
+
+      // Si todas son válidas, conservar comportamiento actual
       await db
         .delete(
           playerCategoriesTable
@@ -731,6 +852,7 @@ router.delete(
 
 router.get(
   "/players/:id/stats",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -764,15 +886,15 @@ router.get(
       } | undefined
     )?.clubId;
 
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
     const [player] =
       await db
         .select()
         .from(playersTable)
         .where(
-          eq(
-            playersTable.id,
-            playerId
-          )
+          isSuperAdminUser(user)
+            ? eq(playersTable.id, playerId)
+            : and(eq(playersTable.id, playerId), eq(playersTable.clubId, user.clubId!))
         );
 
     if (!player) {

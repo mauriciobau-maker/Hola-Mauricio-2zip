@@ -214,25 +214,25 @@ const TRANSLATIONS = {
 };
 
 const STATUS_CONFIG = {
-  confirmed: { 
-    labelKey: "attending" as const, 
-    icon: Check, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30" 
+  confirmed: {
+    labelKey: "attending" as const,
+    icon: Check, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30"
   },
-  declined: { 
-    labelKey: "cantGo" as const, 
-    icon: X, color: "text-red-400", bg: "bg-red-500/10 border-red-500/30" 
+  declined: {
+    labelKey: "cantGo" as const,
+    icon: X, color: "text-red-400", bg: "bg-red-500/10 border-red-500/30"
   },
-  pending: { 
-    labelKey: "pending" as const, 
-    icon: Clock, color: "text-muted-foreground", bg: "bg-white/5 border-border" 
+  pending: {
+    labelKey: "pending" as const,
+    icon: Clock, color: "text-muted-foreground", bg: "bg-white/5 border-border"
   },
-  waitlist: { 
-    labelKey: "waitlist" as const, 
-    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" 
+  waitlist: {
+    labelKey: "waitlist" as const,
+    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30"
   },
-  reserva: { 
-    labelKey: "waitlist" as const, 
-    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" 
+  reserva: {
+    labelKey: "waitlist" as const,
+    icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30"
   },
 };
 
@@ -328,7 +328,6 @@ export function EncuentroDetalle() {
   const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
 
-  // Estado para la edición de resultados por sets
   const [editingMatchId, setEditingMatchId] = useState<number | null>(null);
   const [editSets, setEditSets] = useState<SetScore[]>([{ team1: 0, team2: 0 }]);
   const [savingScore, setSavingScore] = useState(false);
@@ -563,7 +562,6 @@ export function EncuentroDetalle() {
     }
   }
 
-  // --- Funciones para gestión de Sets dinámicos ---
   const handleStartEditMatch = (match: MatchData) => {
     setEditingMatchId(match.id);
     if (Array.isArray(match.sets) && match.sets.length > 0) {
@@ -603,6 +601,7 @@ export function EncuentroDetalle() {
 
   async function handleSaveScore(matchId: number) {
     setSavingScore(true);
+    setRsvpError(null);
     try {
       let t1Sets = 0;
       let t2Sets = 0;
@@ -616,7 +615,6 @@ export function EncuentroDetalle() {
         else if (s.team2 > s.team1) t2Sets++;
       });
 
-      // Si hay más de 1 set, el score global suele ser la cantidad de sets ganados. Si es 1 set, son los juegos.
       const team1Score = editSets.length > 1 ? t1Sets : editSets[0].team1;
       const team2Score = editSets.length > 1 ? t2Sets : editSets[0].team2;
 
@@ -628,12 +626,25 @@ export function EncuentroDetalle() {
           team1Score,
           team2Score,
           sets: editSets,
+          status: "confirmed",
         }),
       });
+
       if (res.ok) {
         setEditingMatchId(null);
         reloadMatches();
+        return;
       }
+
+      const errorData = await res.json().catch(() => null);
+      setRsvpError(
+        errorData?.message ||
+          errorData?.error ||
+          `No se pudo guardar el resultado (HTTP ${res.status}).`
+      );
+    } catch (err) {
+      console.error("Error guardando resultado:", err);
+      setRsvpError("Error de conexión al guardar el resultado.");
     } finally {
       setSavingScore(false);
     }
@@ -1132,7 +1143,6 @@ export function EncuentroDetalle() {
                         {match.team1Players.map((p) => p.name).join(" / ")}
                       </div>
 
-                      {/* Visualización del Marcador Global y de los Sets */}
                       <div className="text-center">
                         <div className="font-bold text-lg tabular-nums">
                           <span
@@ -1174,7 +1184,6 @@ export function EncuentroDetalle() {
                       </div>
                     </div>
 
-                    {/* Formulario de Edición con Sets Dinámicos */}
                     {isOrganizer && (
                       <>
                         {editingMatchId === match.id ? (
@@ -1215,7 +1224,7 @@ export function EncuentroDetalle() {
                             <button
                               type="button"
                               onClick={handleAddSet}
-                              className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-1 font-medium"
+                              className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-1"
                             >
                               <Plus size={12} /> {t.addSet}
                             </button>

@@ -5,6 +5,7 @@ import {
   getListPlayersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@workspace/replit-auth-web";
 import {
   ArrowLeft,
   User,
@@ -82,6 +83,7 @@ interface Category {
 export default function NuevoJugador() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // Datos básicos del jugador
   const [name, setName] = useState("");
@@ -100,9 +102,9 @@ export default function NuevoJugador() {
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  // Código de club (para Super Admin cuando crea desde el panel global)
+  // Código de club: solo lo necesita el Super Admin cuando crea desde el panel global.
   const [clubCode, setClubCode] = useState("");
-  const isSuperAdmin = true; // Control de rol para mostrar el campo de club
+  const isSuperAdmin = !!(user && (user as any).isAdmin === 1);
 
   // Textos traducidos dinámicamente según la opción elegida
   const t = labels[language] || labels.es;
