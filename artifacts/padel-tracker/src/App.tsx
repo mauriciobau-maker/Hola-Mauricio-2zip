@@ -58,8 +58,11 @@ function Router() {
     navigate(returnTo);
   }, [location, navigate]);
 
+  // Public club pages must not mount Layout/AuthButton/useAuth. Visiting a
+  // public club is intentionally anonymous; authentication happens only when
+  // the user explicitly presses "Entrar al club".
   if (isPublicClubPath) {
-    return <Layout><PublicClub /></Layout>;
+    return <PublicClub />;
   }
 
   return (
