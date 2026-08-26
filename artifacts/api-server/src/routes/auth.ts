@@ -198,9 +198,12 @@ router.get("/login", async (req: Request, res: Response) => {
     scope: "openid email profile offline_access",
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
-    prompt: "login consent",
     state,
     nonce,
+    // Do not force `prompt=login`: that explicitly re-authenticates an already
+    // signed-in Replit account and is the reason the public-club flow kept
+    // bouncing through Replit instead of behaving like a normal SSO flow.
+    prompt: "consent",
   });
 
   setOidcCookie(res, "code_verifier", codeVerifier);
