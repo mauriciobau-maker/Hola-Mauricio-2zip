@@ -9,6 +9,32 @@ export function isSuperAdminUser(
 }
 
 /**
+ * Returns the club selected in the current request.
+ *
+ * Normal users are always scoped by their persisted membership.
+ * Super Admins may temporarily select a club through the server-set/client
+ * context cookie used by the public-club flow. This does NOT change their
+ * global admin privileges; it only scopes club-facing queries for this request.
+ */
+export function getCurrentClubId(req: Request): number | null {
+  const user = req.user as
+    | { clubId?: number | null; isAdmin?: number | boolean | null }
+    | undefined;
+
+  if (!isSuperAdminUser(user)) {
+    return user?.clubId ?? null;
+  }
+
+  const requestedClubId = Number(req.query?.clubId);
+  if (Number.isInteger(requestedClubId) && requestedClubId > 0) {
+    return requestedClubId;
+  }
+
+  const activeClubId = Number(req.cookies?.padel_tracker_active_club_id);
+  return Number.isInteger(activeClubId) && activeClubId > 0 ? activeClubId : null;
+}
+
+/**
  * requireAuth
  *
  * Rejects requests with no active session.
@@ -52,7 +78,7 @@ export function requireClub(
 
 /**
  * Requires authentication and a community scope, except for Super Admins.
- * Super Admins intentionally keep global access without a clubId.
+ * Super Admins intentionally keep global access without a persisted clubId.
  */
 export function requireCommunityAccess(
   req: Request,
