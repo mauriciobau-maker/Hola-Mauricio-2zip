@@ -30,6 +30,15 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, sta
 
 const PUBLIC_CLUB_RETURN_TO_KEY = "padel_tracker_public_club_return_to";
 
+function normalizePublicClubPath(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  const normalized = value.replace(/\/+$/, "") || "/";
+  if (!/^\/[^/]+$/.test(normalized)) return null;
+  const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
+  if (reservedSingleSegmentRoutes.has(normalized)) return null;
+  return normalized;
+}
+
 function Router() {
   const [location, navigate] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
@@ -38,9 +47,13 @@ function Router() {
   useEffect(() => {
     if (location !== "/") return;
 
-    const returnTo = sessionStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY);
-    if (!returnTo || !/^\/[^/]+$/.test(returnTo) || reservedSingleSegmentRoutes.has(returnTo)) return;
+    const returnTo = normalizePublicClubPath(
+      localStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY) ||
+      sessionStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY),
+    );
+    if (!returnTo) return;
 
+    localStorage.removeItem(PUBLIC_CLUB_RETURN_TO_KEY);
     sessionStorage.removeItem(PUBLIC_CLUB_RETURN_TO_KEY);
     navigate(returnTo);
   }, [location, navigate]);
