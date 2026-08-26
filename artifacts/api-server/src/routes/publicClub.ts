@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, usersTable } from "@workspace/db";
+import { isSuperAdminUser } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -79,6 +80,54 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
     });
   } catch (error) {
     console.error("Error en GET /clubs/public/:slug:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// GET /clubs/public/:slug/enter — valida la sesión de la aplicación para
+// permitir que un usuario ya autenticado entre al club sin iniciar OIDC otra vez.
+// Super Admin puede entrar a cualquier club; un usuario normal solo al suyo.
+router.get("/clubs/public/:slug/enter", async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const slug = String(req.params.slug || "").trim().toLowerCase();
+    if (!slug) {
+      res.status(400).json({ error: "Slug de club requerido" });
+      return;
+    }
+
+    const [club] = await db
+      .select({ id: clubsTable.id, name: clubsTable.name, slug: clubsTable.slug, active: clubsTable.active })
+      .from(clubsTable)
+      .where(and(eq(clubsTable.slug, slug), eq(clubsTable.active, true)));
+
+    if (!club) {
+      res.status(404).json({ error: "Club no encontrado" });
+      return;
+    }
+
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+    const canEnter = isSuperAdminUser(user) || user.clubId === club.id;
+    if (!canEnter) {
+      res.status(403).json({ error: "No tienes acceso a este club" });
+      return;
+    }
+
+    // El contexto seleccionado es temporal y no modifica la membresía persistida.
+    res.cookie("padel_tracker_active_club_id", String(club.id), {
+      httpOnly: false,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    res.json({ success: true, club });
+  } catch (error) {
+    console.error("Error en GET /clubs/public/:slug/enter:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
