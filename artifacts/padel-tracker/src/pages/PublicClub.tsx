@@ -134,7 +134,7 @@ export default function PublicClub() {
           </div>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button onClick={() => login()} className="gap-2">
+            <Button onClick={() => login(location)} className="gap-2">
               {user ? <LogIn size={16} /> : <UserPlus size={16} />}
               {user ? "Entrar al club" : "Entrar / Registrarme"}
             </Button>
