@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } from "lucide-react";
+import { MapPin, MessageSquare, Trophy, Users, LogIn, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AuthButton } from "@/components/AuthButton";
-import { useAuth } from "@workspace/replit-auth-web";
 import type { CSSProperties } from "react";
 
 interface PublicClubData {
@@ -51,7 +49,6 @@ function hexToHsl(hex: string) {
 
 export default function PublicClub() {
   const [location, navigate] = useLocation();
-  const { user } = useAuth();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -112,9 +109,10 @@ export default function PublicClub() {
     setEntering(true);
 
     try {
-      // La sesión de la aplicación se valida en el servidor. Esto evita que un
-      // Super Admin ya autenticado vuelva innecesariamente al proveedor OIDC.
+      // Este endpoint consulta la sesión existente sin iniciar OIDC. Solo si no
+      // hay sesión se deriva explícitamente al login de Replit.
       const response = await fetch(`/api/clubs/public/${encodeURIComponent(slug)}/enter`, {
+        method: "POST",
         credentials: "include",
         headers: { Accept: "application/json" },
       });
@@ -145,89 +143,109 @@ export default function PublicClub() {
   };
 
   return (
-    <div className="space-y-6" style={cssVars}>
-      <div className="flex items-center justify-end">
-        <AuthButton />
-      </div>
-
-      <section className="relative overflow-hidden rounded-3xl border bg-card p-8 md:p-12 shadow-sm">
-        <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
-        <div className="relative flex flex-col items-center text-center">
-          <div className="w-28 h-28 md:w-36 md:h-36 rounded-3xl border-2 border-primary/20 bg-background flex items-center justify-center overflow-hidden shadow-lg">
+    <div className="min-h-screen bg-background" style={cssVars}>
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-bold text-base md:text-lg tracking-tight">
             {club.logoUrl ? (
-              <img src={club.logoUrl} alt={`Logo ${club.name}`} className="w-full h-full object-cover" />
+              <img src={club.logoUrl} alt={`Logo ${club.name}`} className="h-7 w-7 object-cover rounded" />
             ) : (
-              <Trophy className="text-primary" size={48} />
+              <Trophy size={20} className="text-primary" />
             )}
+            <span className="text-foreground">{club.name}</span>
           </div>
-          <h1 className="mt-6 text-3xl md:text-5xl font-bold tracking-tight">{club.name}</h1>
-          <p className="mt-2 text-muted-foreground">Comunidad deportiva en Padel Tracker IA</p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-2">
-            {activeSports.map((sport) => (
-              <span key={sport.id} className="rounded-full border bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
-                {sport.name}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button onClick={handleEnterClub} disabled={entering} className="gap-2">
-              {user ? <LogIn size={16} /> : <UserPlus size={16} />}
-              {entering ? "Entrando..." : user ? "Entrar al club" : "Entrar / Registrarme"}
-            </Button>
-            {publicMapUrl && (
-              <Button asChild variant="outline" className="gap-2">
-                <a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Ver ubicación</a>
-              </Button>
-            )}
-          </div>
+          <span className="text-xs text-muted-foreground">Padel Tracker IA</span>
         </div>
-      </section>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section className="rounded-2xl border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Users className="text-primary" size={20} />
-            <h2 className="font-bold text-lg">Únete al club</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">Si ya recibiste el código de invitación del administrador, úsalo para vincularte al club.</p>
-          {club.inviteCode ? (
-            <div className="flex items-center gap-2 rounded-xl border bg-muted/30 p-3">
-              <span className="flex-1 font-mono text-lg font-bold tracking-wider">{club.inviteCode}</span>
-              <Button variant="outline" size="sm" onClick={copyInviteCode} className="gap-1.5">
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
+      <main className="max-w-7xl mx-auto w-full px-4 py-6">
+        <div className="space-y-6">
+          <section className="relative overflow-hidden rounded-3xl border bg-card p-8 md:p-12 shadow-sm">
+            <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+            <div className="relative flex flex-col items-center text-center">
+              <div className="w-28 h-28 md:w-36 md:h-36 rounded-3xl border-2 border-primary/20 bg-background flex items-center justify-center overflow-hidden shadow-lg">
+                {club.logoUrl ? (
+                  <img src={club.logoUrl} alt={`Logo ${club.name}`} className="w-full h-full object-cover" />
+                ) : (
+                  <Trophy className="text-primary" size={48} />
+                )}
+              </div>
+              <h1 className="mt-6 text-3xl md:text-5xl font-bold tracking-tight">{club.name}</h1>
+              <p className="mt-2 text-muted-foreground">Comunidad deportiva en Padel Tracker IA</p>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {activeSports.map((sport) => (
+                  <span key={sport.id} className="rounded-full border bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
+                    {sport.name}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Button onClick={handleEnterClub} disabled={entering} className="gap-2">
+                  <LogIn size={16} />
+                  {entering ? "Entrando..." : "Entrar al club"}
+                </Button>
+                {publicMapUrl && (
+                  <Button asChild variant="outline" className="gap-2">
+                    <a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Ver ubicación</a>
+                  </Button>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-sm italic text-muted-foreground">El administrador aún no ha configurado un código.</p>
-          )}
-        </section>
+          </section>
 
-        <section className="rounded-2xl border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="text-primary" size={20} />
-            <h2 className="font-bold text-lg">Ubicación</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <section className="rounded-2xl border bg-card p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="text-primary" size={20} />
+                <h2 className="font-bold text-lg">Únete al club</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">Si ya recibiste el código de invitación del administrador, úsalo para vincularte al club.</p>
+              {club.inviteCode ? (
+                <div className="flex items-center gap-2 rounded-xl border bg-muted/30 p-3">
+                  <span className="flex-1 font-mono text-lg font-bold tracking-wider">{club.inviteCode}</span>
+                  <Button variant="outline" size="sm" onClick={copyInviteCode} className="gap-1.5">
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm italic text-muted-foreground">El administrador aún no ha configurado un código.</p>
+              )}
+            </section>
+
+            <section className="rounded-2xl border bg-card p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <MapPin className="text-primary" size={20} />
+                <h2 className="font-bold text-lg">Ubicación</h2>
+              </div>
+              {locationParts.length ? <p className="text-sm text-muted-foreground">{locationParts.join(", ")}</p> : <p className="text-sm italic text-muted-foreground">Ubicación no informada.</p>}
+              {publicMapUrl && <Button asChild variant="outline" className="gap-2"><a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Abrir mapa</a></Button>}
+            </section>
           </div>
-          {locationParts.length ? <p className="text-sm text-muted-foreground">{locationParts.join(", ")}</p> : <p className="text-sm italic text-muted-foreground">Ubicación no informada.</p>}
-          {publicMapUrl && <Button asChild variant="outline" className="gap-2"><a href={publicMapUrl} target="_blank" rel="noreferrer"><MapPin size={16} /> Abrir mapa</a></Button>}
-        </section>
-      </div>
 
-      <section className="rounded-2xl border bg-card p-6">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="text-primary" size={20} />
-          <h2 className="font-bold text-lg">Contacto del administrador</h2>
+          <section className="rounded-2xl border bg-card p-6">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="text-primary" size={20} />
+              <h2 className="font-bold text-lg">Contacto del administrador</h2>
+            </div>
+            <div className="mt-4 space-y-1 text-sm text-muted-foreground">
+              {club.adminName && <p className="font-semibold text-foreground">{club.adminName}</p>}
+              {club.adminEmail && <p>{club.adminEmail}</p>}
+              {club.adminPhone && <p>{club.adminPhone}</p>}
+              {club.adminWhatsappAlias && <p>WhatsApp: @{club.adminWhatsappAlias.replace(/^@/, "")}</p>}
+              {!club.adminName && !club.adminEmail && !club.adminPhone && !club.adminWhatsappAlias && <p className="italic">El administrador aún no ha publicado datos de contacto.</p>}
+            </div>
+          </section>
         </div>
-        <div className="mt-4 space-y-1 text-sm text-muted-foreground">
-          {club.adminName && <p className="font-semibold text-foreground">{club.adminName}</p>}
-          {club.adminEmail && <p>{club.adminEmail}</p>}
-          {club.adminPhone && <p>{club.adminPhone}</p>}
-          {club.adminWhatsappAlias && <p>WhatsApp: @{club.adminWhatsappAlias.replace(/^@/, "")}</p>}
-          {!club.adminName && !club.adminEmail && !club.adminPhone && !club.adminWhatsappAlias && <p className="italic">El administrador aún no ha publicado datos de contacto.</p>}
+      </main>
+
+      <footer className="border-t border-border bg-muted/30 py-4">
+        <div className="max-w-7xl mx-auto px-4 text-xs text-muted-foreground">
+          © {new Date().getFullYear()} {club.name}.
         </div>
-      </section>
+      </footer>
     </div>
   );
 }
