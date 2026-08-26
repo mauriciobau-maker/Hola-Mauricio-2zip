@@ -106,6 +106,11 @@ export default function PublicClub() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleEnterClub = () => {
+    sessionStorage.setItem("padel_tracker_public_club_return_to", location);
+    login(location);
+  };
+
   return (
     <div className="space-y-6" style={cssVars}>
       <div className="flex items-center justify-end">
@@ -134,7 +139,7 @@ export default function PublicClub() {
           </div>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button onClick={() => login(location)} className="gap-2">
+            <Button onClick={handleEnterClub} className="gap-2">
               {user ? <LogIn size={16} /> : <UserPlus size={16} />}
               {user ? "Entrar al club" : "Entrar / Registrarme"}
             </Button>
