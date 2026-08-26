@@ -56,6 +56,7 @@ export default function PublicClub() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [entering, setEntering] = useState(false);
 
   const slug = location.replace(/^\//, "").split("/")[0] || "";
 
@@ -106,23 +107,45 @@ export default function PublicClub() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleEnterClub = () => {
-    const returnTo = `/${slug}`;
+  const handleEnterClub = async () => {
+    if (entering) return;
+    setEntering(true);
 
-    // If the user is already authenticated (for example, a Super Admin
-    // visiting a club), do not send them through Replit authentication again.
-    // They are already authenticated; keep the public club context intact.
-    if (user) {
+    const returnTo = `/${slug}`;
+    let authenticatedUser = user;
+
+    // The auth hook can briefly report null while the existing browser session
+    // is still being resolved. Verify the session directly before ever calling
+    // Replit OIDC login, so an already authenticated user is never sent through
+    // the external authorization screen again.
+    if (!authenticatedUser) {
+      try {
+        const response = await fetch("/api/auth/user", {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          authenticatedUser = data?.user ?? null;
+        }
+      } catch {
+        authenticatedUser = null;
+      }
+    }
+
+    if (authenticatedUser) {
       localStorage.removeItem("padel_tracker_public_club_return_to");
       sessionStorage.removeItem("padel_tracker_public_club_return_to");
-      navigate(returnTo);
+      // Super Admin uses clubId as the explicit context for the club dashboard.
+      navigate(`/?clubId=${club.id}`);
       return;
     }
 
-    // Unauthenticated visitors must authenticate, then return to this club.
+    // Only a genuinely unauthenticated visitor starts OIDC login.
     localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
     sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
     login(returnTo);
+    setEntering(false);
   };
 
   return (
@@ -153,9 +176,9 @@ export default function PublicClub() {
           </div>
 
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button onClick={handleEnterClub} className="gap-2">
+            <Button onClick={handleEnterClub} disabled={entering} className="gap-2">
               {user ? <LogIn size={16} /> : <UserPlus size={16} />}
-              {user ? "Entrar al club" : "Entrar / Registrarme"}
+              {entering ? "Entrando..." : user ? "Entrar al club" : "Entrar / Registrarme"}
             </Button>
             {publicMapUrl && (
               <Button asChild variant="outline" className="gap-2">
