@@ -17,13 +17,18 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+
+// Las rutas públicas deben registrarse antes de cualquier router que aplique
+// requireCommunityAccess a nivel de router, para que no queden bloqueadas
+// por la autenticación/comunidad de rutas privadas.
+router.use(publicClubRouter);
+
 router.use(playersRouter);
 router.use(matchesRouter);
 router.use(rankingRouter);
 router.use(parejasRouter);
 router.use("/encuentros", encuentrosRouter);
 router.use(clubRouter);
-router.use(publicClubRouter);
 router.use(adminRouter);
 router.use("/cobros", cobrosRouter);
 router.use(sportsRouter);
