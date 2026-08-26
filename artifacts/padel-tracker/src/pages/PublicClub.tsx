@@ -51,7 +51,7 @@ function hexToHsl(hex: string) {
 
 export default function PublicClub() {
   const [location, navigate] = useLocation();
-  const { user, login } = useAuth();
+  const { user } = useAuth();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -111,45 +111,37 @@ export default function PublicClub() {
     if (entering) return;
     setEntering(true);
 
-    const returnTo = `/${slug}`;
-    let authenticatedUser = user;
+    try {
+      // La sesión de la aplicación se valida en el servidor. Esto evita que un
+      // Super Admin ya autenticado vuelva innecesariamente al proveedor OIDC.
+      const response = await fetch(`/api/clubs/public/${encodeURIComponent(slug)}/enter`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
 
-    // The app session is the source of truth. Check it directly so an existing
-    // session is never sent through Replit OIDC again just because the auth hook
-    // has not hydrated yet on the public-club route.
-    if (!authenticatedUser) {
-      try {
-        const response = await fetch("/api/auth/user", {
-          credentials: "include",
-          headers: { Accept: "application/json" },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          authenticatedUser = data?.user ?? null;
-        }
-      } catch {
-        authenticatedUser = null;
+      if (response.ok) {
+        localStorage.removeItem("padel_tracker_public_club_return_to");
+        sessionStorage.removeItem("padel_tracker_public_club_return_to");
+        navigate("/");
+        return;
       }
+
+      if (response.status === 401) {
+        const returnTo = `/${slug}`;
+        localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
+        sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
+        window.location.assign(`/api/login?returnTo=${encodeURIComponent(returnTo)}`);
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || "No tienes acceso a este club.");
+    } catch (error: any) {
+      console.error("Error entrando al club:", error);
+      alert(error?.message || "No fue posible entrar al club.");
+    } finally {
+      setEntering(false);
     }
-
-    if (authenticatedUser) {
-      localStorage.removeItem("padel_tracker_public_club_return_to");
-      sessionStorage.removeItem("padel_tracker_public_club_return_to");
-
-      // Keep the selected club as client-side context. The API only honors this
-      // context for a Super Admin, so it cannot grant a normal user access.
-      document.cookie = `padel_tracker_active_club_id=${club.id}; path=/; SameSite=Lax`;
-      navigate("/");
-      return;
-    }
-
-    // Start the app's own OIDC flow only when there is no app session. Do not
-    // call the generic `login()` helper here because it may discard returnTo.
-    // Passing returnTo explicitly to /api/login guarantees the callback returns
-    // to this public club instead of falling back to the dashboard.
-    localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
-    sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
-    window.location.assign(`/api/login?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
