@@ -175,7 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>}
       </header>
 
-      <main onClick={handleMainClick} className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
+      <main onClickCapture={handleMainClick} className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
