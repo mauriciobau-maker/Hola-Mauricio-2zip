@@ -1,42 +1,24 @@
 import { Router, type IRouter, type Request } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable } from "@workspace/db";
-import { isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
+import { getCurrentClubId, requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
 function currentClubId(req: Request): number | null {
-  if (isSuperAdminUser(req.user)) return null;
-  return (req.user as { clubId?: number | null }).clubId ?? null;
+  return getCurrentClubId(req);
 }
 
 router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
-    const clubId = isSuperAdminUser(req.user)
-      ? Number(req.query.clubId) || Number(req.cookies?.padel_tracker_active_club_id) || null
-      : currentClubId(req);
-    if (!clubId) {
-      res.status(403).json({ error: "El usuario no pertenece a ningún club" });
-      return;
-    }
-
+    const clubId = currentClubId(req);
+    if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
     const [club] = await db.select().from(clubsTable).where(eq(clubsTable.id, clubId));
-    if (!club) {
-      res.status(404).json({ error: "Club no encontrado" });
-      return;
-    }
-
+    if (!club) { res.status(404).json({ error: "Club no encontrado" }); return; }
     let clubSports: any[] = [];
     try {
-      clubSports = await db
-        .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, teamSize: sportsTable.teamSize, useSets: sportsTable.useSets, active: clubSportsTable.active })
-        .from(clubSportsTable)
-        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
-        .where(eq(clubSportsTable.clubId, clubId));
-    } catch (e) {
-      console.error("⚠️ Error cargando deportes del club:", e);
-    }
-
+      clubSports = await db.select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, teamSize: sportsTable.teamSize, useSets: sportsTable.useSets, active: clubSportsTable.active }).from(clubSportsTable).innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
+    } catch (e) { console.error("⚠️ Error cargando deportes del club:", e); }
     res.json({
       id: club.id, name: club.name, slug: club.slug, plan: club.plan, active: club.active,
       createdAt: club.createdAt ? (club.createdAt as Date).toISOString() : null,
@@ -49,78 +31,44 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
       contactPreference: (club as any).contactPreference || "whatsapp",
       primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
     });
-  } catch (error) {
-    console.error("Error en GET /club:", error);
-    res.status(500).json({ error: "Error interno del servidor" });
-  }
+  } catch (error) { console.error("Error en GET /club:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   try {
     const slug = String(req.params.slug || "").trim();
-    if (!slug) {
-      res.status(400).json({ error: "Slug de club requerido" });
-      return;
-    }
-
+    if (!slug) { res.status(400).json({ error: "Slug de club requerido" }); return; }
     const [club] = await db.select().from(clubsTable).where(eq(clubsTable.slug, slug));
-    if (!club || !(club as any).active) {
-      res.status(404).json({ error: "Club no encontrado" });
-      return;
-    }
-
+    if (!club || !(club as any).active) { res.status(404).json({ error: "Club no encontrado" }); return; }
     let sports: any[] = [];
-    try {
-      sports = await db
-        .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, active: clubSportsTable.active })
-        .from(clubSportsTable)
-        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
-        .where(eq(clubSportsTable.clubId, club.id));
-    } catch (e) {
-      console.error("⚠️ Error cargando deportes del club público:", e);
-    }
-
+    try { sports = await db.select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, active: clubSportsTable.active }).from(clubSportsTable).innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id)).where(eq(clubSportsTable.clubId, club.id)); } catch (e) { console.error("⚠️ Error cargando deportes del club público:", e); }
     res.json({
-      id: club.id,
-      name: club.name,
-      slug: club.slug,
-      logoUrl: (club as any).logoUrl || null,
-      primaryColor: (club as any).primaryColor || null,
-      secondaryColor: (club as any).secondaryColor || null,
-      inviteCode: (club as any).inviteCode || null,
-      country: (club as any).country || "Chile",
-      state: (club as any).state || null,
-      city: (club as any).city || null,
-      address: (club as any).address || null,
-      mapUrl: (club as any).mapUrl || null,
-      sports,
+      id: club.id, name: club.name, slug: club.slug, logoUrl: (club as any).logoUrl || null,
+      primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
+      inviteCode: (club as any).inviteCode || null, country: (club as any).country || "Chile",
+      state: (club as any).state || null, city: (club as any).city || null,
+      address: (club as any).address || null, mapUrl: (club as any).mapUrl || null, sports,
       adminName: (club as any).adminName || (club as any).admin_name || null,
       adminEmail: (club as any).adminEmail || (club as any).admin_email || null,
       adminPhone: (club as any).adminPhone || (club as any).admin_phone || null,
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
     });
-  } catch (error) {
-    console.error("Error en GET /clubs/public/:slug:", error);
-    res.status(500).json({ error: "Error interno del servidor" });
-  }
+  } catch (error) { console.error("Error en GET /clubs/public/:slug:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
-    const clubId = (req.user as { clubId?: number | null }).clubId ?? null;
+    const clubId = currentClubId(req);
     if (!clubId) { res.json(null); return; }
     const [club] = await db.select().from(clubsTable).where(eq(clubsTable.id, clubId));
     res.json(club || null);
-  } catch (error) {
-    console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
-    res.json(null);
-  }
+  } catch (error) { console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error); res.json(null); }
 });
 
 router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
-  const { sportId, active } = req.body as { sportId?: unknown; active?: unknown };
+  const { sportId, active } = req.body;
   if (typeof sportId !== "number" || typeof active !== "boolean") { res.status(400).json({ error: "Se requiere sportId (número) y active (boolean)" }); return; }
   try {
     const [sport] = await db.select().from(sportsTable).where(eq(sportsTable.id, sportId));
@@ -129,39 +77,29 @@ router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<v
     if (existing) await db.update(clubSportsTable).set({ active }).where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.sportId, sportId)));
     else await db.insert(clubSportsTable).values({ clubId, sportId, active });
     res.json({ clubId, sportId, sportName: sport.name, active });
-  } catch (error) {
-    console.error("Error en PATCH /club/sports:", error);
-    res.status(500).json({ error: "Error interno al actualizar deportes" });
-  }
+  } catch (error) { console.error("Error en PATCH /club/sports:", error); res.status(500).json({ error: "Error interno al actualizar deportes" }); }
 });
 
-router.get("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
+router.get("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name })
-      .from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
     res.json(categories);
-  } catch (error) {
-    console.error("Error en GET /club/categories:", error);
-    res.status(500).json({ error: "Error interno al obtener categorías" });
-  }
+  } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno al obtener categorías" }); }
 });
 
-router.post("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
+router.post("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
-  const { clubSportId, name } = req.body as { clubSportId?: unknown; name?: unknown };
+  const { clubSportId, name } = req.body;
   if (typeof clubSportId !== "number" || typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "Se requiere clubSportId (número) y name (texto válido)" }); return; }
   try {
     const [clubSport] = await db.select().from(clubSportsTable).where(and(eq(clubSportsTable.id, clubSportId), eq(clubSportsTable.clubId, clubId)));
     if (!clubSport) { res.status(404).json({ error: "El deporte del club no existe o no pertenece a tu club" }); return; }
     const [newCategory] = await db.insert(clubSportCategoriesTable).values({ clubSportId, name: name.trim() }).returning();
     res.status(201).json(newCategory);
-  } catch (error) {
-    console.error("Error en POST /club/categories:", error);
-    res.status(500).json({ error: "Error interno al crear la categoría" });
-  }
+  } catch (error) { console.error("Error en POST /club/categories:", error); res.status(500).json({ error: "Error interno al crear la categoría" }); }
 });
 
 export default router;
