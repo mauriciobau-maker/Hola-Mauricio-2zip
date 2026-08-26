@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,7 +35,30 @@ const queryClient = new QueryClient({
   },
 });
 
+const reservedSingleSegmentRoutes = new Set([
+  "/admin",
+  "/onboarding",
+  "/vincular",
+  "/jugadores",
+  "/partidos",
+  "/ranking",
+  "/parejas",
+  "/encuentros",
+  "/cobros",
+]);
+
 function Router() {
+  const [location] = useLocation();
+  const isPublicClubPath = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
+
+  if (isPublicClubPath) {
+    return (
+      <Layout>
+        <PublicClub />
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <Switch>
@@ -57,7 +80,6 @@ function Router() {
         <Route path="/onboarding" component={Onboarding} />
         <Route path="/vincular" component={VincularJugador} />
         <Route path="/admin" component={Admin} />
-        <Route path="/:slug" component={PublicClub} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
