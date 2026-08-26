@@ -114,10 +114,9 @@ export default function PublicClub() {
     const returnTo = `/${slug}`;
     let authenticatedUser = user;
 
-    // The auth hook can briefly report null while the existing browser session
-    // is still being resolved. Verify the session directly before ever calling
-    // Replit OIDC login, so an already authenticated user is never sent through
-    // the external authorization screen again.
+    // Verify the existing browser session directly before ever calling Replit
+    // OIDC login. This prevents an already authenticated user from being sent
+    // through the external authorization screen again.
     if (!authenticatedUser) {
       try {
         const response = await fetch("/api/auth/user", {
@@ -136,8 +135,11 @@ export default function PublicClub() {
     if (authenticatedUser) {
       localStorage.removeItem("padel_tracker_public_club_return_to");
       sessionStorage.removeItem("padel_tracker_public_club_return_to");
-      // Super Admin uses clubId as the explicit context for the club dashboard.
-      navigate(`/?clubId=${club.id}`);
+
+      // Keep the selected club as client-side context. The API only honors this
+      // context for a Super Admin, so it cannot grant a normal user access.
+      document.cookie = `padel_tracker_active_club_id=${club.id}; path=/; SameSite=Lax`;
+      navigate("/");
       return;
     }
 
