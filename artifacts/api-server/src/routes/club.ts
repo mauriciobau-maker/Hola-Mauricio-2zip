@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable } from "@workspace/db";
-import { getCurrentClubId, requireCommunityAccess } from "../middlewares/requireCommunity";
+import { getCurrentClubId, isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -54,6 +54,59 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
     });
   } catch (error) { console.error("Error en GET /clubs/public/:slug:", error); res.status(500).json({ error: "Error interno del servidor" }); }
+});
+
+/**
+ * Selecciona el club activo para la sesión actual.
+ *
+ * El Super Admin conserva su identidad y privilegios globales; solo cambia
+ * el contexto de club mediante una cookie httpOnly. No modifica users.clubId.
+ * Un usuario normal solo puede seleccionar el club al que ya pertenece.
+ */
+router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const slug = String(req.params.slug || "").trim();
+    if (!slug) {
+      res.status(400).json({ error: "Slug de club requerido" });
+      return;
+    }
+
+    const [club] = await db.select().from(clubsTable).where(eq(clubsTable.slug, slug));
+    if (!club || !(club as any).active) {
+      res.status(404).json({ error: "Club no encontrado" });
+      return;
+    }
+
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    if (!isSuperAdmin && user.clubId !== club.id) {
+      res.status(403).json({ error: "No tienes acceso a este club" });
+      return;
+    }
+
+    res.cookie("padel_tracker_active_club_id", String(club.id), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      club: { id: club.id, name: club.name, slug: club.slug },
+      superAdminContext: isSuperAdmin,
+    });
+  } catch (error) {
+    console.error("Error en POST /clubs/public/:slug/enter:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
 });
 
 router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
