@@ -103,6 +103,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     } else setClub(null);
   }, [user, isAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
 
+  const handleMainClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const target = event.target as HTMLElement;
+    const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+
+    let url: URL;
+    try {
+      url = new URL(href, window.location.origin);
+    } catch {
+      return;
+    }
+
+    if (url.origin !== window.location.origin) return;
+
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    const isPublicClubLink = /^\/[^/]+$/.test(path) && !reservedSingleSegmentRoutes.has(path);
+    if (!isPublicClubLink) return;
+
+    event.preventDefault();
+    setMobileOpen(false);
+    navigate(path);
+  };
+
   const dynamicStyles: Record<string, string> = {};
   if (club?.primaryColor) dynamicStyles["--primary"] = hexToHslChannels(club.primaryColor);
   if (club?.secondaryColor) dynamicStyles["--secondary"] = hexToHslChannels(club.secondaryColor);
@@ -147,7 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>}
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
+      <main onClick={handleMainClick} className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
