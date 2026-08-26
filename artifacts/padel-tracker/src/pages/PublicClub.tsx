@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRoute } from "wouter";
+import { useLocation } from "wouter";
 import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuthButton } from "@/components/AuthButton";
@@ -50,16 +50,21 @@ function hexToHsl(hex: string) {
 }
 
 export default function PublicClub() {
-  const [, params] = useRoute("/:slug");
+  const [location] = useLocation();
   const { user, login } = useAuth();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const slug = location.replace(/^\//, "").split("/")[0] || "";
+
   useEffect(() => {
-    const slug = params?.slug;
-    if (!slug) return;
+    if (!slug) {
+      setLoading(false);
+      setError(true);
+      return;
+    }
 
     setLoading(true);
     setError(false);
@@ -71,7 +76,7 @@ export default function PublicClub() {
       .then((data) => setClub(data))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [params?.slug]);
+  }, [slug]);
 
   if (loading) {
     return <div className="py-20 text-center text-muted-foreground">Cargando club...</div>;
