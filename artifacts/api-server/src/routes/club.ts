@@ -10,10 +10,11 @@ function currentClubId(req: Request): number | null {
   return (req.user as { clubId?: number | null }).clubId ?? null;
 }
 
-// GET /club — devuelve el club + deportes activos del usuario autenticado con todos los campos
 router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
-    const clubId = currentClubId(req);
+    const clubId = isSuperAdminUser(req.user)
+      ? Number(req.query.clubId) || Number(req.cookies?.padel_tracker_active_club_id) || null
+      : currentClubId(req);
     if (!clubId) {
       res.status(403).json({ error: "El usuario no pertenece a ningún club" });
       return;
@@ -54,7 +55,6 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/public/:slug — página pública del club, sin autenticación.
 router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   try {
     const slug = String(req.params.slug || "").trim();
@@ -105,7 +105,6 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/current — devuelve únicamente el club explícitamente asociado al usuario.
 router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
     const clubId = (req.user as { clubId?: number | null }).clubId ?? null;
@@ -118,7 +117,6 @@ router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<v
   }
 });
 
-// PATCH /club/sports — activa o desactiva un deporte para el club
 router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
@@ -137,7 +135,6 @@ router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<v
   }
 });
 
-// GET /club/categories — devuelve todas las categorías creadas para los deportes del club
 router.get("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
@@ -151,7 +148,6 @@ router.get("/club/categories", requireCommunityAccess, async (req, res): Promise
   }
 });
 
-// POST /club/categories — permite al administrador crear una categoría para un deporte del club
 router.post("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
