@@ -1134,15 +1134,17 @@ export default function Admin() {
                     </button>
                   )}
 
-                  <a
-                    href={clubLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2 border rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1.5"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.history.pushState({}, "", clubLink);
+                      window.dispatchEvent(new PopStateEvent("popstate"));
+                    }}
+                    className="p-2 border rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1.5 cursor-pointer"
                     title="Visitar club"
                   >
                     <ExternalLink size={14} /> {t("visit")}
-                  </a>
+                  </button>
 
                   <button
                     onClick={() => openEditModal(club)}
