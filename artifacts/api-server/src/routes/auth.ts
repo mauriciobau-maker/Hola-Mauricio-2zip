@@ -25,7 +25,6 @@ const ExchangeMobileAuthorizationCodeBody = z.object({
 });
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
-
 const router: IRouter = Router();
 
 function getOrigin(req: Request): string {
@@ -59,7 +58,13 @@ function getSafeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
     return "/";
   }
-  return value;
+
+  // Public club routes are single-segment paths. Normalize an optional
+  // trailing slash so `/club-de-prueba-3/` is not discarded as `/` during
+  // the authentication round-trip.
+  const normalized = value.replace(/\/+$/, "") || "/";
+  if (!/^\/[^/]+$/.test(normalized)) return "/";
+  return normalized;
 }
 
 async function upsertUser(claims: Record<string, unknown>) {
@@ -70,7 +75,6 @@ async function upsertUser(claims: Record<string, unknown>) {
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as string | null,
   };
-
   const [user] = await db
     .insert(usersTable)
     .values(userData)
@@ -93,9 +97,7 @@ async function getUserWithClub(userId: string) {
     .select()
     .from(usersTable)
     .where(eq(usersTable.id, userId));
-
   if (!user) return null;
-
   let club = null;
   if (user.clubId) {
     const [c] = await db
@@ -104,7 +106,6 @@ async function getUserWithClub(userId: string) {
       .where(eq(clubsTable.id, user.clubId));
     club = c ?? null;
   }
-
   return { ...user, club };
 }
 
@@ -137,11 +138,9 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
         : and(eq(playersTable.id, playerId), eq(playersTable.clubId, sessionUser.clubId!)),
     );
   if (!player) {
-    // Do not reveal whether the requested player exists in another community.
     res.status(404).json({ error: "Jugador no encontrado" });
     return;
   }
-
   const [updated] = await db
     .update(usersTable)
     .set({ playerId, updatedAt: new Date() })
@@ -160,12 +159,10 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Código de invitación requerido" });
     return;
   }
-
   const [club] = await db
     .select()
     .from(clubsTable)
     .where(eq(clubsTable.inviteCode, inviteCode.toUpperCase().trim()));
-
   if (!club) {
     res.status(404).json({ error: "Código de invitación inválido" });
     return;
@@ -174,13 +171,11 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Este club no está activo" });
     return;
   }
-
   const [updated] = await db
     .update(usersTable)
     .set({ clubId: club.id, updatedAt: new Date() })
     .where(eq(usersTable.id, req.user.id))
     .returning();
-
   res.json({
     success: true,
     club: { id: club.id, name: club.name, slug: club.slug },
