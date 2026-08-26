@@ -107,8 +107,12 @@ export default function PublicClub() {
   };
 
   const handleEnterClub = () => {
-    sessionStorage.setItem("padel_tracker_public_club_return_to", location);
-    login(location);
+    // Always persist the canonical public-club path before leaving for Replit.
+    // This also handles links that arrive with a trailing slash.
+    const returnTo = `/${slug}`;
+    localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
+    sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
+    login(returnTo);
   };
 
   return (
