@@ -21,7 +21,7 @@ export function AuthButton() {
 
   if (!user) {
     return (
-      <Button size="sm" variant="outline" onClick={login} className="gap-2 border-white/20 text-white hover:bg-white/10">
+      <Button size="sm" variant="outline" onClick={() => login()} className="gap-2 border-white/20 text-white hover:bg-white/10">
         <LogIn className="h-4 w-4" />
         <span className="hidden sm:inline">Entrar</span>
       </Button>
