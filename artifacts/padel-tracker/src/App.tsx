@@ -23,40 +23,17 @@ import NotFound from "@/pages/not-found";
 import { Onboarding } from "@/pages/Onboarding";
 import Cobros from "@/pages/Cobros";
 import PublicClub from "@/pages/PublicClub";
-
 import { LanguageProvider } from "./context/LanguageContext";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
-
-const reservedSingleSegmentRoutes = new Set([
-  "/admin",
-  "/onboarding",
-  "/vincular",
-  "/jugadores",
-  "/partidos",
-  "/ranking",
-  "/parejas",
-  "/encuentros",
-  "/cobros",
-]);
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 
 function Router() {
   const [location] = useLocation();
+  const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const isPublicClubPath = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
 
   if (isPublicClubPath) {
-    return (
-      <Layout>
-        <PublicClub />
-      </Layout>
-    );
+    return <Layout><PublicClub /></Layout>;
   }
 
   return (
@@ -80,6 +57,7 @@ function Router() {
         <Route path="/onboarding" component={Onboarding} />
         <Route path="/vincular" component={VincularJugador} />
         <Route path="/admin" component={Admin} />
+        <Route path="/:slug" component={PublicClub} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

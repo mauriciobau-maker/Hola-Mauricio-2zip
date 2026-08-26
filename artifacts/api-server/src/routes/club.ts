@@ -19,11 +19,7 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
       return;
     }
 
-    const [club] = await db
-      .select()
-      .from(clubsTable)
-      .where(eq(clubsTable.id, clubId));
-
+    const [club] = await db.select().from(clubsTable).where(eq(clubsTable.id, clubId));
     if (!club) {
       res.status(404).json({ error: "Club no encontrado" });
       return;
@@ -32,14 +28,7 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
     let clubSports: any[] = [];
     try {
       clubSports = await db
-        .select({
-          id: sportsTable.id,
-          name: sportsTable.name,
-          slug: sportsTable.slug,
-          teamSize: sportsTable.teamSize,
-          useSets: sportsTable.useSets,
-          active: clubSportsTable.active,
-        })
+        .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, teamSize: sportsTable.teamSize, useSets: sportsTable.useSets, active: clubSportsTable.active })
         .from(clubSportsTable)
         .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
         .where(eq(clubSportsTable.clubId, clubId));
@@ -48,25 +37,16 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
     }
 
     res.json({
-      id: club.id,
-      name: club.name,
-      slug: club.slug,
-      plan: club.plan,
-      active: club.active,
+      id: club.id, name: club.name, slug: club.slug, plan: club.plan, active: club.active,
       createdAt: club.createdAt ? (club.createdAt as Date).toISOString() : null,
-      sports: clubSports,
-      inviteCode: (club as any).inviteCode || null,
-      logoUrl: (club as any).logoUrl || null,
-      country: (club as any).country || "Chile",
-      state: (club as any).state || null,
-      city: (club as any).city || null,
-      address: (club as any).address || null,
-      mapUrl: (club as any).mapUrl || null,
+      sports: clubSports, inviteCode: (club as any).inviteCode || null,
+      logoUrl: (club as any).logoUrl || null, country: (club as any).country || "Chile",
+      state: (club as any).state || null, city: (club as any).city || null,
+      address: (club as any).address || null, mapUrl: (club as any).mapUrl || null,
       defaultLanguage: (club as any).defaultLanguage || "es",
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
       contactPreference: (club as any).contactPreference || "whatsapp",
-      primaryColor: (club as any).primaryColor || null,
-      secondaryColor: (club as any).secondaryColor || null,
+      primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
     });
   } catch (error) {
     console.error("Error en GET /club:", error);
@@ -74,21 +54,63 @@ router.get("/club", requireCommunityAccess, async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/current — devuelve únicamente el club explícitamente asociado al usuario.
-// Un Super Admin sin clubId no recibe arbitrariamente el primer club de la BD.
-router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
+// GET /clubs/public/:slug — página pública del club, sin autenticación.
+router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   try {
-    const clubId = (req.user as { clubId?: number | null }).clubId ?? null;
-    if (!clubId) {
-      res.json(null);
+    const slug = String(req.params.slug || "").trim();
+    if (!slug) {
+      res.status(400).json({ error: "Slug de club requerido" });
       return;
     }
 
-    const [club] = await db
-      .select()
-      .from(clubsTable)
-      .where(eq(clubsTable.id, clubId));
+    const [club] = await db.select().from(clubsTable).where(eq(clubsTable.slug, slug));
+    if (!club || !(club as any).active) {
+      res.status(404).json({ error: "Club no encontrado" });
+      return;
+    }
 
+    let sports: any[] = [];
+    try {
+      sports = await db
+        .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug, active: clubSportsTable.active })
+        .from(clubSportsTable)
+        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+        .where(eq(clubSportsTable.clubId, club.id));
+    } catch (e) {
+      console.error("⚠️ Error cargando deportes del club público:", e);
+    }
+
+    res.json({
+      id: club.id,
+      name: club.name,
+      slug: club.slug,
+      logoUrl: (club as any).logoUrl || null,
+      primaryColor: (club as any).primaryColor || null,
+      secondaryColor: (club as any).secondaryColor || null,
+      inviteCode: (club as any).inviteCode || null,
+      country: (club as any).country || "Chile",
+      state: (club as any).state || null,
+      city: (club as any).city || null,
+      address: (club as any).address || null,
+      mapUrl: (club as any).mapUrl || null,
+      sports,
+      adminName: (club as any).adminName || (club as any).admin_name || null,
+      adminEmail: (club as any).adminEmail || (club as any).admin_email || null,
+      adminPhone: (club as any).adminPhone || (club as any).admin_phone || null,
+      adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
+    });
+  } catch (error) {
+    console.error("Error en GET /clubs/public/:slug:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// GET /clubs/current — devuelve únicamente el club explícitamente asociado al usuario.
+router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
+  try {
+    const clubId = (req.user as { clubId?: number | null }).clubId ?? null;
+    if (!clubId) { res.json(null); return; }
+    const [club] = await db.select().from(clubsTable).where(eq(clubsTable.id, clubId));
     res.json(club || null);
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
@@ -99,45 +121,15 @@ router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<v
 // PATCH /club/sports — activa o desactiva un deporte para el club
 router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
-  if (!clubId) {
-    res.status(403).json({ error: "El usuario no pertenece a ningún club" });
-    return;
-  }
-
+  if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   const { sportId, active } = req.body as { sportId?: unknown; active?: unknown };
-
-  if (typeof sportId !== "number" || typeof active !== "boolean") {
-    res.status(400).json({ error: "Se requiere sportId (número) y active (boolean)" });
-    return;
-  }
-
+  if (typeof sportId !== "number" || typeof active !== "boolean") { res.status(400).json({ error: "Se requiere sportId (número) y active (boolean)" }); return; }
   try {
-    const [sport] = await db
-      .select()
-      .from(sportsTable)
-      .where(eq(sportsTable.id, sportId));
-
-    if (!sport) {
-      res.status(404).json({ error: "Deporte no encontrado" });
-      return;
-    }
-
-    const [existing] = await db
-      .select()
-      .from(clubSportsTable)
-      .where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.sportId, sportId)));
-
-    if (existing) {
-      await db
-        .update(clubSportsTable)
-        .set({ active })
-        .where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.sportId, sportId)));
-    } else {
-      await db
-        .insert(clubSportsTable)
-        .values({ clubId, sportId, active });
-    }
-
+    const [sport] = await db.select().from(sportsTable).where(eq(sportsTable.id, sportId));
+    if (!sport) { res.status(404).json({ error: "Deporte no encontrado" }); return; }
+    const [existing] = await db.select().from(clubSportsTable).where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.sportId, sportId)));
+    if (existing) await db.update(clubSportsTable).set({ active }).where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.sportId, sportId)));
+    else await db.insert(clubSportsTable).values({ clubId, sportId, active });
     res.json({ clubId, sportId, sportName: sport.name, active });
   } catch (error) {
     console.error("Error en PATCH /club/sports:", error);
@@ -148,22 +140,10 @@ router.patch("/club/sports", requireCommunityAccess, async (req, res): Promise<v
 // GET /club/categories — devuelve todas las categorías creadas para los deportes del club
 router.get("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
-  if (!clubId) {
-    res.status(403).json({ error: "El usuario no pertenece a ningún club" });
-    return;
-  }
-
+  if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db
-      .select({
-        id: clubSportCategoriesTable.id,
-        clubSportId: clubSportCategoriesTable.clubSportId,
-        name: clubSportCategoriesTable.name,
-      })
-      .from(clubSportCategoriesTable)
-      .innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id))
-      .where(eq(clubSportsTable.clubId, clubId));
-
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name })
+      .from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
     res.json(categories);
   } catch (error) {
     console.error("Error en GET /club/categories:", error);
@@ -174,34 +154,13 @@ router.get("/club/categories", requireCommunityAccess, async (req, res): Promise
 // POST /club/categories — permite al administrador crear una categoría para un deporte del club
 router.post("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
   const clubId = currentClubId(req);
-  if (!clubId) {
-    res.status(403).json({ error: "El usuario no pertenece a ningún club" });
-    return;
-  }
-
+  if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   const { clubSportId, name } = req.body as { clubSportId?: unknown; name?: unknown };
-
-  if (typeof clubSportId !== "number" || typeof name !== "string" || !name.trim()) {
-    res.status(400).json({ error: "Se requiere clubSportId (número) y name (texto válido)" });
-    return;
-  }
-
+  if (typeof clubSportId !== "number" || typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "Se requiere clubSportId (número) y name (texto válido)" }); return; }
   try {
-    const [clubSport] = await db
-      .select()
-      .from(clubSportsTable)
-      .where(and(eq(clubSportsTable.id, clubSportId), eq(clubSportsTable.clubId, clubId)));
-
-    if (!clubSport) {
-      res.status(404).json({ error: "El deporte del club no existe o no pertenece a tu club" });
-      return;
-    }
-
-    const [newCategory] = await db
-      .insert(clubSportCategoriesTable)
-      .values({ clubSportId, name: name.trim() })
-      .returning();
-
+    const [clubSport] = await db.select().from(clubSportsTable).where(and(eq(clubSportsTable.id, clubSportId), eq(clubSportsTable.clubId, clubId)));
+    if (!clubSport) { res.status(404).json({ error: "El deporte del club no existe o no pertenece a tu club" }); return; }
+    const [newCategory] = await db.insert(clubSportCategoriesTable).values({ clubSportId, name: name.trim() }).returning();
     res.status(201).json(newCategory);
   } catch (error) {
     console.error("Error en POST /club/categories:", error);
