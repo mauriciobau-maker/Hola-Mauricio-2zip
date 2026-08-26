@@ -50,7 +50,7 @@ function hexToHsl(hex: string) {
 }
 
 export default function PublicClub() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, login } = useAuth();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,9 +107,19 @@ export default function PublicClub() {
   };
 
   const handleEnterClub = () => {
-    // Always persist the canonical public-club path before leaving for Replit.
-    // This also handles links that arrive with a trailing slash.
     const returnTo = `/${slug}`;
+
+    // If the user is already authenticated (for example, a Super Admin
+    // visiting a club), do not send them through Replit authentication again.
+    // They are already authenticated; keep the public club context intact.
+    if (user) {
+      localStorage.removeItem("padel_tracker_public_club_return_to");
+      sessionStorage.removeItem("padel_tracker_public_club_return_to");
+      navigate(returnTo);
+      return;
+    }
+
+    // Unauthenticated visitors must authenticate, then return to this club.
     localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
     sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
     login(returnTo);
