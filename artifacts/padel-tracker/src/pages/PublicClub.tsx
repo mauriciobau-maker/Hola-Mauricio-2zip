@@ -114,9 +114,9 @@ export default function PublicClub() {
     const returnTo = `/${slug}`;
     let authenticatedUser = user;
 
-    // Verify the existing browser session directly before ever calling Replit
-    // OIDC login. This prevents an already authenticated user from being sent
-    // through the external authorization screen again.
+    // The app session is the source of truth. Check it directly so an existing
+    // session is never sent through Replit OIDC again just because the auth hook
+    // has not hydrated yet on the public-club route.
     if (!authenticatedUser) {
       try {
         const response = await fetch("/api/auth/user", {
@@ -143,11 +143,13 @@ export default function PublicClub() {
       return;
     }
 
-    // Only a genuinely unauthenticated visitor starts OIDC login.
+    // Start the app's own OIDC flow only when there is no app session. Do not
+    // call the generic `login()` helper here because it may discard returnTo.
+    // Passing returnTo explicitly to /api/login guarantees the callback returns
+    // to this public club instead of falling back to the dashboard.
     localStorage.setItem("padel_tracker_public_club_return_to", returnTo);
     sessionStorage.setItem("padel_tracker_public_club_return_to", returnTo);
-    login(returnTo);
-    setEntering(false);
+    window.location.assign(`/api/login?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
