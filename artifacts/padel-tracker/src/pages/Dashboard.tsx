@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useGetDashboard, useGetRanking } from "@workspace/api-client-react";
-import { Users, Calendar, Trophy, TrendingUp, ChevronRight } from "lucide-react";
+import { Users, Calendar, Trophy, TrendingUp, ChevronRight, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatDate(iso: string) {
@@ -14,6 +15,35 @@ function initials(name: string) {
 export default function Dashboard() {
   const { data: dashboard, isLoading: loadingDash } = useGetDashboard();
   const { data: ranking } = useGetRanking();
+  const [club, setClub] = useState<{ name?: string; inviteCode?: string | null } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/club")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data) setClub(data);
+      })
+      .catch(() => {
+        if (active) setClub(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const copyInviteCode = async () => {
+    if (!club?.inviteCode) return;
+    try {
+      await navigator.clipboard.writeText(club.inviteCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   if (loadingDash) {
     return (
@@ -36,6 +66,24 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-sm mt-0.5">Resumen general del club</p>
         </div>
       </div>
+
+      {club?.inviteCode && (
+        <div className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Código de invitación del club</p>
+            <p className="text-lg font-bold tracking-wider mt-1">{club.inviteCode}</p>
+            <p className="text-xs text-muted-foreground mt-1">Compártelo para que nuevos jugadores puedan incorporarse a este club.</p>
+          </div>
+          <button
+            type="button"
+            onClick={copyInviteCode}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted/50 transition-colors"
+          >
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+            {copied ? "Copiado" : "Copiar código"}
+          </button>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
