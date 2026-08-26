@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,10 +28,22 @@ import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 
+const PUBLIC_CLUB_RETURN_TO_KEY = "padel_tracker_public_club_return_to";
+
 function Router() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const isPublicClubPath = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
+
+  useEffect(() => {
+    if (location !== "/") return;
+
+    const returnTo = sessionStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY);
+    if (!returnTo || !/^\/[^/]+$/.test(returnTo) || reservedSingleSegmentRoutes.has(returnTo)) return;
+
+    sessionStorage.removeItem(PUBLIC_CLUB_RETURN_TO_KEY);
+    navigate(returnTo);
+  }, [location, navigate]);
 
   if (isPublicClubPath) {
     return <Layout><PublicClub /></Layout>;
