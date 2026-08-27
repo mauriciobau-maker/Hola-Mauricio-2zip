@@ -104,9 +104,33 @@ router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
       superAdminContext: isSuperAdmin,
     });
   } catch (error) {
-    console.error("Error en POST /clubs/public/:slug/enter:", error);
+    console.error("Error entrando al club:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
+});
+
+/**
+ * Restablece el contexto de club del Super Admin al entrar normalmente a la app.
+ * Para usuarios normales no altera su membresía ni su club actual.
+ */
+router.post("/clubs/active/clear", async (req, res): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | null })) {
+    res.json({ success: true, cleared: false });
+    return;
+  }
+
+  res.clearCookie("padel_tracker_active_club_id", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+  });
+  res.json({ success: true, cleared: true });
 });
 
 router.get("/clubs/current", requireCommunityAccess, async (req, res): Promise<void> => {
@@ -137,9 +161,9 @@ router.get("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportCategoriesTable.id, clubSportCategoriesTable.id)).where(eq(clubSportsTable.clubId, clubId));
     res.json(categories);
-  } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno al obtener categorías" }); }
+  } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 router.post("/club/categories", requireCommunityAccess, async (req, res) => {
@@ -152,7 +176,7 @@ router.post("/club/categories", requireCommunityAccess, async (req, res) => {
     if (!clubSport) { res.status(404).json({ error: "El deporte del club no existe o no pertenece a tu club" }); return; }
     const [newCategory] = await db.insert(clubSportCategoriesTable).values({ clubSportId, name: name.trim() }).returning();
     res.status(201).json(newCategory);
-  } catch (error) { console.error("Error en POST /club/categories:", error); res.status(500).json({ error: "Error interno al crear la categoría" }); }
+  } catch (error) { console.error("Error en POST /club/categories:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 export default router;
