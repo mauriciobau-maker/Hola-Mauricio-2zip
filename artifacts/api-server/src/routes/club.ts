@@ -161,9 +161,9 @@ router.get("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportCategoriesTable.id, clubSportCategoriesTable.id)).where(eq(clubSportsTable.clubId, clubId));
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
     res.json(categories);
-  } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno del servidor" }); }
+  } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno al obtener categorías" }); }
 });
 
 router.post("/club/categories", requireCommunityAccess, async (req, res) => {
