@@ -86,9 +86,13 @@ function ClubEntryContext() {
   useEffect(() => {
     let cancelled = false;
 
-    // The server has already selected the club in the httpOnly cookie. Do not
-    // mount Dashboard until all previously cached global queries are marked
-    // stale, otherwise React Query can briefly render the old global context.
+    // The server has already selected the club in the httpOnly cookie. Remove
+    // all cached club-facing data before mounting Dashboard so React Query
+    // cannot render a previous global context while the new club is loading.
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== "/api/auth/user",
+    });
+
     queryClient.invalidateQueries().finally(() => {
       if (!cancelled) {
         window.history.replaceState({}, "", "/");
