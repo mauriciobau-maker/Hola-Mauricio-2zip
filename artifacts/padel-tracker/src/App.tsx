@@ -27,7 +27,7 @@ import PublicClub from "@/pages/PublicClub";
 import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
-const ACTIVE_CLUB_CONTEXT_KEY = "padel_tracker_active_club_context";
+const CLUB_ENTRY_QUERY = "clubEntry";
 
 function clearActiveClubCookie() {
   if (typeof document === "undefined") return;
@@ -37,21 +37,26 @@ function clearActiveClubCookie() {
 function Router() {
   const [location] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
-  const isPublicClubPath = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
+  const pathname = location.split("?")[0] || "/";
+  const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
   useEffect(() => {
-    if (location !== "/") return;
+    if (pathname !== "/") return;
+
+    const params = new URLSearchParams(location.split("?")[1] || "");
+    if (params.get(CLUB_ENTRY_QUERY) === "1") {
+      // This is the one navigation produced by an explicit "Entrar al club".
+      // Keep the selected club context, then remove the one-time URL marker so
+      // a later normal visit to "/" starts globally again.
+      window.history.replaceState({}, "", "/");
+      return;
+    }
 
     // A normal visit to the application must start in the global context.
-    // A club context is retained only for the current navigation session after
-    // the user explicitly entered a club.
-    const activeClubContext = sessionStorage.getItem(ACTIVE_CLUB_CONTEXT_KEY) === "1";
-    if (!activeClubContext) {
-      clearActiveClubCookie();
-      localStorage.removeItem("padel_tracker_public_club_return_to");
-      sessionStorage.removeItem("padel_tracker_public_club_return_to");
-    }
-  }, [location]);
+    clearActiveClubCookie();
+    localStorage.removeItem("padel_tracker_public_club_return_to");
+    sessionStorage.removeItem("padel_tracker_public_club_return_to");
+  }, [location, pathname]);
 
   // Public club pages must not mount Layout/AuthButton/useAuth. Visiting a
   // public club is intentionally anonymous; authentication happens only when
