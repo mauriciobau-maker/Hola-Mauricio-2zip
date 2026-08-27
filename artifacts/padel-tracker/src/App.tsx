@@ -34,29 +34,36 @@ function clearActiveClubCookie() {
   document.cookie = "padel_tracker_active_club_id=; Max-Age=0; path=/";
 }
 
-function Router() {
+function ContextGuard({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const pathname = location.split("?")[0] || "/";
-  const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
   useEffect(() => {
     if (pathname !== "/") return;
 
     const params = new URLSearchParams(location.split("?")[1] || "");
     if (params.get(CLUB_ENTRY_QUERY) === "1") {
-      // This is the one navigation produced by an explicit "Entrar al club".
-      // Keep the selected club context, then remove the one-time URL marker so
-      // a later normal visit to "/" starts globally again.
+      // Preserve the selected club for this explicit entry only. The marker is
+      // immediately removed from the URL so a later normal visit is global.
       window.history.replaceState({}, "", "/");
       return;
     }
 
-    // A normal visit to the application must start in the global context.
+    // This effect belongs to the parent of Layout, so the active-club cookie is
+    // cleared before Layout/Dashboard effects can request club-scoped data.
     clearActiveClubCookie();
     localStorage.removeItem("padel_tracker_public_club_return_to");
     sessionStorage.removeItem("padel_tracker_public_club_return_to");
   }, [location, pathname]);
+
+  return <>{children}</>;
+}
+
+function Router() {
+  const [location] = useLocation();
+  const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
+  const pathname = location.split("?")[0] || "/";
+  const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
   // Public club pages must not mount Layout/AuthButton/useAuth. Visiting a
   // public club is intentionally anonymous; authentication happens only when
@@ -66,30 +73,32 @@ function Router() {
   }
 
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/jugadores" component={Jugadores} />
-        <Route path="/jugadores/nuevo" component={NuevoJugador} />
-        <Route path="/jugadores/:id/editar" component={EditarJugador} />
-        <Route path="/jugadores/:id" component={JugadorDetalle} />
-        <Route path="/partidos" component={Partidos} />
-        <Route path="/partidos/nuevo" component={NuevoPartido} />
-        <Route path="/partidos/:id/editar" component={EditarPartido} />
-        <Route path="/ranking" component={Ranking} />
-        <Route path="/parejas" component={Parejas} />
-        <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
-        <Route path="/encuentros" component={Encuentros} />
-        <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
-        <Route path="/encuentros/:id" component={EncuentroDetalle} />
-        <Route path="/cobros" component={Cobros} />
-        <Route path="/onboarding" component={Onboarding} />
-        <Route path="/vincular" component={VincularJugador} />
-        <Route path="/admin" component={Admin} />
-        <Route path="/:slug" component={PublicClub} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <ContextGuard>
+      <Layout>
+        <Switch>
+          <Route path="/" component={Dashboard} />
+          <Route path="/jugadores" component={Jugadores} />
+          <Route path="/jugadores/nuevo" component={NuevoJugador} />
+          <Route path="/jugadores/:id/editar" component={EditarJugador} />
+          <Route path="/jugadores/:id" component={JugadorDetalle} />
+          <Route path="/partidos" component={Partidos} />
+          <Route path="/partidos/nuevo" component={NuevoPartido} />
+          <Route path="/partidos/:id/editar" component={EditarPartido} />
+          <Route path="/ranking" component={Ranking} />
+          <Route path="/parejas" component={Parejas} />
+          <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
+          <Route path="/encuentros" component={Encuentros} />
+          <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
+          <Route path="/encuentros/:id" component={EncuentroDetalle} />
+          <Route path="/cobros" component={Cobros} />
+          <Route path="/onboarding" component={Onboarding} />
+          <Route path="/vincular" component={VincularJugador} />
+          <Route path="/admin" component={Admin} />
+          <Route path="/:slug" component={PublicClub} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    </ContextGuard>
   );
 }
 
