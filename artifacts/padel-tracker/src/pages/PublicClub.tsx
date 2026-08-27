@@ -109,10 +109,9 @@ export default function PublicClub() {
     setEntering(true);
 
     try {
-      // Este endpoint consulta la sesión existente sin iniciar OIDC. Solo si no
-      // hay sesión se deriva explícitamente al login de Replit.
+      // Consulta la sesión existente sin iniciar OIDC. Solo si no hay sesión
+      // se deriva explícitamente al login de Replit.
       const response = await fetch(`/api/clubs/public/${encodeURIComponent(slug)}/enter`, {
-        method: "POST",
         credentials: "include",
         headers: { Accept: "application/json" },
       });
