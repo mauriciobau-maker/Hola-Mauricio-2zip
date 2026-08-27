@@ -115,12 +115,12 @@ export default function PublicClub() {
       });
 
       if (response.ok) {
-        // Mark this navigation as an explicit club entry. App.tsx uses this
-        // session-only marker to distinguish it from a fresh application visit.
-        sessionStorage.setItem("padel_tracker_active_club_context", "1");
+        // The query marker is consumed exactly once by App.tsx. It preserves the
+        // selected club for this explicit navigation without leaving a persistent
+        // session flag that can redirect a later normal application visit.
         localStorage.removeItem("padel_tracker_public_club_return_to");
         sessionStorage.removeItem("padel_tracker_public_club_return_to");
-        navigate("/");
+        navigate("/?clubEntry=1");
         return;
       }
 
