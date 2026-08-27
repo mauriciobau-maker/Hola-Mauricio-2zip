@@ -47,8 +47,6 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
 
     const params = new URLSearchParams(location.split("?")[1] || "");
     if (params.get(CLUB_ENTRY_QUERY) === "1") {
-      // Preserve the selected club for this explicit entry only. The marker is
-      // immediately removed from the URL so a later normal visit is global.
       window.history.replaceState({}, "", "/");
       setGlobalContextReady(true);
       return;
@@ -60,9 +58,6 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("padel_tracker_public_club_return_to");
     sessionStorage.removeItem("padel_tracker_public_club_return_to");
 
-    // The active-club cookie is httpOnly, so the browser cannot clear it with
-    // document.cookie. Clear it server-side before mounting Dashboard; otherwise
-    // a Super Admin returning to "/" could still inherit the last visited club.
     fetch("/api/clubs/active/clear", {
       method: "POST",
       credentials: "include",
@@ -85,15 +80,50 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ClubEntryContext() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // The server has already selected the club in the httpOnly cookie. Do not
+    // mount Dashboard until all previously cached global queries are marked
+    // stale, otherwise React Query can briefly render the old global context.
+    queryClient.invalidateQueries().finally(() => {
+      if (!cancelled) {
+        window.history.replaceState({}, "", "/");
+        setReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!ready) {
+    return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Cargando el club...</div>;
+  }
+
+  return (
+    <Layout>
+      <Dashboard />
+    </Layout>
+  );
+}
+
 function Router() {
   const [location] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const pathname = location.split("?")[0] || "/";
+  const params = new URLSearchParams(location.split("?")[1] || "");
+  const isClubEntry = pathname === "/" && params.get(CLUB_ENTRY_QUERY) === "1";
   const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
-  // Public club pages must not mount Layout/AuthButton/useAuth. Visiting a
-  // public club is intentionally anonymous; authentication happens only when
-  // the user explicitly presses "Entrar al club".
+  if (isClubEntry) {
+    return <ClubEntryContext />;
+  }
+
   if (isPublicClubPath) {
     return <PublicClub />;
   }
