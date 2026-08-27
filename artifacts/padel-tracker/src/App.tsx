@@ -27,36 +27,31 @@ import PublicClub from "@/pages/PublicClub";
 import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
+const ACTIVE_CLUB_CONTEXT_KEY = "padel_tracker_active_club_context";
 
-const PUBLIC_CLUB_RETURN_TO_KEY = "padel_tracker_public_club_return_to";
-
-function normalizePublicClubPath(value: string | null): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
-  const normalized = value.replace(/\/+$/, "") || "/";
-  if (!/^\/[^/]+$/.test(normalized)) return null;
-  const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
-  if (reservedSingleSegmentRoutes.has(normalized)) return null;
-  return normalized;
+function clearActiveClubCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "padel_tracker_active_club_id=; Max-Age=0; path=/";
 }
 
 function Router() {
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const isPublicClubPath = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
 
   useEffect(() => {
     if (location !== "/") return;
 
-    const returnTo = normalizePublicClubPath(
-      localStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY) ||
-      sessionStorage.getItem(PUBLIC_CLUB_RETURN_TO_KEY),
-    );
-    if (!returnTo) return;
-
-    localStorage.removeItem(PUBLIC_CLUB_RETURN_TO_KEY);
-    sessionStorage.removeItem(PUBLIC_CLUB_RETURN_TO_KEY);
-    navigate(returnTo);
-  }, [location, navigate]);
+    // A normal visit to the application must start in the global context.
+    // A club context is retained only for the current navigation session after
+    // the user explicitly entered a club.
+    const activeClubContext = sessionStorage.getItem(ACTIVE_CLUB_CONTEXT_KEY) === "1";
+    if (!activeClubContext) {
+      clearActiveClubCookie();
+      localStorage.removeItem("padel_tracker_public_club_return_to");
+      sessionStorage.removeItem("padel_tracker_public_club_return_to");
+    }
+  }, [location]);
 
   // Public club pages must not mount Layout/AuthButton/useAuth. Visiting a
   // public club is intentionally anonymous; authentication happens only when
