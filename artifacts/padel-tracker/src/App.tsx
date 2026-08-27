@@ -1,5 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,25 +36,51 @@ function clearActiveClubCookie() {
 
 function ContextGuard({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const [globalContextReady, setGlobalContextReady] = useState(false);
   const pathname = location.split("?")[0] || "/";
 
   useEffect(() => {
-    if (pathname !== "/") return;
+    if (pathname !== "/") {
+      setGlobalContextReady(true);
+      return;
+    }
 
     const params = new URLSearchParams(location.split("?")[1] || "");
     if (params.get(CLUB_ENTRY_QUERY) === "1") {
       // Preserve the selected club for this explicit entry only. The marker is
       // immediately removed from the URL so a later normal visit is global.
       window.history.replaceState({}, "", "/");
+      setGlobalContextReady(true);
       return;
     }
 
-    // This effect belongs to the parent of Layout, so the active-club cookie is
-    // cleared before Layout/Dashboard effects can request club-scoped data.
+    let cancelled = false;
+    setGlobalContextReady(false);
     clearActiveClubCookie();
     localStorage.removeItem("padel_tracker_public_club_return_to");
     sessionStorage.removeItem("padel_tracker_public_club_return_to");
+
+    // The active-club cookie is httpOnly, so the browser cannot clear it with
+    // document.cookie. Clear it server-side before mounting Dashboard; otherwise
+    // a Super Admin returning to "/" could still inherit the last visited club.
+    fetch("/api/clubs/active/clear", {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    })
+      .catch((error) => console.error("Error restableciendo contexto global:", error))
+      .finally(() => {
+        if (!cancelled) setGlobalContextReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [location, pathname]);
+
+  if (pathname === "/" && !globalContextReady) {
+    return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Preparando tu panel...</div>;
+  }
 
   return <>{children}</>;
 }
