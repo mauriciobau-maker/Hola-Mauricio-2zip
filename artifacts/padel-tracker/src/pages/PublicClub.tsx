@@ -109,14 +109,15 @@ export default function PublicClub() {
     setEntering(true);
 
     try {
-      // Consulta la sesión existente sin iniciar OIDC. Solo si no hay sesión
-      // se deriva explícitamente al login de Replit.
       const response = await fetch(`/api/clubs/public/${encodeURIComponent(slug)}/enter`, {
         credentials: "include",
         headers: { Accept: "application/json" },
       });
 
       if (response.ok) {
+        // Mark this navigation as an explicit club entry. App.tsx uses this
+        // session-only marker to distinguish it from a fresh application visit.
+        sessionStorage.setItem("padel_tracker_active_club_context", "1");
         localStorage.removeItem("padel_tracker_public_club_return_to");
         sessionStorage.removeItem("padel_tracker_public_club_return_to");
         navigate("/");
