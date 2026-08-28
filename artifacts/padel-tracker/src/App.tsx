@@ -29,6 +29,11 @@ import { LanguageProvider } from "./context/LanguageContext";
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 const CLUB_ENTRY_QUERY = "clubEntry";
 
+function hasClubEntryQuery(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get(CLUB_ENTRY_QUERY) === "1";
+}
+
 function clearActiveClubCookie() {
   if (typeof document === "undefined") return;
   document.cookie = "padel_tracker_active_club_id=; Max-Age=0; path=/";
@@ -38,6 +43,7 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [globalContextReady, setGlobalContextReady] = useState(false);
   const pathname = location.split("?")[0] || "/";
+  const clubEntry = hasClubEntryQuery();
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -45,8 +51,7 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const params = new URLSearchParams(location.split("?")[1] || "");
-    if (params.get(CLUB_ENTRY_QUERY) === "1") {
+    if (clubEntry) {
       setGlobalContextReady(true);
       return;
     }
@@ -70,7 +75,7 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [location, pathname]);
+  }, [location, pathname, clubEntry]);
 
   if (pathname === "/" && !globalContextReady) {
     return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Preparando tu panel...</div>;
@@ -93,13 +98,7 @@ function ClubEntryContext() {
     });
 
     queryClient.invalidateQueries().finally(() => {
-      if (!cancelled) {
-        // Keep the clubEntry marker while this context is mounted. Removing it
-        // with history.replaceState can cause Wouter to remount ContextGuard,
-        // which interprets the root route as a request for the global context
-        // and clears the selected-club cookie before the Dashboard loads.
-        setReady(true);
-      }
+      if (!cancelled) setReady(true);
     });
 
     return () => {
@@ -122,7 +121,7 @@ function Router() {
   const [location] = useLocation();
   const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros"]);
   const pathname = location.split("?")[0] || "/";
-  const params = new URLSearchParams(location.split("?")[1] || "");
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams(location.split("?")[1] || "");
   const isClubEntry = pathname === "/" && params.get(CLUB_ENTRY_QUERY) === "1";
   const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
