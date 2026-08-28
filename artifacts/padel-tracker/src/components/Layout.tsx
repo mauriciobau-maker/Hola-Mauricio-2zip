@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, ChevronDown, Check, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslationKey } from "../lib/translations";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ClubBranding {
+  id?: number;
   name: string;
+  slug?: string | null;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
@@ -16,11 +19,7 @@ interface ClubBranding {
   defaultLanguage?: string | null;
 }
 
-interface NavItem {
-  href: string;
-  key: TranslationKey;
-  icon: any;
-}
+interface NavItem { href: string; key: TranslationKey; icon: any; }
 
 const navItems: NavItem[] = [
   { href: "/", key: "dashboard", icon: LayoutDashboard },
@@ -40,10 +39,8 @@ function hexToHslChannels(hex: string): string {
   const r = parseInt(hex.substring(0, 2), 16) / 255;
   const g = parseInt(hex.substring(2, 4), 16) / 255;
   const b = parseInt(hex.substring(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
   const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
@@ -62,13 +59,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [club, setClub] = useState<ClubBranding | null>(null);
+  const [availableClubs, setAvailableClubs] = useState<ClubBranding[]>([]);
+  const [clubMenuOpen, setClubMenuOpen] = useState(false);
+  const [contextBusy, setContextBusy] = useState(false);
   const { user, isLoading } = useAuth();
   const { language, setLanguage, setClubDefaultLanguage, t } = useLanguage();
+  const queryClient = useQueryClient();
 
   const isPublicClubRoute = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
-  const isSuperAdmin = !!(user && ((user as any).role === "superadmin" || (user as any).role === "super_admin"));
-  const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0) || isSuperAdmin;
+  const isSuperAdmin = !!(user && (((user as any).role === "superadmin" || (user as any).role === "super_admin") || (user as any).isAdmin > 0));
+  const isAdmin = isSuperAdmin || !!(user && (user as any).isAdmin && (user as any).isAdmin > 0);
   const hasClubEntryMarker = location.startsWith("/?clubEntry=1");
+  const activeClubContext = isSuperAdmin && !!club?.id;
+  const dashboardHref = activeClubContext ? "/?clubEntry=1" : "/";
 
   useEffect(() => {
     if (!isLoading && user && !(user as any).clubId && !isAdmin && !isPublicClubRoute && location !== "/onboarding" && location !== "/vincular" && location !== "/admin") {
@@ -82,57 +85,86 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       fetch(`/api/clubs/public/${encodeURIComponent(slug)}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data) {
-            setClub(data);
-            if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
-          } else setClub(null);
+          if (data) { setClub(data); if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage); }
+          else setClub(null);
         })
         .catch(() => setClub(null));
       return;
     }
 
-    if (user && ((user as any).clubId || isAdmin)) {
-      fetch("/api/clubs/current")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data) {
-            setClub(data);
-            if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
-          }
-        })
-        .catch((err) => console.error("Error cargando marca blanca:", err));
-    } else setClub(null);
-  }, [user, isAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
+    if (!user) { setClub(null); setAvailableClubs([]); return; }
 
-  const activeClubContext = isSuperAdmin && (hasClubEntryMarker || !!club?.name);
-  const dashboardHref = activeClubContext ? "/?clubEntry=1" : "/";
+    // Always resolve branding from the server-side active context. This is the
+    // single source of truth for the club currently being viewed.
+    fetch("/api/clubs/current", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        setClub(data || null);
+        if (data?.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
+      })
+      .catch((err) => console.error("Error cargando marca blanca:", err));
+
+    if (isSuperAdmin) {
+      fetch("/api/clubs/available", { credentials: "include" })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setAvailableClubs(Array.isArray(data) ? data : []))
+        .catch(() => setAvailableClubs([]));
+    } else {
+      setAvailableClubs([]);
+    }
+  }, [user, isSuperAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
+
+  const selectClub = async (target: ClubBranding) => {
+    if (!target.slug || contextBusy) return;
+    setContextBusy(true);
+    try {
+      const response = await fetch(`/api/clubs/public/${encodeURIComponent(target.slug)}/enter`, { method: "POST", credentials: "include", headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("No se pudo cambiar el club activo");
+      setClubMenuOpen(false);
+      setMobileOpen(false);
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "/api/auth/user" });
+      await queryClient.invalidateQueries();
+      navigate("/?clubEntry=1");
+    } catch (error) {
+      console.error("Error cambiando de club:", error);
+    } finally {
+      setContextBusy(false);
+    }
+  };
+
+  const goGlobal = async () => {
+    if (contextBusy) return;
+    setContextBusy(true);
+    try {
+      const response = await fetch("/api/clubs/active/clear", { method: "POST", credentials: "include", headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("No se pudo limpiar el contexto activo");
+      setClubMenuOpen(false);
+      setMobileOpen(false);
+      setClub(null);
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "/api/auth/user" });
+      await queryClient.invalidateQueries();
+      navigate("/?global=1");
+    } catch (error) {
+      console.error("Error volviendo a Vista Super Admin:", error);
+    } finally {
+      setContextBusy(false);
+    }
+  };
 
   const handleMainClick = (event: React.MouseEvent<HTMLElement>) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
     const target = event.target as HTMLElement;
     const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
     if (!anchor) return;
-
     const href = anchor.getAttribute("href");
     if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
-
     let url: URL;
-    try {
-      url = new URL(href, window.location.origin);
-    } catch {
-      return;
-    }
-
+    try { url = new URL(href, window.location.origin); } catch { return; }
     if (url.origin !== window.location.origin) return;
-
     const path = url.pathname.replace(/\/+$/, "") || "/";
     const isPublicClubLink = /^\/[^/]+$/.test(path) && !reservedSingleSegmentRoutes.has(path);
     if (!isPublicClubLink) return;
-
-    event.preventDefault();
-    setMobileOpen(false);
-    navigate(path);
+    event.preventDefault(); setMobileOpen(false); navigate(path);
   };
 
   const dynamicStyles: Record<string, string> = {};
@@ -150,6 +182,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  const ContextSelector = () => isSuperAdmin && !isPublicClubRoute ? (
+    <div className="relative">
+      <button type="button" onClick={() => setClubMenuOpen((open) => !open)} disabled={contextBusy} className="flex items-center gap-2 max-w-[260px] rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold hover:bg-muted/50 transition-colors">
+        {club?.logoUrl ? <img src={club.logoUrl} alt="" className="h-6 w-6 rounded object-contain shrink-0" /> : <Building2 size={16} className="text-primary shrink-0" />}
+        <span className="truncate">{club?.name || "Vista Super Admin"}</span>
+        <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+      </button>
+      {clubMenuOpen && (
+        <>
+          <button type="button" aria-label="Cerrar selector" className="fixed inset-0 z-40 cursor-default" onClick={() => setClubMenuOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl border border-border bg-background p-2 shadow-xl">
+            <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">Contexto activo</div>
+            {availableClubs.map((item) => {
+              const selected = club?.id === item.id;
+              return (
+                <button key={item.id} type="button" onClick={() => selectClub(item)} className={cn("w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/60", selected && "bg-primary/10")}>
+                  {item.logoUrl ? <img src={item.logoUrl} alt="" className="h-8 w-8 rounded object-contain shrink-0" /> : <Building2 size={18} className="text-primary shrink-0" />}
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.name}</span>
+                  {selected && <Check size={16} className="text-primary shrink-0" />}
+                </button>
+              );
+            })}
+            <div className="my-2 border-t border-border" />
+            <button type="button" onClick={goGlobal} className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/60 text-sm font-semibold">
+              <Shield size={18} className="text-primary shrink-0" />
+              <span className="flex-1">Vista Super Admin</span>
+              {!activeClubContext && <Check size={16} className="text-primary shrink-0" />}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-background flex flex-col" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -164,17 +230,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const href = item.key === "dashboard" ? dashboardHref : item.href;
               const isActive = item.key === "dashboard" ? location === "/" || location === "/?clubEntry=1" : location === item.href;
-              return (
-                <Link key={item.key} href={href} className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", isActive ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}>
-                  <item.icon size={14} />{t(item.key)}
-                </Link>
-              );
+              return <Link key={item.key} href={href} className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", isActive ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><item.icon size={14} />{t(item.key)}</Link>;
             })}
             {isAdmin && <Link href="/admin" className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><Shield size={14} />{t("adminPanel")}</Link>}
           </nav>}
 
-          <div className="hidden xl:flex items-center gap-2 shrink-0"><LanguageSelector /><AuthButton /></div>
-          <div className="xl:hidden flex items-center gap-2 shrink-0"><LanguageSelector /><AuthButton />{!isPublicClubRoute && <button className="p-2 rounded-md hover:bg-muted/50 text-foreground" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">{mobileOpen ? <X size={20} /> : <Menu size={20} />}</button>}</div>
+          <div className="hidden xl:flex items-center gap-2 shrink-0"><ContextSelector /><LanguageSelector /><AuthButton /></div>
+          <div className="xl:hidden flex items-center gap-2 shrink-0"><ContextSelector /><LanguageSelector /><AuthButton />{!isPublicClubRoute && <button className="p-2 rounded-md hover:bg-muted/50 text-foreground" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">{mobileOpen ? <X size={20} /> : <Menu size={20} />}</button>}</div>
         </div>
 
         {mobileOpen && !isPublicClubRoute && <div className="xl:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
