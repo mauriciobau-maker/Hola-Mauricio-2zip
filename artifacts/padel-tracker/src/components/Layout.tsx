@@ -68,6 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isPublicClubRoute = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
   const isSuperAdmin = !!(user && ((user as any).role === "superadmin" || (user as any).role === "super_admin"));
   const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0) || isSuperAdmin;
+  const hasClubEntryMarker = location.startsWith("/?clubEntry=1");
 
   useEffect(() => {
     if (!isLoading && user && !(user as any).clubId && !isAdmin && !isPublicClubRoute && location !== "/onboarding" && location !== "/vincular" && location !== "/admin") {
@@ -102,6 +103,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         .catch((err) => console.error("Error cargando marca blanca:", err));
     } else setClub(null);
   }, [user, isAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
+
+  const activeClubContext = isSuperAdmin && (hasClubEntryMarker || !!club?.name);
+  const dashboardHref = activeClubContext ? "/?clubEntry=1" : "/";
 
   const handleMainClick = (event: React.MouseEvent<HTMLElement>) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -150,18 +154,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background flex flex-col" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2 font-bold text-base md:text-lg tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
+          <Link href={dashboardHref} className="flex items-center gap-2 font-bold text-base md:text-lg tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
             {club?.logoUrl ? <img src={club.logoUrl} alt={`Logo ${club.name}`} className="h-7 w-auto object-contain max-w-[110px] rounded shrink-0" /> : !club?.name?.toLowerCase().includes("padel") && <span className="text-primary shrink-0">Padel</span>}
             <span className="text-foreground whitespace-nowrap shrink-0">{club?.name || "Tracker"}</span>
             {!club?.logoUrl && <span className="text-xs font-semibold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full border border-primary/30 shrink-0">IA</span>}
           </Link>
 
           {!isPublicClubRoute && <nav className="hidden xl:flex items-center gap-1 shrink-0">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", location === item.href ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}>
-                <item.icon size={14} />{t(item.key)}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const href = item.key === "dashboard" ? dashboardHref : item.href;
+              const isActive = item.key === "dashboard" ? location === "/" || location === "/?clubEntry=1" : location === item.href;
+              return (
+                <Link key={item.key} href={href} className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", isActive ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}>
+                  <item.icon size={14} />{t(item.key)}
+                </Link>
+              );
+            })}
             {isAdmin && <Link href="/admin" className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><Shield size={14} />{t("adminPanel")}</Link>}
           </nav>}
 
@@ -170,7 +178,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {mobileOpen && !isPublicClubRoute && <div className="xl:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
-          {navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={cn("flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors", location === item.href ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><item.icon size={16} />{t(item.key)}</Link>)}
+          {navItems.map((item) => {
+            const href = item.key === "dashboard" ? dashboardHref : item.href;
+            const isActive = item.key === "dashboard" ? location === "/" || location === "/?clubEntry=1" : location === item.href;
+            return <Link key={item.key} href={href} onClick={() => setMobileOpen(false)} className={cn("flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors", isActive ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><item.icon size={16} />{t(item.key)}</Link>;
+          })}
           {isAdmin && <Link href="/admin" onClick={() => setMobileOpen(false)} className={cn("flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors", location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><Shield size={16} />{t("adminPanel")}</Link>}
         </div>}
       </header>
@@ -185,7 +197,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </footer>
 
       {!isPublicClubRoute && <><nav className="xl:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex z-40">
-        {navItems.map((item) => <Link key={item.href} href={item.href} className={cn("flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors", location === item.href ? "text-primary" : "text-muted-foreground")}><item.icon size={18} /><span className="text-[10px]">{t(item.key)}</span></Link>)}
+        {navItems.map((item) => {
+          const href = item.key === "dashboard" ? dashboardHref : item.href;
+          const isActive = item.key === "dashboard" ? location === "/" || location === "/?clubEntry=1" : location === item.href;
+          return <Link key={item.key} href={href} className={cn("flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors", isActive ? "text-primary" : "text-muted-foreground")}><item.icon size={18} /><span className="text-[10px]">{t(item.key)}</span></Link>;
+        })}
       </nav><div className="xl:hidden h-16" /></>}
     </div>
   );
