@@ -47,7 +47,6 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
 
     const params = new URLSearchParams(location.split("?")[1] || "");
     if (params.get(CLUB_ENTRY_QUERY) === "1") {
-      window.history.replaceState({}, "", "/");
       setGlobalContextReady(true);
       return;
     }
@@ -95,7 +94,10 @@ function ClubEntryContext() {
 
     queryClient.invalidateQueries().finally(() => {
       if (!cancelled) {
-        window.history.replaceState({}, "", "/");
+        // Keep the clubEntry marker while this context is mounted. Removing it
+        // with history.replaceState can cause Wouter to remount ContextGuard,
+        // which interprets the root route as a request for the global context
+        // and clears the selected-club cookie before the Dashboard loads.
         setReady(true);
       }
     });
