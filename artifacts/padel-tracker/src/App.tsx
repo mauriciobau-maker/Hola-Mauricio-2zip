@@ -28,22 +28,24 @@ import { LanguageProvider } from "./context/LanguageContext";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 const CLUB_ENTRY_QUERY = "clubEntry";
+const GLOBAL_CONTEXT_QUERY = "global";
 
 function hasClubEntryQuery(): boolean {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).get(CLUB_ENTRY_QUERY) === "1";
 }
 
-function clearActiveClubCookie() {
-  if (typeof document === "undefined") return;
-  document.cookie = "padel_tracker_active_club_id=; Max-Age=0; path=/";
+function hasExplicitGlobalQuery(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get(GLOBAL_CONTEXT_QUERY) === "1";
 }
 
 function ContextGuard({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const [globalContextReady, setGlobalContextReady] = useState(false);
+  const [globalContextReady, setGlobalContextReady] = useState(true);
   const pathname = location.split("?")[0] || "/";
   const clubEntry = hasClubEntryQuery();
+  const explicitGlobal = hasExplicitGlobalQuery();
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -56,11 +58,16 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!explicitGlobal) {
+      // A Super Admin may be operating inside a selected club. Navigating to
+      // Dashboard ("/") is normal internal navigation and must NOT destroy
+      // that context. Returning to the global Super Admin panel is explicit.
+      setGlobalContextReady(true);
+      return;
+    }
+
     let cancelled = false;
     setGlobalContextReady(false);
-    clearActiveClubCookie();
-    localStorage.removeItem("padel_tracker_public_club_return_to");
-    sessionStorage.removeItem("padel_tracker_public_club_return_to");
 
     fetch("/api/clubs/active/clear", {
       method: "POST",
@@ -75,7 +82,7 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [location, pathname, clubEntry]);
+  }, [location, pathname, clubEntry, explicitGlobal]);
 
   if (pathname === "/" && !globalContextReady) {
     return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Preparando tu panel...</div>;
