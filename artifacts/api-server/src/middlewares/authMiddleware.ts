@@ -1,6 +1,8 @@
 import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
 import {
   clearSession,
   getOidcConfig,
@@ -53,6 +55,37 @@ async function refreshIfExpired(
   }
 }
 
+/**
+ * The session contains a snapshot of the user. Authorization attributes that
+ * live in the application database must not become stale after an admin/club
+ * change, so refresh them for each authenticated request.
+ */
+async function hydrateCurrentUser(session: SessionData): Promise<SessionData> {
+  const [dbUser] = await db
+    .select({
+      id: usersTable.id,
+      email: usersTable.email,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      profileImageUrl: usersTable.profileImageUrl,
+      clubId: usersTable.clubId,
+      isAdmin: usersTable.isAdmin,
+      isClubAdmin: usersTable.isClubAdmin,
+      playerId: usersTable.playerId,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, session.user.id));
+
+  if (!dbUser) return session;
+
+  session.user = {
+    ...session.user,
+    ...dbUser,
+  } as AuthUser;
+
+  return session;
+}
+
 export async function authMiddleware(
   req: Request,
   res: Response,
@@ -82,6 +115,13 @@ export async function authMiddleware(
     return;
   }
 
-  req.user = refreshed.user;
+  try {
+    const hydrated = await hydrateCurrentUser(refreshed);
+    req.user = hydrated.user;
+  } catch (error) {
+    console.error("Error actualizando autorización del usuario:", error);
+    req.user = refreshed.user;
+  }
+
   next();
 }
