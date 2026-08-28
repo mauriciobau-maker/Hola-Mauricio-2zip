@@ -124,7 +124,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setMobileOpen(false);
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "/api/auth/user" });
       await queryClient.invalidateQueries();
-      navigate("/?clubEntry=1");
+      window.location.assign("/?clubEntry=1");
     } catch (error) {
       console.error("Error cambiando de club:", error);
     } finally {
@@ -143,7 +143,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setClub(null);
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "/api/auth/user" });
       await queryClient.invalidateQueries();
-      navigate("/?global=1");
+      window.location.assign("/?global=1");
     } catch (error) {
       console.error("Error volviendo a Vista Super Admin:", error);
     } finally {
