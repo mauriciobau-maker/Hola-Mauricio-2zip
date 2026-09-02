@@ -101,11 +101,7 @@ export default function NuevoJugador() {
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  const isSuperAdmin = !!(
-    user &&
-    (user as any).isAdmin === 1 &&
-    (user as any).isClubAdmin !== 1
-  );
+  const isSuperAdmin = !!(user && (user as any).isAdmin === 1);
 
   const t = labels[language] || labels.es;
 
