@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Globe,
   Tag,
-  Building2,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -102,9 +101,12 @@ export default function NuevoJugador() {
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  // Código de club: solo lo necesita el Super Admin cuando crea desde el panel global.
-  const [clubCode, setClubCode] = useState("");
-  const isSuperAdmin = !!(user && (user as any).isAdmin === 1);
+  // El Super Admin opera globalmente; Club Admin siempre trabaja sobre su club.
+  const isSuperAdmin = !!(
+    user &&
+    (user as any).isAdmin === 1 &&
+    (user as any).isClubAdmin !== 1
+  );
 
   // Textos traducidos dinámicamente según la opción elegida
   const t = labels[language] || labels.es;
@@ -158,9 +160,6 @@ export default function NuevoJugador() {
         ...(waId.trim() ? { waId: waId.trim() } : {}),
         wspConsent,
         categoryIds: selectedCategoryIds,
-        ...(isSuperAdmin && clubCode.trim()
-          ? { clubCode: clubCode.trim().toUpperCase() }
-          : {}),
       } as any,
     });
   };
@@ -246,26 +245,6 @@ export default function NuevoJugador() {
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {/* Campo opcional de Código de Club (Solo Super Admin) */}
-          {isSuperAdmin && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                <Building2 size={14} className="text-muted-foreground" />
-                Código de Club{" "}
-                <span className="text-muted-foreground text-xs">
-                  {t.optional}
-                </span>
-              </label>
-              <input
-                type="text"
-                value={clubCode}
-                onChange={(e) => setClubCode(e.target.value)}
-                placeholder="Ej: CENTRAL123"
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
             </div>
           )}
 
