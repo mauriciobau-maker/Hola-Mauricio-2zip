@@ -1,13 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
 
-export function isSuperAdminUser(user: { isAdmin?: number | boolean | null } | undefined): boolean {
-  return user?.isAdmin === 1 || user?.isAdmin === true;
+export function isSuperAdminUser(user: { isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null } | undefined): boolean {
+  return (user?.isAdmin === 1 || user?.isAdmin === true) && !(user?.isClubAdmin === 1 || user?.isClubAdmin === true);
 }
 
 /** Selected club context for the current request. Super Admin keeps global privileges,
  * but club-facing endpoints can operate on the selected club. */
 export function getCurrentClubId(req: Request): number | null {
-  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null } | undefined;
+  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null } | undefined;
   if (!isSuperAdminUser(user)) return user?.clubId ?? null;
   const requestedClubId = Number(req.query?.clubId);
   if (Number.isInteger(requestedClubId) && requestedClubId > 0) return requestedClubId;
