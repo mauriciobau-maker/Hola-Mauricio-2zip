@@ -1,7 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 
+/**
+ * SUPER_ADMIN has global authority. isClubAdmin may coexist as legacy/secondary
+ * role data and must never downgrade a Super Admin to club-admin scope.
+ */
 export function isSuperAdminUser(user: { isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null } | undefined): boolean {
-  return (user?.isAdmin === 1 || user?.isAdmin === true) && !(user?.isClubAdmin === 1 || user?.isClubAdmin === true);
+  return user?.isAdmin === 1 || user?.isAdmin === true;
 }
 
 /** Selected club context for the current request. Super Admin keeps global privileges,
