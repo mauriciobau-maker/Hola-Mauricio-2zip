@@ -13,10 +13,10 @@ import {
   MessageSquare,
   Globe,
   Tag,
+  Building2,
 } from "lucide-react";
 import { Link } from "wouter";
 
-// Diccionario de traducciones para el formulario dinámico
 const labels: Record<string, Record<string, string>> = {
   es: {
     title: "Nuevo Jugador",
@@ -31,6 +31,8 @@ const labels: Record<string, Record<string, string>> = {
     waId: "WhatsApp ID / Usuario",
     consent:
       "Autoriza el envío de notificantes y confirmación de partidos por WhatsApp.",
+    clubCode: "Código de Club",
+    clubCodeHelp: "Solo necesario para seleccionar el club como Super Admin.",
     submit: "Crear Jugador",
     creating: "Creando...",
     errorMsg: "Error al crear el jugador. Intenta de nuevo.",
@@ -49,6 +51,8 @@ const labels: Record<string, Record<string, string>> = {
     waId: "WhatsApp ID / Username",
     consent:
       "Authorizes sending notifications and match confirmations via WhatsApp.",
+    clubCode: "Club Code",
+    clubCodeHelp: "Only needed to select the club as Super Admin.",
     submit: "Create Player",
     creating: "Creating...",
     errorMsg: "Error creating player. Please try again.",
@@ -67,6 +71,8 @@ const labels: Record<string, Record<string, string>> = {
     waId: "ID / Usuário do WhatsApp",
     consent:
       "Autoriza o envio de notificações e confirmação de jogos pelo WhatsApp.",
+    clubCode: "Código do Clube",
+    clubCodeHelp: "Necessário apenas para selecionar o clube como Super Admin.",
     submit: "Criar Jogador",
     creating: "Criando...",
     errorMsg: "Erro ao criar jogador. Tente novamente.",
@@ -84,34 +90,25 @@ export default function NuevoJugador() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Datos básicos del jugador
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
-
-  // Idioma de la aplicación/usuario (por defecto Español)
   const [language, setLanguage] = useState("es");
-
-  // Contacto y WhatsApp
   const [phone, setPhone] = useState("");
   const [waId, setWaId] = useState("");
   const [wspConsent, setWspConsent] = useState(false);
-
-  // Categorías disponibles y seleccionadas (Multideporte)
+  const [clubCode, setClubCode] = useState("");
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  // El Super Admin opera globalmente; Club Admin siempre trabaja sobre su club.
   const isSuperAdmin = !!(
     user &&
     (user as any).isAdmin === 1 &&
     (user as any).isClubAdmin !== 1
   );
 
-  // Textos traducidos dinámicamente según la opción elegida
   const t = labels[language] || labels.es;
 
-  // Cargar categorías disponibles al montar el componente
   useEffect(() => {
     fetch("/api/club-sport-categories")
       .then((res) => res.json())
@@ -158,6 +155,9 @@ export default function NuevoJugador() {
         language,
         ...(phone.trim() ? { phone: phone.trim() } : {}),
         ...(waId.trim() ? { waId: waId.trim() } : {}),
+        ...(isSuperAdmin && clubCode.trim()
+          ? { clubCode: clubCode.trim() }
+          : {}),
         wspConsent,
         categoryIds: selectedCategoryIds,
       } as any,
@@ -187,7 +187,6 @@ export default function NuevoJugador() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nombre completo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
               {t.fullName} <span className="text-destructive">*</span>
@@ -202,7 +201,6 @@ export default function NuevoJugador() {
             />
           </div>
 
-          {/* Apodo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
               {t.nickname}{" "}
@@ -219,7 +217,23 @@ export default function NuevoJugador() {
             />
           </div>
 
-          {/* Selector de Categorías / Deportes */}
+          {isSuperAdmin && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                <Building2 size={14} className="text-muted-foreground" />
+                {t.clubCode}
+              </label>
+              <input
+                type="text"
+                value={clubCode}
+                onChange={(e) => setClubCode(e.target.value)}
+                placeholder="Ej: club-de-prueba-3"
+                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">{t.clubCodeHelp}</p>
+            </div>
+          )}
+
           {availableCategories.length > 0 && (
             <div className="space-y-2 pt-1">
               <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
@@ -248,7 +262,6 @@ export default function NuevoJugador() {
             </div>
           )}
 
-          {/* Selector de Idioma Principal */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
               <Globe size={14} className="text-muted-foreground" />
@@ -267,13 +280,11 @@ export default function NuevoJugador() {
 
           <hr className="border-border/60 my-3" />
 
-          {/* Contacto & WhatsApp */}
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t.contactHeader}
             </p>
 
-            {/* Teléfono */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 <Phone size={14} className="text-muted-foreground" />
@@ -291,7 +302,6 @@ export default function NuevoJugador() {
               />
             </div>
 
-            {/* WhatsApp ID / Handle */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 <MessageSquare size={14} className="text-muted-foreground" />
@@ -309,7 +319,6 @@ export default function NuevoJugador() {
               />
             </div>
 
-            {/* Consentimiento */}
             <label className="flex items-start gap-2.5 pt-1 cursor-pointer select-none">
               <input
                 type="checkbox"
