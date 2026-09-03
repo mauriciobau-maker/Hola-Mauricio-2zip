@@ -29,6 +29,46 @@ import { LanguageProvider } from "./context/LanguageContext";
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 const CLUB_ENTRY_QUERY = "clubEntry";
 const GLOBAL_CONTEXT_QUERY = "global";
+const ACTIVE_CLUB_COOKIE = "padel_tracker_active_club_id";
+
+function getActiveClubIdFromCookie(): number | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${ACTIVE_CLUB_COOKIE}=`));
+  if (!match) return null;
+  const value = Number(decodeURIComponent(match.slice(ACTIVE_CLUB_COOKIE.length + 1)));
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function installActiveClubContextFetch(): void {
+  if (typeof window === "undefined" || typeof window.fetch !== "function") return;
+  const marker = "__padelTrackerActiveClubFetchInstalled";
+  const globalWindow = window as typeof window & { [marker]?: boolean };
+  if (globalWindow[marker]) return;
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    let url: URL;
+    try { url = new URL(rawUrl, window.location.origin); } catch { return originalFetch(input, init); }
+
+    const isApiRequest = url.origin === window.location.origin && url.pathname.startsWith("/api/");
+    const excluded = url.pathname.startsWith("/api/auth/") || url.pathname.startsWith("/api/login") || url.pathname.startsWith("/api/logout") || url.pathname.startsWith("/api/clubs/public/");
+    const activeClubId = getActiveClubIdFromCookie();
+    if (!isApiRequest || excluded || !activeClubId || url.searchParams.has("clubId")) {
+      return originalFetch(input, init);
+    }
+
+    url.searchParams.set("clubId", String(activeClubId));
+    if (typeof input === "string" || input instanceof URL) {
+      return originalFetch(url.toString(), init);
+    }
+    return originalFetch(new Request(url.toString(), input), init);
+  };
+
+  globalWindow[marker] = true;
+}
+
+installActiveClubContextFetch();
 
 function hasClubEntryQuery(): boolean {
   if (typeof window === "undefined") return false;
@@ -97,9 +137,6 @@ function ClubEntryContext() {
   useEffect(() => {
     let cancelled = false;
 
-    // The server has already selected the club in the httpOnly cookie. Remove
-    // all cached club-facing data before mounting Dashboard so React Query
-    // cannot render a previous global context while the new club is loading.
     queryClient.removeQueries({
       predicate: (query) => query.queryKey[0] !== "/api/auth/user",
     });
