@@ -9,6 +9,7 @@ import {
   gastosTable,
 } from "@workspace/db";
 import type { Request, Response, NextFunction } from "express";
+import { isSuperAdminUser } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -30,10 +31,7 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
       return;
     }
 
-    const isSuperAdmin =
-      user.isAdmin === 1 ||
-      user.role === "superadmin" ||
-      user.role === "admin";
+    const isSuperAdmin = isSuperAdminUser(user);
 
     if (isSuperAdmin) {
       next();
@@ -86,12 +84,8 @@ router.get(
         }
       }
 
-      const [firstClub] = await db.select().from(clubsTable).limit(1);
-      if (firstClub) {
-        res.json(firstClub);
-        return;
-      }
-
+      // A Super Admin without an active club context is intentionally global.
+      // Never guess a club from database ordering.
       res.json(null);
     } catch (error) {
       console.error("Error en GET /clubs/current:", error);
@@ -405,14 +399,20 @@ router.patch(
       const adminPhone = body.adminPhone || body.admin_phone || admin?.phone || body.phone;
       const adminNickname = body.adminNickname || body.nickname || body.apodo;
       const currentUser = req.user as any;
-      const isSuperAdmin =
-        currentUser?.isAdmin === 1 ||
-        currentUser?.role === "superadmin" ||
-        currentUser?.role === "admin";
+      const isSuperAdmin = isSuperAdminUser(currentUser);
 
       if (adminEmail && !isSuperAdmin) {
         res.status(403).json({
           error: "Solo un Super Admin puede modificar privilegios administrativos",
+        });
+        return;
+      }
+
+      // Club lifecycle is a Super Admin responsibility. Club Admins may
+      // configure the club but cannot deactivate/suspend/archive the club.
+      if (body.active !== undefined && !isSuperAdmin) {
+        res.status(403).json({
+          error: "Solo un Super Admin puede cambiar el estado activo del club",
         });
         return;
       }
@@ -423,7 +423,7 @@ router.patch(
       if (body.slug) clubUpdate.slug = body.slug;
       if (body.plan) clubUpdate.plan = body.plan;
       if (body.logoUrl || body.logo) clubUpdate.logoUrl = body.logoUrl || body.logo;
-      if (body.active !== undefined) clubUpdate.active = body.active;
+      if (isSuperAdmin && body.active !== undefined) clubUpdate.active = body.active;
       if (body.country) clubUpdate.country = body.country;
       if (body.state) clubUpdate.state = body.state;
       if (body.city) clubUpdate.city = body.city;
