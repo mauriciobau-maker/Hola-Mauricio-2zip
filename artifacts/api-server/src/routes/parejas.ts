@@ -135,8 +135,10 @@ router.get("/parejas", requireCommunityAccess, async (req, res): Promise<void> =
 
 router.get("/parejas/:player1Id/:player2Id", requireCommunityAccess, async (req, res): Promise<void> => {
   try {
-    const p1Raw = parseInt(req.params.player1Id, 10);
-    const p2Raw = parseInt(req.params.player2Id, 10);
+    const p1Param = Array.isArray(req.params.player1Id) ? req.params.player1Id[0] : req.params.player1Id;
+    const p2Param = Array.isArray(req.params.player2Id) ? req.params.player2Id[0] : req.params.player2Id;
+    const p1Raw = parseInt(p1Param, 10);
+    const p2Raw = parseInt(p2Param, 10);
     if (isNaN(p1Raw) || isNaN(p2Raw)) {
       res.status(400).json({ error: "IDs inválidos" });
       return;
