@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
+  clubSportsTable,
   matchPlayersTable,
   matchesTable,
   playerSportRatingsTable,
@@ -15,16 +16,39 @@ import {
 
 const router: IRouter = Router();
 
-async function getSelectedSportId(rawSportId: unknown): Promise<number | null> {
+async function getSelectedSportId(rawSportId: unknown, clubId: number): Promise<number | null> {
   if (rawSportId !== undefined) {
     const sportId = Number(rawSportId);
-    return Number.isInteger(sportId) && sportId > 0 ? sportId : null;
+    if (!Number.isInteger(sportId) || sportId <= 0) return null;
+
+    const [selectedSport] = await db
+      .select({ id: sportsTable.id })
+      .from(clubSportsTable)
+      .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+      .where(
+        and(
+          eq(clubSportsTable.clubId, clubId),
+          eq(clubSportsTable.active, true),
+          eq(sportsTable.id, sportId),
+          eq(sportsTable.active, true),
+        ),
+      )
+      .limit(1);
+
+    return selectedSport?.id ?? null;
   }
 
   const [sport] = await db
     .select({ id: sportsTable.id })
-    .from(sportsTable)
-    .where(eq(sportsTable.active, true))
+    .from(clubSportsTable)
+    .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+    .where(
+      and(
+        eq(clubSportsTable.clubId, clubId),
+        eq(clubSportsTable.active, true),
+        eq(sportsTable.active, true),
+      ),
+    )
     .orderBy(sportsTable.id)
     .limit(1);
 
@@ -54,9 +78,9 @@ router.get("/ranking", requireCommunityAccess, async (req, res): Promise<void> =
   const clubId = requireTargetClub(req, res);
   if (!clubId) return;
 
-  const sportId = await getSelectedSportId(req.query.sportId);
+  const sportId = await getSelectedSportId(req.query.sportId, clubId);
   if (!sportId) {
-    res.status(400).json({ error: "sportId inválido" });
+    res.status(400).json({ error: "El deporte seleccionado no está activo en el club actual" });
     return;
   }
 
@@ -156,9 +180,9 @@ router.get("/dashboard", requireCommunityAccess, async (req, res): Promise<void>
   const clubId = requireTargetClub(req, res);
   if (!clubId) return;
 
-  const sportId = await getSelectedSportId(req.query.sportId);
+  const sportId = await getSelectedSportId(req.query.sportId, clubId);
   if (!sportId) {
-    res.status(400).json({ error: "sportId inválido" });
+    res.status(400).json({ error: "El deporte seleccionado no está activo en el club actual" });
     return;
   }
 
