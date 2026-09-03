@@ -9,13 +9,12 @@ import {
   sportModalitiesTable,
 } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
-import { isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
+import { getCurrentClubId, isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router = Router();
 
 function requestClubId(req: Request): number | null {
-  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null } | undefined;
-  return isSuperAdminUser(user) ? null : user?.clubId ?? null;
+  return getCurrentClubId(req);
 }
 
 async function getScopedEncuentro(encuentroId: number, req: Request) {
