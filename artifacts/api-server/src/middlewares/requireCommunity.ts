@@ -34,8 +34,17 @@ export function getCurrentClubId(req: Request): number | null {
     role?: string | null;
   } | undefined;
   if (!isSuperAdminUser(user)) return user?.clubId ?? null;
+
+  // Once requireCommunityAccess has resolved the active Super Admin context,
+  // prefer that request-scoped value. This prevents individual routes from
+  // re-resolving the cookie independently and guarantees they see the same
+  // community scope for the lifetime of the request.
+  const scopedClubId = Number(user?.clubId);
+  if (Number.isInteger(scopedClubId) && scopedClubId > 0) return scopedClubId;
+
   const requestedClubId = Number(req.query?.clubId);
   if (Number.isInteger(requestedClubId) && requestedClubId > 0) return requestedClubId;
+
   const activeClubId = Number(req.cookies?.padel_tracker_active_club_id);
   return Number.isInteger(activeClubId) && activeClubId > 0 ? activeClubId : null;
 }
