@@ -360,7 +360,14 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  // The Padel Tracker web client uses the authenticated session cookie for
+  // both identity and the temporary active-club context.  Generated API
+  // calls must therefore carry credentials just like the manual fetch calls
+  // used by the navigation/context layer.  Keep an explicit caller value
+  // authoritative so consumers can still opt out when required.
+  const credentials = init.credentials ?? "include";
+
+  const response = await fetch(input, { ...init, method, headers, credentials });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
