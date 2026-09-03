@@ -18,6 +18,7 @@ import {
 } from "../elo";
 import { recalculateSportElo } from "../lib/recalculateElo";
 import {
+  getCurrentClubId,
   isSuperAdminUser,
   requireCommunityAccess,
 } from "../middlewares/requireCommunity";
@@ -222,8 +223,7 @@ router.use(requireCommunityAccess);
 
 router.get("/matches", async (req, res): Promise<void> => {
   try {
-    const user = req.user as { clubId?: number | null } | undefined;
-    const clubId = isSuperAdminUser(req.user) ? null : user?.clubId ?? null;
+    const clubId = getCurrentClubId(req);
 
     const matches = clubId == null
       ? await db.select().from(matchesTable).orderBy(desc(matchesTable.playedAt))
@@ -249,19 +249,18 @@ router.get("/matches/:id", async (req, res): Promise<void> => {
       return;
     }
 
+    const clubId = getCurrentClubId(req);
     const [match] = await db
       .select()
       .from(matchesTable)
-      .where(eq(matchesTable.id, id));
+      .where(
+        clubId == null
+          ? eq(matchesTable.id, id)
+          : and(eq(matchesTable.id, id), eq(matchesTable.clubId, clubId)),
+      );
 
     if (!match) {
       res.status(404).json({ error: "Partido no encontrado" });
-      return;
-    }
-
-    const user = req.user as { clubId?: number | null } | undefined;
-    if (!isSuperAdminUser(req.user) && match.clubId !== user?.clubId) {
-      res.status(403).json({ error: "Forbidden" });
       return;
     }
 
