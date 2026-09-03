@@ -161,12 +161,10 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 
     const bodyData = req.body.data ?? req.body;
     const { title, dateTime, location, maxSpots, notes, playerIds } = bodyData;
-    const sessionUser = user as { clubId?: number | null; isAdmin?: number | boolean | null };
-    const requestedClubId = bodyData.clubId === undefined ? null : Number(bodyData.clubId);
-    const clubId = isSuperAdminUser(sessionUser) ? requestedClubId : sessionUser.clubId;
+    const clubId = requestClubId(req);
 
     if (!Number.isInteger(clubId) || clubId! <= 0) {
-      res.status(400).json({ message: "Los Super Admin deben indicar clubId para crear un encuentro" });
+      res.status(400).json({ message: "Debes seleccionar un club activo para crear un encuentro" });
       return;
     }
 
@@ -235,12 +233,9 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
     const { status, playerId: reqPlayerId } = req.body;
-    const targetPlayerId = reqPlayerId ? Number(reqPlayerId) : user.playerId;
-
-    if (!targetPlayerId) {
-      res.status(400).json({ message: "No se encontró un jugador válido para actualizar" });
-      return;
-    }
+    const requestedPlayerId = reqPlayerId === undefined || reqPlayerId === null
+      ? null
+      : Number(reqPlayerId);
 
     const e = await getScopedEncuentro(encuentroId, req);
     if (!e) {
@@ -248,10 +243,25 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const isOrganizer = e.organizerId === user.id;
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    if (requestedPlayerId !== null && !isOrganizer && !isSuperAdmin) {
+      res.status(403).json({ message: "Solo el organizador o un Super Admin puede actualizar la asistencia de otro jugador" });
+      return;
+    }
+
+    const targetPlayerId = requestedPlayerId ?? user.playerId;
+
+    if (!targetPlayerId) {
+      res.status(400).json({ message: "No se encontró un jugador válido para actualizar" });
+      return;
+    }
+
     const [targetPlayer] = await db
       .select({ id: playersTable.id })
       .from(playersTable)
-      .where(and(eq(playersTable.id, targetPlayerId), eq(playersTable.clubId, e.clubId!)));
+      .where(and(eq(playersTable.id, Number(targetPlayerId)), eq(playersTable.clubId, e.clubId!)));
 
     if (!targetPlayer) {
       res.status(403).json({ message: "El jugador no pertenece al club del encuentro" });
@@ -263,14 +273,14 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
     if (status === "confirmed") {
       const asistenciaActual = await getAsistenciaList(encuentroId, e.clubId);
       const confirmedCount = asistenciaActual.filter(
-        (a) => a.status === "confirmed" && a.playerId !== targetPlayerId
+        (a) => a.status === "confirmed" && a.playerId !== Number(targetPlayerId)
       ).length;
 
       if (e.maxSpots && confirmedCount >= e.maxSpots) {
         const waitlistCount = asistenciaActual.filter(
           (a) =>
             (a.status === "waitlist" || a.status === "reserva") &&
-            a.playerId !== targetPlayerId
+            a.playerId !== Number(targetPlayerId)
         ).length;
 
         if (waitlistCount >= 3) {
@@ -290,7 +300,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
       .where(
         and(
           eq(asistenciaTable.encuentroId, encuentroId),
-          eq(asistenciaTable.playerId, targetPlayerId)
+          eq(asistenciaTable.playerId, Number(targetPlayerId))
         )
       );
 
@@ -309,7 +319,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
     } else {
       await db.insert(asistenciaTable).values({
         encuentroId,
-        playerId: targetPlayerId,
+        playerId: Number(targetPlayerId),
         status: finalStatus,
         respondedAt: new Date(),
       });
