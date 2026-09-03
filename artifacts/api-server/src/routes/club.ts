@@ -47,11 +47,14 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
       inviteCode: (club as any).inviteCode || null, country: (club as any).country || "Chile",
       state: (club as any).state || null, city: (club as any).city || null,
-      address: (club as any).address || null, mapUrl: (club as any).mapUrl || null, sports,
+      address: (club as any).address || null, mapUrl: (club as any).mapUrl || null,
+      defaultLanguage: (club as any).defaultLanguage || "es",
+      adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
+      contactPreference: (club as any).contactPreference || "whatsapp",
+      primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
       adminName: (club as any).adminName || (club as any).admin_name || null,
       adminEmail: (club as any).adminEmail || (club as any).admin_email || null,
       adminPhone: (club as any).adminPhone || (club as any).admin_phone || null,
-      adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
     });
   } catch (error) { console.error("Error en GET /clubs/public/:slug:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
@@ -67,11 +70,8 @@ router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
     const isSuperAdmin = isSuperAdminUser(user);
     if (!isSuperAdmin && user.clubId !== club.id) { res.status(403).json({ error: "No tienes acceso a este club" }); return; }
 
-    // The active club is a navigation context, not a membership record.
-    // Keep it in a session cookie so closing the browser returns a Super Admin
-    // to the global context instead of silently reviving an old club.
     res.cookie("padel_tracker_active_club_id", String(club.id), {
-      httpOnly: true,
+      httpOnly: false,
       secure: true,
       sameSite: "lax",
       path: "/",
@@ -81,14 +81,13 @@ router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
   } catch (error) { console.error("Error entrando al club:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
-router.post("/clubs/active/clear", async (req, res): Promise<void> => {
+router.post("/clubs/active/clear", async (req, res) => {
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
   if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | string | null })) { res.json({ success: true, cleared: false }); return; }
-  res.clearCookie("padel_tracker_active_club_id", { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
+  res.clearCookie("padel_tracker_active_club_id", { httpOnly: false, secure: true, sameSite: "lax", path: "/" });
   res.json({ success: true, cleared: true });
 });
 
-/** Lista de clubes disponibles para que el Super Admin cambie de contexto. */
 router.get("/clubs/available", async (req, res) => {
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
   if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | string | null })) {
@@ -140,7 +139,7 @@ router.get("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubId));
     res.json(categories);
   } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno al obtener categorías" }); }
 });
