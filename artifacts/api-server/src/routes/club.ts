@@ -63,25 +63,35 @@ router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
     if (!slug) { res.status(400).json({ error: "Slug de club requerido" }); return; }
     const [club] = await db.select().from(clubsTable).where(eq(clubsTable.slug, slug));
     if (!club || !(club as any).active) { res.status(404).json({ error: "Club no encontrado" }); return; }
-    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
+    const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | string | null };
     const isSuperAdmin = isSuperAdminUser(user);
     if (!isSuperAdmin && user.clubId !== club.id) { res.status(403).json({ error: "No tienes acceso a este club" }); return; }
-    res.cookie("padel_tracker_active_club_id", String(club.id), { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    // The active club is a navigation context, not a membership record.
+    // Keep it in a session cookie so closing the browser returns a Super Admin
+    // to the global context instead of silently reviving an old club.
+    res.cookie("padel_tracker_active_club_id", String(club.id), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+    });
+
     res.json({ success: true, club: { id: club.id, name: club.name, slug: club.slug }, superAdminContext: isSuperAdmin });
   } catch (error) { console.error("Error entrando al club:", error); res.status(500).json({ error: "Error interno del servidor" }); }
 });
 
 router.post("/clubs/active/clear", async (req, res): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
-  if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | null })) { res.json({ success: true, cleared: false }); return; }
+  if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | string | null })) { res.json({ success: true, cleared: false }); return; }
   res.clearCookie("padel_tracker_active_club_id", { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
   res.json({ success: true, cleared: true });
 });
 
 /** Lista de clubes disponibles para que el Super Admin cambie de contexto. */
-router.get("/clubs/available", async (req, res): Promise<void> => {
+router.get("/clubs/available", async (req, res) => {
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
-  if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | null })) {
+  if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | string | null })) {
     res.status(403).json({ error: "Super Admin required" });
     return;
   }
