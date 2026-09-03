@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, matchesTable, playersTable, eloHistoryTable, matchPlayersTable } from "@workspace/db";
-import { isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
+import { getCurrentClubId, requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -20,8 +20,7 @@ function sortedPair(a: number, b: number): ParejaKey {
 function pairKey(p: ParejaKey): string { return `${p.p1}_${p.p2}`; }
 
 router.get("/parejas", requireCommunityAccess, async (req, res): Promise<void> => {
-  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
-  const clubId = isSuperAdminUser(user) ? null : user.clubId;
+  const clubId = getCurrentClubId(req);
   const [matches, players, allMatchPlayers] = await Promise.all([
     clubId
       ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId))
@@ -119,8 +118,7 @@ router.get("/parejas/:player1Id/:player2Id", requireCommunityAccess, async (req,
   const pid1 = Math.min(p1Raw, p2Raw);
   const pid2 = Math.max(p1Raw, p2Raw);
 
-  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null };
-  const clubId = isSuperAdminUser(user) ? null : user.clubId!;
+  const clubId = getCurrentClubId(req);
   const [players, allMatches, allMatchPlayers] = await Promise.all([
     clubId ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId)) : db.select().from(playersTable),
     clubId ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId)) : db.select().from(matchesTable),
