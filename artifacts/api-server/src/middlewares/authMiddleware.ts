@@ -59,6 +59,11 @@ async function refreshIfExpired(
  * The session contains a snapshot of the user. Authorization attributes that
  * live in the application database must not become stale after an admin/club
  * change, so refresh them for each authenticated request.
+ *
+ * Authorization flags are normalized here to the canonical numeric form used
+ * by the existing RBAC layer. This prevents a boolean/string representation
+ * mismatch from making the same Super Admin appear authorized in the client
+ * but unauthorized to a protected API route.
  */
 async function hydrateCurrentUser(session: SessionData): Promise<SessionData> {
   const [dbUser] = await db
@@ -81,6 +86,8 @@ async function hydrateCurrentUser(session: SessionData): Promise<SessionData> {
   session.user = {
     ...session.user,
     ...dbUser,
+    isAdmin: dbUser.isAdmin ? 1 : 0,
+    isClubAdmin: dbUser.isClubAdmin ? 1 : 0,
   } as AuthUser;
 
   return session;
