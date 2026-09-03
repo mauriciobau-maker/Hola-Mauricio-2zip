@@ -51,7 +51,6 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       defaultLanguage: (club as any).defaultLanguage || "es",
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
       contactPreference: (club as any).contactPreference || "whatsapp",
-      primaryColor: (club as any).primaryColor || null, secondaryColor: (club as any).secondaryColor || null,
       adminName: (club as any).adminName || (club as any).admin_name || null,
       adminEmail: (club as any).adminEmail || (club as any).admin_email || null,
       adminPhone: (club as any).adminPhone || (club as any).admin_phone || null,
@@ -70,6 +69,9 @@ router.post("/clubs/public/:slug/enter", async (req, res): Promise<void> => {
     const isSuperAdmin = isSuperAdminUser(user);
     if (!isSuperAdmin && user.clubId !== club.id) { res.status(403).json({ error: "No tienes acceso a este club" }); return; }
 
+    // The active club is a navigation context, not a membership record.
+    // It is a session cookie and is intentionally readable by the frontend so
+    // the API client can propagate the selected context on every API request.
     res.cookie("padel_tracker_active_club_id", String(club.id), {
       httpOnly: false,
       secure: true,
@@ -88,6 +90,7 @@ router.post("/clubs/active/clear", async (req, res) => {
   res.json({ success: true, cleared: true });
 });
 
+/** Lista de clubes disponibles para que el Super Admin cambie de contexto. */
 router.get("/clubs/available", async (req, res) => {
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
   if (!isSuperAdminUser(req.user as { isAdmin?: number | boolean | string | null })) {
@@ -139,7 +142,7 @@ router.get("/club/categories", requireCommunityAccess, async (req, res) => {
   const clubId = currentClubId(req);
   if (!clubId) { res.status(403).json({ error: "El usuario no pertenece a ningún club" }); return; }
   try {
-    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubId));
+    const categories = await db.select({ id: clubSportCategoriesTable.id, clubSportId: clubSportCategoriesTable.clubSportId, name: clubSportCategoriesTable.name }).from(clubSportCategoriesTable).innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)).where(eq(clubSportsTable.clubId, clubId));
     res.json(categories);
   } catch (error) { console.error("Error en GET /club/categories:", error); res.status(500).json({ error: "Error interno al obtener categorías" }); }
 });
