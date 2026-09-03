@@ -3,15 +3,36 @@ import type { Request, Response, NextFunction } from "express";
 /**
  * SUPER_ADMIN has global authority. isClubAdmin may coexist as legacy/secondary
  * role data and must never downgrade a Super Admin to club-admin scope.
+ *
+ * The database flag is the canonical authority. Legacy role text and string
+ * values are accepted only as compatibility inputs while older sessions/code
+ * are being normalized at the authentication boundary.
  */
-export function isSuperAdminUser(user: { isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null } | undefined): boolean {
-  return user?.isAdmin === 1 || user?.isAdmin === true;
+export function isSuperAdminUser(
+  user: {
+    isAdmin?: number | boolean | string | null;
+    isClubAdmin?: number | boolean | string | null;
+    role?: string | null;
+  } | undefined,
+): boolean {
+  return (
+    user?.isAdmin === 1 ||
+    user?.isAdmin === true ||
+    user?.isAdmin === "1" ||
+    user?.role === "superadmin" ||
+    user?.role === "admin"
+  );
 }
 
 /** Selected club context for the current request. Super Admin keeps global privileges,
  * but club-facing endpoints can operate on the selected club. */
 export function getCurrentClubId(req: Request): number | null {
-  const user = req.user as { clubId?: number | null; isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null } | undefined;
+  const user = req.user as {
+    clubId?: number | null;
+    isAdmin?: number | boolean | string | null;
+    isClubAdmin?: number | boolean | string | null;
+    role?: string | null;
+  } | undefined;
   if (!isSuperAdminUser(user)) return user?.clubId ?? null;
   const requestedClubId = Number(req.query?.clubId);
   if (Number.isInteger(requestedClubId) && requestedClubId > 0) return requestedClubId;
