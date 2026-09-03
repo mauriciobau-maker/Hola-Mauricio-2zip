@@ -42,7 +42,7 @@ function getActiveClubIdFromCookie(): number | null {
 function installActiveClubContextFetch(): void {
   if (typeof window === "undefined" || typeof window.fetch !== "function") return;
   const marker = "__padelTrackerActiveClubFetchInstalled";
-  const globalWindow = window as typeof window & { [marker]?: boolean };
+  const globalWindow = window as Window & Record<string, boolean | undefined>;
   if (globalWindow[marker]) return;
   const originalFetch = window.fetch.bind(window);
 
@@ -99,9 +99,6 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (!explicitGlobal) {
-      // A Super Admin may be operating inside a selected club. Navigating to
-      // Dashboard ("/") is normal internal navigation and must NOT destroy
-      // that context. Returning to the global Super Admin panel is explicit.
       setGlobalContextReady(true);
       return;
     }
