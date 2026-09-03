@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
@@ -9,7 +9,7 @@ import {
   sportsTable,
 } from "@workspace/db";
 import {
-  isSuperAdminUser,
+  getCurrentClubId,
   requireCommunityAccess,
 } from "../middlewares/requireCommunity";
 
@@ -39,27 +39,8 @@ function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
   return grouped;
 }
 
-function getTargetClubId(req: Request): number | null {
-  const user = req.user as {
-    clubId?: number | null;
-    isAdmin?: number | boolean | null;
-  };
-
-  if (!isSuperAdminUser(user)) {
-    return user.clubId ?? null;
-  }
-
-  const requestedClubId = Number(req.query.clubId);
-  if (Number.isInteger(requestedClubId) && requestedClubId > 0) {
-    return requestedClubId;
-  }
-
-  const activeClubId = Number(req.cookies?.padel_tracker_active_club_id);
-  return Number.isInteger(activeClubId) && activeClubId > 0 ? activeClubId : null;
-}
-
-function requireTargetClub(req: Request, res: any): number | null {
-  const clubId = getTargetClubId(req);
+function requireTargetClub(req: Parameters<typeof getCurrentClubId>[0], res: any): number | null {
+  const clubId = getCurrentClubId(req);
   if (!clubId) {
     res.status(400).json({
       error: "Los Super Admin deben indicar clubId para consultar este panel",
