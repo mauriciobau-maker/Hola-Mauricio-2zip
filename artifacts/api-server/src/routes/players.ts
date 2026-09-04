@@ -1259,90 +1259,86 @@ router.get(
 
 router.get(
   "/players/:id/elo-history",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
-    const raw =
-      Array.isArray(
-        req.params.id
-      )
-        ? req.params.id[0]
-        : req.params.id;
+    const raw = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
 
-    const id =
-      parseInt(
-        raw,
-        10
-      );
+    const id = parseInt(raw, 10);
 
     if (isNaN(id)) {
       res.status(400).json({
-        error:
-          "ID inválido",
+        error: "ID inválido",
       });
       return;
     }
 
-    const [player] =
-      await db
-        .select()
-        .from(playersTable)
-        .where(
-          eq(
-            playersTable.id,
-            id
-          )
-        );
+    const user = req.user as {
+      clubId?: number | null;
+      isAdmin?: number | boolean | string | null;
+      role?: string | null;
+    } | undefined;
+
+    const isSuperAdmin = isSuperAdminUser(user);
+    const activeClubId = user?.clubId ?? null;
+
+    const [player] = await db
+      .select()
+      .from(playersTable)
+      .where(
+        isSuperAdmin || activeClubId == null
+          ? eq(playersTable.id, id)
+          : and(
+              eq(playersTable.id, id),
+              eq(playersTable.clubId, activeClubId)
+            )
+      );
 
     if (!player) {
       res.status(404).json({
-        error:
-          "Jugador no encontrado",
+        error: "Jugador no encontrado",
       });
       return;
     }
 
-    const history =
-      await db
-        .select({
-          h: eloHistoryTable,
-          playedAt:
-            matchesTable.playedAt,
-        })
-        .from(
-          eloHistoryTable
+    const history = await db
+      .select({
+        h: eloHistoryTable,
+        playedAt: matchesTable.playedAt,
+      })
+      .from(eloHistoryTable)
+      .innerJoin(
+        matchesTable,
+        eq(
+          eloHistoryTable.matchId,
+          matchesTable.id
         )
-        .innerJoin(
-          matchesTable,
-          eq(
-            eloHistoryTable.matchId,
-            matchesTable.id
-          )
-        )
-        .where(
-          eq(
-            eloHistoryTable.playerId,
-            id
-          )
-        )
-        .orderBy(
-          asc(
-            matchesTable.playedAt
-          )
-        );
+      )
+      .where(
+        isSuperAdmin || activeClubId == null
+          ? and(
+              eq(eloHistoryTable.playerId, id),
+              eq(matchesTable.clubId, player.clubId!)
+            )
+          : and(
+              eq(eloHistoryTable.playerId, id),
+              eq(matchesTable.clubId, activeClubId)
+            )
+      )
+      .orderBy(
+        asc(matchesTable.playedAt)
+      );
 
     res.json(
       history.map(
         (row) => ({
           id: row.h.id,
-          playerId:
-            row.h.playerId,
-          matchId:
-            row.h.matchId,
-          eloBefore:
-            row.h.eloBefore,
-          eloAfter:
-            row.h.eloAfter,
-          eloChange:
-            row.h.eloChange,
+          playerId: row.h.playerId,
+          matchId: row.h.matchId,
+          eloBefore: row.h.eloBefore,
+          eloAfter: row.h.eloAfter,
+          eloChange: row.h.eloChange,
           matchPlayedAt:
             row.playedAt.toISOString(),
           createdAt:
