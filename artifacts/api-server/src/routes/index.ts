@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
+import playerEditRouter from "./playerEdit";
 import playersRouter from "./players";
 import matchesRouter from "./matches";
 import rankingRouter from "./ranking";
@@ -23,6 +24,9 @@ router.use(authRouter);
 // por la autenticación/comunidad de rutas privadas.
 router.use(publicClubRouter);
 
+// Player edit is registered before the legacy PATCH in players.ts so the
+// complete authorization/validation boundary handles every player update.
+router.use(playerEditRouter);
 router.use(playersRouter);
 router.use(matchesRouter);
 router.use(rankingRouter);
