@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-09-07
 - **Rama:** `p0/community-isolation`
-- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO
+- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO
 - **Alcance:** Editar Player completo, no solo apodo
 
 ## 1. Hallazgo que inició la auditoría
@@ -79,7 +79,8 @@ La documentación canónica ya define esos perfiles deportivos. Su implementaci�
 Durante la auditoría también queda registrado:
 
 - el PATCH legacy de `players.ts` sigue existiendo detrás de la nueva ruta y debe retirarse/refactorizarse en una limpieza posterior;
-- el endpoint DELETE legacy de Player realiza eliminación física, lo que contradice P73 (**Player nunca se elimina físicamente**). Esto debe tratarse en la auditoría de Estado/acciones administrativas, no mezclarse con la corrección del formulario Editar;
+- el endpoint DELETE legacy de Player realizaba eliminación física, lo que contradice P73 (**Player nunca se elimina físicamente**);
+- para evitar que esa deuda pueda destruir datos durante P0, `playerEdit.ts` ahora registra primero un `DELETE /players/:id` que devuelve `410 Gone` y no toca la base de datos. El legacy permanece en código, pero queda protegido por la frontera nueva mientras se diseña el reemplazo por estados;
 - el contrato OpenAPI/generated client inicialmente describía `PlayerUpdate` únicamente con `name` y `nickname`, mientras la frontera real ya validaba además teléfono, WhatsApp, consentimiento, idioma y categorías.
 
 ### 5.0 Alineación del contrato de edición
@@ -87,6 +88,7 @@ Durante la auditoría también queda registrado:
 Se alinearon los tipos generados usados por el frontend/API client con la frontera `playerEdit`:
 
 - `lib/api-zod/src/generated/types/playerUpdate.ts`
+- `lib/api-zod/src/generated/types/player.ts`
 - `lib/api-client-react/src/generated/api.schemas.ts`
 
 `Player` ahora expone los datos que realmente devuelve el endpoint (`phone`, `waId`, `wspConsent`, `language`, `clubId`, `categories`) y `PlayerUpdate` expone los campos aceptados por la operación de edición.
@@ -95,13 +97,11 @@ Se alinearon los tipos generados usados por el frontend/API client con la fronte
 
 ## 5.1 Auditoría de Jugadores → Estado / acciones administrativas
 
-La revisión de la implementación actual confirma un problema estructural que debe resolverse antes de considerar cerrado este módulo:
+### DELETE físico: 🟡 BLOQUEADO EN LA FRONTERA P0 / modelo pendiente
 
-### DELETE físico: 🔴 NO CUMPLE P73
+El código legacy de `players.ts` mantiene `DELETE /players/:id` con eliminación física, pero la nueva frontera `playerEdit.ts`, registrada antes, intercepta esa operación y devuelve `410 Gone` sin ejecutar `db.delete(playersTable)`. Así, durante P0 ya no existe una vía funcional de eliminación física a través de ese endpoint.
 
-`artifacts/api-server/src/routes/players.ts` mantiene `DELETE /players/:id` y ejecuta directamente `db.delete(playersTable)`. Por lo tanto, hoy existe una vía de eliminación física de Player.
-
-La propia tabla `memberships` referencia `playersTable.id` con `onDelete: "cascade"`, por lo que una eliminación física puede arrastrar Membership asociada. Esto es incompatible con P73/P74 y con la regla de preservación de historia.
+La tabla `memberships` referencia `playersTable.id` con `onDelete: "cascade"`, por lo que una eliminación física podría arrastrar Membership asociada. Esto es incompatible con P73/P74 y con la preservación de historia.
 
 ### Estado de Player: 🔴 no existe en el modelo actual
 
@@ -113,7 +113,7 @@ Esto significa que **no es seguro reemplazar ahora DELETE por un supuesto `statu
 
 `Jugadores.tsx` mantiene botón de papelera para cada Player y llama `useDeletePlayer`; el diálogo confirma literalmente que la eliminación "no se puede deshacer".
 
-Por tanto, el problema no es solo backend: la UI presenta una operación que contradice el modelo de negocio. La corrección futura debe retirar la semántica de eliminación y reemplazarla por las acciones de estado autorizadas que se definan.
+El backend ya bloquea la operación destructiva, pero la UI todavía presenta una acción contradictoria. La corrección definitiva debe retirar la semántica de eliminación y reemplazarla por las acciones de estado autorizadas que se definan.
 
 ### Decisión de alcance P0
 
@@ -147,7 +147,8 @@ Los datos deportivos sensibles y las correcciones de hechos oficiales permanecen
 
 - `cfd42aeedab4ac68aca3e90edf7765fb8e8c0b61` — `fix: align generated player update contract with edit route`
 - `a2c5df0b252441efe00256fe292b326aabb8e568` — `fix: align generated player schema with edit response`
-- documentación actualizada en este commit posterior.
+- `4663da1f10863bfac322f7f3b2cd445e7f5c0d9e` — `fix: align generated Player contract with edit API`
+- `ab9ec0b31ff3db8eeee85fff0f3237be558d6fa3` — `fix: block destructive player deletion at community boundary`
 
 ## 8. Verificación
 
@@ -161,7 +162,8 @@ La aceptación funcional mínima continúa siendo:
 4. Player normal → editar sus datos personales permitidos → persistencia.
 5. Club Admin → categorías válidas de Club 3 → persistencia.
 6. Payload con `clubId` → no debe mover al Player de comunidad mediante este endpoint.
-7. Confirmar que ELO/historial/ranking no cambian.
+7. DELETE Player → debe responder 410 y no eliminar el registro.
+8. Confirmar que ELO/historial/ranking no cambian.
 
 ## 9. Regla de continuidad
 
