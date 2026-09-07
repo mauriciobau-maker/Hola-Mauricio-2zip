@@ -133,8 +133,6 @@ router.patch(
     const data = parsed.data;
     const updates: Record<string, unknown> = {};
 
-    // Club Admin/Super Admin can correct normal identity/profile data.
-    // A regular Player can only change their own normal personal data.
     if (data.name !== undefined) {
       if (!isSuperAdmin && !isClubAdmin) {
         res.status(403).json({ error: "El nombre registrado solo puede ser modificado por la administración" });
@@ -163,7 +161,6 @@ router.patch(
       updates.language = data.language;
     }
 
-    // Category assignment is club administration, not a player self-service action.
     if (data.categoryIds !== undefined && !isSuperAdmin && !isClubAdmin) {
       res.status(403).json({ error: "Las categorías solo pueden ser modificadas por la administración" });
       return;
@@ -235,6 +232,23 @@ router.patch(
     }
 
     res.json(await enrichPlayer(updatedRecord));
+  },
+);
+
+/**
+ * Player records are historical official facts and must never be physically deleted.
+ * The legacy DELETE handler in players.ts remains behind this guard for now, but
+ * this route is registered first and makes the destructive operation unreachable.
+ * State transitions (INACTIVE/SUSPENDED/EXPELLED) require the approved state model
+ * and are intentionally not invented here because the current schema has no state.
+ */
+router.delete(
+  "/players/:id",
+  requireCommunityAccess,
+  async (_req, res): Promise<void> => {
+    res.status(410).json({
+      error: "Los jugadores no se eliminan físicamente. Use una acción de estado autorizada.",
+    });
   },
 );
 
