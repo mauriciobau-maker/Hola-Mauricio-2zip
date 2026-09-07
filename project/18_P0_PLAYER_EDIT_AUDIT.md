@@ -2,8 +2,8 @@
 
 - **Fecha:** 2026-09-07
 - **Rama:** `p0/community-isolation`
-- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO / UI SIN ELIMINACIÓN
-- **Alcance:** Editar Player completo, no solo apodo
+- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO / UI SIN ELIMINACIÓN / VINCULACIÓN DUPLICADA BLOQUEADA
+- **Alcance:** Editar Player completo y auditoría transversal de identidad/estado
 
 ## 1. Hallazgo que inició la auditoría
 
@@ -56,23 +56,11 @@ La UI dejó de simular un rol fijo y ahora obtiene `isAdmin` / `isClubAdmin` des
 
 ## 4. Auditoría de modelo y tabla
 
-El modelo actual `players` contiene:
-
-- `name`
-- `nickname`
-- `elo`
-- `phone`
-- `waId`
-- `wspConsent`
-- `language`
-- `clubId`
-- `createdAt`
-
-También existen relaciones de categorías mediante `playerCategories` y `clubSportCategories`.
+El modelo actual `players` contiene identidad, contacto, idioma, club, ELO y fecha de creación, además de relaciones de categorías.
 
 **No existen actualmente en `players` los atributos deportivos aprobados para los perfiles de Pádel/Fútbol/Tenis**, como nivel, mano dominante, lado de pádel, posición/pie de fútbol y preferencias específicas de tenis. Esto es una brecha de modelo/producto que no debe resolverse improvisando columnas durante P0.
 
-La documentación canónica ya define esos perfiles deportivos. Su implementación requiere una decisión técnica posterior y, si corresponde, una migración controlada. **No se hace migración en P0.**
+La documentación canónica ya define esos perfiles. Su implementación requiere una decisión técnica posterior y, si corresponde, una migración controlada. **No se hace migración en P0.**
 
 ## 5. Deuda encontrada fuera del formulario
 
@@ -81,6 +69,7 @@ Durante la auditoría global también queda registrado:
 - el PATCH legacy de `players.ts` sigue existiendo detrás de la nueva ruta y debe retirarse/refactorizarse en una limpieza posterior;
 - el endpoint DELETE legacy de Player realizaba eliminación física, lo que contradice P73 (**Player nunca se elimina físicamente**);
 - para evitar que esa deuda pueda destruir datos durante P0, `playerEdit.ts` registra primero un `DELETE /players/:id` que devuelve `410 Gone` y no toca la base de datos. El legacy permanece en código, pero queda protegido por la frontera nueva mientras se diseña el reemplazo por estados;
+- la UI `Jugadores.tsx` ya no expone el botón de papelera ni ejecuta `useDeletePlayer`, eliminando la semántica destructiva de la interfaz;
 - el contrato OpenAPI/generated client inicialmente describía `PlayerUpdate` únicamente con `name` y `nickname`, mientras la frontera real ya validaba además teléfono, WhatsApp, consentimiento, idioma y categorías.
 
 ### 5.0 Alineación del contrato de edición
@@ -105,7 +94,7 @@ La tabla `memberships` referencia `playersTable.id` con `onDelete: "cascade"`, p
 
 ### Estado de Player: 🔴 no existe en el modelo actual
 
-El modelo `players` auditado contiene identidad, contacto, idioma, club, ELO y fecha de creación, pero no contiene un campo de estado del Player. Por separado, `memberships` actualmente solo tiene `id`, `playerId`, `clubId` y `role`; tampoco implementa los estados P52 (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `EXPELLED`).
+El modelo `players` no contiene un campo de estado del Player. Por separado, `memberships` actualmente solo tiene `id`, `playerId`, `clubId` y `role`; tampoco implementa los estados P52 (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `EXPELLED`).
 
 Esto significa que **no es seguro reemplazar ahora DELETE por un supuesto `status` inventado**. La solución correcta requiere cerrar primero el diseño de estado Player/Membership y su persistencia, y luego implementar la transición de forma no destructiva. No se agrega una columna ni se hace migración durante P0.
 
@@ -123,23 +112,25 @@ No se debe reparar campo por campo. La solución de Estado/acciones debe diseña
 
 La auditoría global confirma otra brecha estructural relevante para Jugadores:
 
-### Vinculación actual: 🔴 no cumple íntegramente P39–P43
+### Vinculación actual: 🟡 parcialmente reforzada / diseño estructural pendiente
 
-`users` mantiene un único `playerId` directo. El endpoint `POST /auth/link-player` valida autenticación y, para usuarios no Super Admin, restringe el Player al `clubId` del usuario; después actualiza directamente `users.playerId`. No existe en este flujo una validación explícita de que el Player ya esté vinculado a otro User, ni una estructura de historial de vínculos.
+`users` mantiene un único `playerId` directo. El endpoint `POST /auth/link-player` valida autenticación y, para usuarios no Super Admin, restringe el Player al `clubId` del usuario; después actualiza directamente `users.playerId`.
 
-La UI `VincularJugador.tsx` ofrece la acción **"Soy yo"** sobre los Players que devuelve la lista y, si el usuario ya tiene `playerId`, solo muestra que está vinculado. No existe flujo de **desvincular/revincular**.
+Se agregó una protección inmediata: si el Player ya está vinculado a cualquier User, el endpoint responde `409` y no reemplaza silenciosamente el vínculo existente. Esto refuerza la regla P42 de que un Player no debe estar vinculado simultáneamente a dos Users.
 
-Además, el mismo endpoint no crea Membership ni permisos administrativos automáticamente, lo cual es compatible con P43, pero el modelo actual tampoco demuestra las garantías completas de P40/P42: máximo un Player por User+Club+Sport y un Player vinculado a un solo User con desvinculación/revinculación controlada.
+La protección no pretende resolver todavía toda la arquitectura P36/P40/P42/P43: el modelo actual sigue soportando un único `users.playerId`, no una estructura de vínculos por User+Club+Sport, y no existe historial de unlink/relink.
+
+La UI `VincularJugador.tsx` continúa ofreciendo **"Soy yo"** como acción de vinculación y no existe flujo de **desvincular/revincular**. No se parchea aisladamente porque requiere el diseño completo de identidad, membership, ownership y auditoría.
 
 ### Decisión P0
 
-No se parchea el botón "Soy yo" de forma aislada. La vinculación debe rediseñarse como una operación de identidad controlada, con reglas de unicidad, ownership, unlink/relink y auditoría, sin tocar ELO ni historia.
+La regla inmediata queda reforzada contra duplicidad de vínculo sin inventar una arquitectura nueva. La solución completa de User ↔ Player queda como trabajo posterior que deberá incorporar reglas de unicidad, unlink/relink y auditoría, preservando ELO e historia.
 
 ## 6. Impacto sobre ELO e historia
 
 No se modificó ninguna regla de ELO.
 
-No se modifica `elo`, `eloHistory`, partidos, ranking ni estadísticas como parte de la edición de perfil.
+No se modifica `elo`, `eloHistory`, partidos, ranking ni estadísticas como parte de la edición de perfil o del guard de vinculación.
 
 Los datos deportivos sensibles y las correcciones de hechos oficiales permanecen fuera de esta operación y deben seguir sus flujos autorizados/auditables.
 
@@ -150,6 +141,7 @@ Los datos deportivos sensibles y las correcciones de hechos oficiales permanecen
 - `4663da1f10863bfac322f7f3b2cd445e7f5c0d9e` — `fix: align generated Player contract with edit API`
 - `ab9ec0b31ff3db8eeee85fff0f3237be558d6fa3` — `fix: block destructive player deletion at community boundary`
 - `293ca9ab9c10009f72a16c974587157e1a62bad6` — `fix: remove destructive player delete action from UI`
+- `1a761424f59fd05807da5f71fc2f131ffd1f0303` — `fix: prevent duplicate User to Player linking`
 
 ## 8. Verificación
 
@@ -164,8 +156,9 @@ La aceptación funcional mínima continúa siendo:
 5. Club Admin → categorías válidas de Club 3 → persistencia.
 6. Payload con `clubId` → no debe mover al Player de comunidad mediante este endpoint.
 7. DELETE Player → debe responder 410 y no eliminar el registro.
-8. Confirmar que ELO/historial/ranking no cambian.
-9. Jugadores → comprobar que ya no existe acción de eliminación física en la UI.
+8. Intentar vincular un Player ya vinculado → debe responder 409 y conservar el vínculo original.
+9. Confirmar que ELO/historial/ranking no cambian.
+10. Jugadores → comprobar que ya no existe acción de eliminación física en la UI.
 
 ## 9. Regla de continuidad
 
