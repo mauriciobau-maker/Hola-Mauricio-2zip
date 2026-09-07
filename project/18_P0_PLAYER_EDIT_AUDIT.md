@@ -108,6 +108,34 @@ Por tanto, el problema no es solo backend: la UI presenta una operación que con
 
 **No modificar código todavía en esta subfase.** Primero se cierra la especificación de estados, acciones, permisos y relación Player ↔ Membership; después se implementa una única solución coherente. Esto evita reparar campo por campo o inventar una columna que no corresponde al modelo definitivo.
 
+## 5.2 Auditoría de User ↔ Player / Vinculación
+
+La auditoría global confirma otra brecha estructural relevante para Jugadores:
+
+### Vinculación actual: 🔴 no cumple íntegramente P39–P43
+
+`users` mantiene un único `playerId` directo. El endpoint `POST /auth/link-player` valida autenticación y, para usuarios no Super Admin, restringe el Player al `clubId` del usuario; después actualiza directamente `users.playerId`. No existe en este flujo una validación explícita de que el Player ya esté vinculado a otro User, ni una estructura de historial de vínculos. fileciteturn153file0L2-L2
+
+La UI `VincularJugador.tsx` ofrece la acción **"Soy yo"** sobre todos los Players que devuelve la lista y, si el usuario ya tiene `playerId`, solo muestra que está vinculado. No existe flujo de **desvincular/revincular** ni una presentación clara de Players ya vinculados que impida la selección. fileciteturn168file0L2-L2
+
+Además, el mismo endpoint no crea Membership ni permisos administrativos automáticamente, lo cual es compatible con P43, pero el modelo actual tampoco demuestra las garantías completas de P40/P42: máximo un Player por User+Club+Sport y un Player vinculado a un solo User con desvinculación/revinculación controlada.
+
+### Modelo actual
+
+`users.playerId` es una relación directa única a nivel de User. El modelo `memberships` existente está definido por `playerId + clubId + role`, pero no contiene estado de Membership ni un vínculo histórico User↔Player. fileciteturn155file0L2-L9 fileciteturn155file7L99-L106
+
+Esto confirma que **no corresponde resolver el problema con un parche aislado del botón "Soy yo"**. La vinculación debe rediseñarse como una operación de identidad controlada, con reglas de unicidad, ownership, unlink/relink y auditoría, sin tocar ELO ni historia.
+
+### Estado de auditoría
+
+- P39 autorización/preservación: 🟡 parcial.
+- P40 unicidad User+Club+Sport: 🔴 no demostrable con modelo actual.
+- P41 email como candidato, no identidad automática: 🟡 el flujo actual no implementa esa protección de forma completa.
+- P42 un Player → un User + unlink/relink controlado: 🔴 no implementado.
+- P43 iniciadores autorizados y no creación automática de Membership/admin: 🟡 parcial.
+
+**Decisión P0:** no modificar todavía la vinculación ni introducir una tabla/constraint inventada. Primero cerrar el diseño técnico User↔Player/Membership y su estrategia de persistencia; luego implementarlo como una operación coherente y auditable fuera de una reparación campo por campo.
+
 ## 6. Impacto sobre ELO e historia
 
 No se modificó ninguna regla de ELO.
@@ -136,4 +164,4 @@ Una vez disponible el runtime de la aplicación, el flujo mínimo de aceptación
 
 ## 9. Regla de continuidad
 
-Esta auditoría queda vinculada a la Biblia del proyecto y debe recuperarse antes de continuar con **Jugadores → Estado/acciones administrativas**.
+Esta auditoría queda vinculada a la Biblia del proyecto y debe recuperarse antes de continuar con **Jugadores → Estado/acciones administrativas** y **User ↔ Player / vinculación**.
