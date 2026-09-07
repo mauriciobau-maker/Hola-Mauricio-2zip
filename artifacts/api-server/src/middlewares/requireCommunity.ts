@@ -24,6 +24,21 @@ export function isSuperAdminUser(
   );
 }
 
+/** Club Admin is a distinct role and must not be treated as Super Admin. */
+export function isClubAdminUser(
+  user: {
+    isClubAdmin?: number | boolean | string | null;
+    role?: string | null;
+  } | undefined,
+): boolean {
+  return (
+    user?.isClubAdmin === 1 ||
+    user?.isClubAdmin === true ||
+    user?.isClubAdmin === "1" ||
+    user?.role === "club_admin"
+  );
+}
+
 /** Selected club context for the current request. Super Admin keeps global privileges,
  * but club-facing endpoints can operate on the selected club. */
 export function getCurrentClubId(req: Request): number | null {
@@ -35,10 +50,6 @@ export function getCurrentClubId(req: Request): number | null {
   } | undefined;
   if (!isSuperAdminUser(user)) return user?.clubId ?? null;
 
-  // Once requireCommunityAccess has resolved the active Super Admin context,
-  // prefer that request-scoped value. This prevents individual routes from
-  // re-resolving the cookie independently and guarantees they see the same
-  // community scope for the lifetime of the request.
   const scopedClubId = Number(user?.clubId);
   if (Number.isInteger(scopedClubId) && scopedClubId > 0) return scopedClubId;
 
@@ -65,9 +76,6 @@ export function requireCommunityAccess(req: Request, res: Response, next: NextFu
   if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
 
   if (isSuperAdminUser(req.user)) {
-    // Keep the persisted session unchanged. This assignment is request-scoped and
-    // lets legacy club-facing handlers that read req.user.clubId honor the selected
-    // Super Admin club without turning the Super Admin into a club member.
     const selectedClubId = getCurrentClubId(req);
     if (selectedClubId) {
       (req.user as { clubId?: number | null }).clubId = selectedClubId;
