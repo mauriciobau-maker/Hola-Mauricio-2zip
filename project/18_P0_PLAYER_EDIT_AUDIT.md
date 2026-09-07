@@ -82,6 +82,32 @@ Durante la auditoría también queda registrado:
 - el endpoint DELETE legacy de Player realiza eliminación física, lo que contradice P73 (**Player nunca se elimina físicamente**). Esto debe tratarse en la auditoría de Estado/acciones administrativas, no mezclarse con la corrección del formulario Editar;
 - el contrato OpenAPI/generated client todavía describe `PlayerUpdate` únicamente con `name` y `nickname`. La nueva frontera backend valida su contrato localmente para evitar seguir aceptando campos sin validar. La sincronización formal del contrato generado queda pendiente de una tarea de codegen controlada.
 
+## 5.1 Auditoría de Jugadores → Estado / acciones administrativas
+
+La revisión de la implementación actual confirma un problema estructural que debe resolverse antes de considerar cerrado este módulo:
+
+### DELETE físico: 🔴 NO CUMPLE P73
+
+`artifacts/api-server/src/routes/players.ts` mantiene `DELETE /players/:id` y ejecuta directamente `db.delete(playersTable)`. Por lo tanto, hoy existe una vía de eliminación física de Player. fileciteturn125file0L2-L2
+
+La propia tabla `memberships` referencia `playersTable.id` con `onDelete: "cascade"`, por lo que una eliminación física puede arrastrar Membership asociada. Esto es incompatible con P73/P74 y con la regla de preservación de historia. fileciteturn128file0L2-L2
+
+### Estado de Player: 🔴 no existe en el modelo actual
+
+El modelo `players` auditado contiene identidad, contacto, idioma, club, ELO y fecha de creación, pero no contiene un campo de estado del Player. Por separado, `memberships` actualmente solo tiene `id`, `playerId`, `clubId` y `role`; tampoco implementa los estados P52 (`ACTIVE`, `INACTIVE`, `SUSPENDED`, `EXPELLED`). fileciteturn128file0L2-L2
+
+Esto significa que **no es seguro reemplazar ahora DELETE por un supuesto `status` inventado**. La solución correcta requiere cerrar primero el diseño de estado Player/Membership y su persistencia, y luego implementar la transición de forma no destructiva. No se agrega una columna ni se hace migración durante P0.
+
+### UI de Jugadores: 🔴 acción de eliminar actualmente expuesta
+
+`Jugadores.tsx` mantiene botón de papelera para cada Player y llama `useDeletePlayer`; el diálogo confirma literalmente que la eliminación "no se puede deshacer". fileciteturn136file0L2-L2
+
+Por tanto, el problema no es solo backend: la UI presenta una operación que contradice el modelo de negocio. La corrección futura debe retirar la semántica de eliminación y reemplazarla por las acciones de estado autorizadas que se definan.
+
+### Decisión de alcance P0
+
+**No modificar código todavía en esta subfase.** Primero se cierra la especificación de estados, acciones, permisos y relación Player ↔ Membership; después se implementa una única solución coherente. Esto evita reparar campo por campo o inventar una columna que no corresponde al modelo definitivo.
+
 ## 6. Impacto sobre ELO e historia
 
 No se modificó ninguna regla de ELO.
