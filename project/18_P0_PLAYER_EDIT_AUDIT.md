@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-09-07
 - **Rama:** `p0/community-isolation`
-- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO / UI SIN ELIMINACIÓN / VINCULACIÓN DUPLICADA BLOQUEADA
+- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO / UI SIN ELIMINACIÓN / VINCULACIÓN DUPLICADA BLOQUEADA / PRIMERA VERIFICACIÓN FUNCIONAL EJECUTADA
 - **Alcance:** Editar Player completo y auditoría transversal de identidad/estado
 
 ## 1. Hallazgo que inició la auditoría
@@ -126,6 +126,28 @@ La UI `VincularJugador.tsx` continúa ofreciendo **"Soy yo"** como acción de vi
 
 La regla inmediata queda reforzada contra duplicidad de vínculo sin inventar una arquitectura nueva. La solución completa de User ↔ Player queda como trabajo posterior que deberá incorporar reglas de unicidad, unlink/relink y auditoría, preservando ELO e historia.
 
+## 5.3 Primera verificación funcional — Club Admin / Club 3
+
+La primera prueba real fue ejecutada por el usuario sobre **Club Admin → Club 3 → Jugadores → Editar**.
+
+| Prueba | Resultado | Lectura técnica |
+|---|---|---|
+| Nombre | 🟢 persiste | La nueva frontera PATCH está activa y la autorización Club Admin funciona. |
+| Apodo | 🔴 no persiste | Queda un fallo específico pendiente; no se debe asumir todavía que sea un problema aislado de UI. Requiere traza completa frontend → payload → endpoint → persistencia → lectura. |
+| Teléfono / WhatsApp / idioma | 🟢 persisten | Los campos personales permitidos están operativos. |
+| Email | 🟡 no aparece | `email` pertenece actualmente al modelo `users`, no al modelo `players`. No se debe agregar como columna de Player sin una decisión de identidad. Si el Player está vinculado, puede diseñarse una visualización del email de la cuenta, pero no debe convertirse en un atributo duplicado del Player. |
+| Categorías | 🟡 sin opciones visibles | El endpoint `/api/club/categories` solo devuelve categorías configuradas para la comunidad actual. En Club 3 actualmente no aparecen categorías configuradas; el formulario por tanto muestra correctamente que no existen opciones. La capacidad de seleccionar está implementada cuando existen categorías. |
+| Aislamiento | 🟢 correcto | Un Club Admin de Club 3 no accede a Players de otra comunidad. |
+| ELO / historial | 🟢 correcto | La edición no altera ELO ni historial. |
+| Eliminación | 🟢 no hay botón | La UI ya no ofrece eliminación física. |
+| Estados | 🔴 no aparecen | Esto confirma la brecha de modelo ya documentada: no existe aún el estado Player/Membership persistible y no se debe inventar en esta fase. |
+
+### Conclusión de esta primera prueba
+
+La corrección **no está cerrada todavía**. El aislamiento y la protección de datos deportivos están funcionando, y la edición de nombre/contacto está operativa, pero **Apodo queda abierto** y el modelo de estados permanece pendiente por razones estructurales.
+
+El email tampoco debe repararse como un simple campo adicional del Player: requiere respetar la separación User ↔ Player definida en la Biblia.
+
 ## 6. Impacto sobre ELO e historia
 
 No se modificó ninguna regla de ELO.
@@ -142,6 +164,7 @@ Los datos deportivos sensibles y las correcciones de hechos oficiales permanecen
 - `ab9ec0b31ff3db8eeee85fff0f3237be558d6fa3` — `fix: block destructive player deletion at community boundary`
 - `293ca9ab9c10009f72a16c974587157e1a62bad6` — `fix: remove destructive player delete action from UI`
 - `1a761424f59fd05807da5f71fc2f131ffd1f0303` — `fix: prevent duplicate User to Player linking`
+- **documentación:** este resultado funcional se registra en este mismo archivo para continuidad.
 
 ## 8. Verificación
 
@@ -149,16 +172,16 @@ La verificación funcional pendiente debe ejecutarse sobre el runtime de la apli
 
 La aceptación funcional mínima continúa siendo:
 
-1. Club Admin en Club 3 → editar Player de Club 3 → cambiar apodo → guardar → comprobar persistencia.
-2. Club Admin en Club 3 → intentar editar Player de otro club → debe devolver 404/denegación sin exponer datos.
+1. Club Admin en Club 3 → editar Player de Club 3 → cambiar apodo → guardar → comprobar persistencia. **🔴 pendiente por fallo observado.**
+2. Club Admin en Club 3 → intentar editar Player de otro club → debe devolver 404/denegación sin exponer datos. **🟢 verificado.**
 3. Player normal → intentar editar otro Player → 403.
 4. Player normal → editar sus datos personales permitidos → persistencia.
-5. Club Admin → categorías válidas de Club 3 → persistencia.
+5. Club Admin → categorías válidas de Club 3 → persistencia, cuando existan categorías configuradas.
 6. Payload con `clubId` → no debe mover al Player de comunidad mediante este endpoint.
 7. DELETE Player → debe responder 410 y no eliminar el registro.
 8. Intentar vincular un Player ya vinculado → debe responder 409 y conservar el vínculo original.
-9. Confirmar que ELO/historial/ranking no cambian.
-10. Jugadores → comprobar que ya no existe acción de eliminación física en la UI.
+9. Confirmar que ELO/historial/ranking no cambian. **🟢 verificado en esta prueba.**
+10. Jugadores → comprobar que ya no existe acción de eliminación física en la UI. **🟢 verificado.**
 
 ## 9. Regla de continuidad
 
