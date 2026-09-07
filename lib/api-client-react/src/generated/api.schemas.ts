@@ -23,283 +23,61 @@ export interface AuthUser {
   clubId?: number | null;
 }
 
-export interface AuthUserEnvelope {
-  user: AuthUser | null;
-}
+export interface AuthUserEnvelope { user: AuthUser | null; }
+export interface LinkPlayerInput { playerId: number; }
+export interface ExchangeMobileAuthorizationCodeBody { code: string; code_verifier: string; redirect_uri: string; state: string; nonce?: string; }
+export interface ExchangeMobileAuthorizationCodeResponse { token: string; }
+export interface LogoutMobileSessionResponse { success: boolean; }
 
-export interface LinkPlayerInput {
-  playerId: number;
-}
-
-export interface ExchangeMobileAuthorizationCodeBody {
-  code: string;
-  code_verifier: string;
-  redirect_uri: string;
-  state: string;
-  nonce?: string;
-}
-
-export interface ExchangeMobileAuthorizationCodeResponse {
-  token: string;
-}
-
-export interface LogoutMobileSessionResponse {
-  success: boolean;
-}
-
-export interface Encuentro {
-  id: number;
-  title: string;
-  dateTime: string;
-  location: string;
-  /** @nullable */
-  maxSpots?: number | null;
-  /** @nullable */
-  notes?: string | null;
-  /** @nullable */
-  organizerId?: string | null;
-  notificationEmail?: boolean;
-  notificationWhatsapp?: boolean;
-  createdAt: string;
-}
-
-export interface EncuentroInput {
-  /** @minLength 1 */
-  title: string;
-  dateTime: string;
-  /** @minLength 1 */
-  location: string;
-  /** @minimum 1 */
-  maxSpots?: number;
-  notes?: string;
-  playerIds?: number[];
-  notificationEmail?: boolean;
-  notificationWhatsapp?: boolean;
-}
-
-export interface EncuentroUpdate {
-  /** @minLength 1 */
-  title?: string;
-  dateTime?: string;
-  /** @minLength 1 */
-  location?: string;
-  /** @nullable */
-  maxSpots?: number | null;
-  /** @nullable */
-  notes?: string | null;
-  notificationEmail?: boolean;
-  notificationWhatsapp?: boolean;
-}
-
+export interface Encuentro { id: number; title: string; dateTime: string; location: string; maxSpots?: number | null; notes?: string | null; organizerId?: string | null; notificationEmail?: boolean; notificationWhatsapp?: boolean; createdAt: string; }
+export interface EncuentroInput { title: string; dateTime: string; location: string; maxSpots?: number; notes?: string; playerIds?: number[]; notificationEmail?: boolean; notificationWhatsapp?: boolean; }
+export interface EncuentroUpdate { title?: string; dateTime?: string; location?: string; maxSpots?: number | null; notes?: string | null; notificationEmail?: boolean; notificationWhatsapp?: boolean; }
 export type AsistenciaEntryStatus = typeof AsistenciaEntryStatus[keyof typeof AsistenciaEntryStatus];
-
-
-export const AsistenciaEntryStatus = {
-  confirmed: 'confirmed',
-  declined: 'declined',
-  pending: 'pending',
-} as const;
-
-export interface AsistenciaEntry {
-  id: number;
-  encuentroId: number;
-  playerId: number;
-  playerName: string;
-  /** @nullable */
-  playerNickname?: string | null;
-  status: AsistenciaEntryStatus;
-  /** @nullable */
-  respondedAt?: string | null;
-  createdAt: string;
-}
-
+export const AsistenciaEntryStatus = { confirmed: 'confirmed', declined: 'declined', pending: 'pending' } as const;
+export interface AsistenciaEntry { id: number; encuentroId: number; playerId: number; playerName: string; playerNickname?: string | null; status: AsistenciaEntryStatus; respondedAt?: string | null; createdAt: string; }
 export type RsvpInputStatus = typeof RsvpInputStatus[keyof typeof RsvpInputStatus];
+export const RsvpInputStatus = { confirmed: 'confirmed', declined: 'declined', pending: 'pending' } as const;
+export interface RsvpInput { status: RsvpInputStatus; }
+export interface EncuentroDetail { encuentro: Encuentro; asistencia: AsistenciaEntry[]; }
+export interface HealthStatus { status: string; }
 
-
-export const RsvpInputStatus = {
-  confirmed: 'confirmed',
-  declined: 'declined',
-  pending: 'pending',
-} as const;
-
-export interface RsvpInput {
-  status: RsvpInputStatus;
-}
-
-export interface EncuentroDetail {
-  encuentro: Encuentro;
-  asistencia: AsistenciaEntry[];
-}
-
-export interface HealthStatus {
-  status: string;
-}
-
+export interface PlayerCategory { id: number; clubSportId?: number | null; name: string; }
 export interface Player {
   id: number;
   name: string;
-  /** @nullable */
   nickname?: string | null;
   avatarInitials?: string;
   elo: number;
+  phone?: string | null;
+  waId?: string | null;
+  wspConsent?: boolean;
+  language?: 'es' | 'en' | 'pt' | string | null;
+  clubId?: number | null;
+  categories?: PlayerCategory[];
   createdAt: string;
 }
-
-export interface PlayerInput {
-  /** @minLength 1 */
-  name: string;
-  nickname?: string;
-}
-
+export interface PlayerInput { name: string; nickname?: string; }
 export interface PlayerUpdate {
-  /** @minLength 1 */
   name?: string;
-  /** @nullable */
   nickname?: string | null;
+  phone?: string | null;
+  waId?: string | null;
+  wspConsent?: boolean;
+  language?: 'es' | 'en' | 'pt';
+  categoryIds?: number[];
 }
 
-export interface SetScore {
-  setNumber: number;
-  team1Games: number;
-  team2Games: number;
-}
-
-export interface EloChange {
-  playerId: number;
-  playerName: string;
-  eloBefore: number;
-  eloAfter: number;
-  eloChange: number;
-}
-
-export interface Match {
-  id: number;
-  team1Player1Id: number;
-  team1Player2Id: number;
-  team2Player1Id: number;
-  team2Player2Id: number;
-  team1SetsWon: number;
-  team2SetsWon: number;
-  sets: SetScore[];
-  playedAt: string;
-  createdAt: string;
-  /** @nullable */
-  team1Player1Name?: string | null;
-  /** @nullable */
-  team1Player2Name?: string | null;
-  /** @nullable */
-  team2Player1Name?: string | null;
-  /** @nullable */
-  team2Player2Name?: string | null;
-  eloChanges?: EloChange[];
-}
-
-export interface PlayerStats {
-  playerId: number;
-  playerName: string;
-  totalMatches: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  points: number;
-  setsWon: number;
-  setsLost: number;
-  currentStreak: number;
-  recentMatches?: Match[];
-}
-
-export interface EloHistoryEntry {
-  id: number;
-  playerId: number;
-  matchId: number;
-  eloBefore: number;
-  eloAfter: number;
-  eloChange: number;
-  matchPlayedAt: string;
-  createdAt: string;
-}
-
-export interface MatchInput {
-  team1Player1Id: number;
-  team1Player2Id: number;
-  team2Player1Id: number;
-  team2Player2Id: number;
-  sets: SetScore[];
-  playedAt: string;
-}
-
-export interface MatchUpdate {
-  team1Player1Id?: number;
-  team1Player2Id?: number;
-  team2Player1Id?: number;
-  team2Player2Id?: number;
-  sets?: SetScore[];
-  playedAt?: string;
-}
-
-export interface RankingEntry {
-  rank: number;
-  playerId: number;
-  playerName: string;
-  /** @nullable */
-  nickname?: string | null;
-  elo: number;
-  points: number;
-  wins: number;
-  losses: number;
-  totalMatches: number;
-  winRate: number;
-}
-
-export interface ParejaStats {
-  player1Id: number;
-  player1Name: string;
-  /** @nullable */
-  player1Nickname?: string | null;
-  player2Id: number;
-  player2Name: string;
-  /** @nullable */
-  player2Nickname?: string | null;
-  totalMatches: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  setsWon: number;
-  setsLost: number;
-  gamesWon: number;
-  gamesLost: number;
-  gameDiff: number;
-  avgElo: number;
-}
-
-export interface ParejaDetail {
-  stats: ParejaStats;
-  matches: Match[];
-}
-
-/**
- * @nullable
- */
-export type DashboardSummaryTopPlayer = {
-  id?: number;
-  name?: string;
-  points?: number;
-} | null;
-
-export interface DashboardSummary {
-  totalPlayers: number;
-  totalMatches: number;
-  /** @nullable */
-  topPlayer: DashboardSummaryTopPlayer;
-  recentMatches: Match[];
-}
-
-/**
- * Opaque session token — `Bearer <sid>`.
- */
+export interface SetScore { setNumber: number; team1Games: number; team2Games: number; }
+export interface EloChange { playerId: number; playerName: string; eloBefore: number; eloAfter: number; eloChange: number; }
+export interface Match { id: number; team1Player1Id: number; team1Player2Id: number; team2Player1Id: number; team2Player2Id: number; team1SetsWon: number; team2SetsWon: number; sets: SetScore[]; playedAt: string; createdAt: string; team1Player1Name?: string | null; team1Player2Name?: string | null; team2Player1Name?: string | null; team2Player2Name?: string | null; eloChanges?: EloChange[]; }
+export interface PlayerStats { playerId: number; playerName: string; totalMatches: number; wins: number; losses: number; winRate: number; points: number; setsWon: number; setsLost: number; currentStreak: number; recentMatches?: Match[]; }
+export interface EloHistoryEntry { id: number; playerId: number; matchId: number; eloBefore: number; eloAfter: number; eloChange: number; matchPlayedAt: string; createdAt: string; }
+export interface MatchInput { team1Player1Id: number; team1Player2Id: number; team2Player1Id: number; team2Player2Id: number; sets: SetScore[]; playedAt: string; }
+export interface MatchUpdate { team1Player1Id?: number; team1Player2Id?: number; team2Player1Id?: number; team2Player2Id?: number; sets?: SetScore[]; playedAt?: string; }
+export interface RankingEntry { rank: number; playerId: number; playerName: string; nickname?: string | null; elo: number; points: number; wins: number; losses: number; totalMatches: number; winRate: number; }
+export interface ParejaStats { player1Id: number; player1Name: string; player1Nickname?: string | null; player2Id: number; player2Name: string; player2Nickname?: string | null; totalMatches: number; wins: number; losses: number; winRate: number; setsWon: number; setsLost: number; gamesWon: number; gamesLost: number; gameDiff: number; avgElo: number; }
+export interface ParejaDetail { stats: ParejaStats; matches: Match[]; }
+export type DashboardSummaryTopPlayer = { id?: number; name?: string; points?: number } | null;
+export interface DashboardSummary { totalPlayers: number; totalMatches: number; topPlayer: DashboardSummaryTopPlayer; recentMatches: Match[]; }
 export type AuthorizationSessionHeaderParameter = string;
-
-export type BeginBrowserLoginParams = {
-returnTo?: string;
-};
-
+export type BeginBrowserLoginParams = { returnTo?: string; };
