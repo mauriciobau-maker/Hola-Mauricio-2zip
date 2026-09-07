@@ -11,4 +11,11 @@ export interface PlayerUpdate {
   name?: string;
   /** @nullable */
   nickname?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  waId?: string | null;
+  wspConsent?: boolean;
+  language?: 'es' | 'en' | 'pt';
+  categoryIds?: number[];
 }
