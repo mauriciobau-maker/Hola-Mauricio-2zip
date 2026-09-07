@@ -13,5 +13,18 @@ export interface Player {
   nickname?: string | null;
   avatarInitials?: string;
   elo: number;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  waId?: string | null;
+  wspConsent?: boolean;
+  language?: 'es' | 'en' | 'pt' | string | null;
+  /** @nullable */
+  clubId?: number | null;
+  categories?: Array<{
+    id: number;
+    clubSportId?: number | null;
+    name: string;
+  }>;
   createdAt: string;
 }
