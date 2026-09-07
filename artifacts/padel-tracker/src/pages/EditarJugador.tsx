@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import {
+  useGetCurrentAuthUser,
   useGetPlayer,
   useUpdatePlayer,
   getListPlayersQueryKey,
@@ -14,7 +15,6 @@ function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-// Diccionario de traducciones para soportar el idioma dinámico
 const labels: Record<string, Record<string, string>> = {
   es: {
     title: "Editar Jugador",
@@ -90,15 +90,17 @@ export default function EditarJugador() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
-  // Simulación del rol activo (por defecto "admin" para pruebas; integrable con Auth Context)
-  const [currentUserRole] = useState<"admin" | "superadmin" | "player">("admin");
-  const isAdmin = currentUserRole === "admin" || currentUserRole === "superadmin";
+  // The role comes from the authenticated user. Never hardcode a role in the UI.
+  const { data: authData, isLoading: isAuthLoading } = useGetCurrentAuthUser();
+  const authUser = authData?.user;
+  const isSuperAdmin = authUser?.isAdmin === 1;
+  const isClubAdmin = authUser?.isClubAdmin === 1;
+  const isAdmin = isSuperAdmin || isClubAdmin;
 
   const { data: player, isLoading } = useGetPlayer(id, {
     query: { enabled: !!id, queryKey: getGetPlayerQueryKey(id) },
   });
 
-  // Estados del formulario
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [language, setLanguage] = useState("es");
@@ -110,23 +112,18 @@ export default function EditarJugador() {
   const [clubCategories, setClubCategories] = useState<any[]>([]);
   const [error, setError] = useState("");
 
-  // Cargar deportes y categorías del club
   useEffect(() => {
     fetch("/api/club")
       .then((res) => res.json())
       .then((data) => {
-        if (data && Array.isArray(data.sports)) {
-          setClubSports(data.sports);
-        }
+        if (data && Array.isArray(data.sports)) setClubSports(data.sports);
       })
       .catch((err) => console.error("Error cargando club sports:", err));
 
     fetch("/api/club/categories")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setClubCategories(data);
-        }
+        if (Array.isArray(data)) setClubCategories(data);
       })
       .catch((err) => console.error("Error cargando club categories:", err));
   }, []);
@@ -155,13 +152,12 @@ export default function EditarJugador() {
         queryClient.invalidateQueries({ queryKey: getGetPlayerStatsQueryKey(id) });
         navigate(`/jugadores/${id}`);
       },
-      onError: () => {
-        setError(t.errorMsg);
-      },
+      onError: () => setError(t.errorMsg),
     },
   });
 
   const handleCategoryToggle = (catId: number) => {
+    if (!isAdmin) return;
     setSelectedCategoryIds((prev) =>
       prev.includes(catId) ? prev.filter((i) => i !== catId) : [...prev, catId]
     );
@@ -184,12 +180,12 @@ export default function EditarJugador() {
         phone: phone.trim() || null,
         waId: waId.trim() || null,
         wspConsent,
-        categoryIds: selectedCategoryIds,
+        ...(isAdmin ? { categoryIds: selectedCategoryIds } : {}),
       } as any,
     });
   };
 
-  if (isLoading) {
+  if (isLoading || isAuthLoading) {
     return (
       <div className="max-w-md mx-auto space-y-4 animate-pulse">
         <div className="h-8 w-32 bg-muted rounded" />
@@ -209,7 +205,6 @@ export default function EditarJugador() {
     );
   }
 
-  // Verificación ampliada de cambios (isDirty) incluyendo categorías
   const originalCatIds = Array.isArray((player as any).categories)
     ? (player as any).categories.map((c: any) => c.id).sort()
     : [];
@@ -222,17 +217,14 @@ export default function EditarJugador() {
     phone !== ((player as any).phone ?? "") ||
     waId !== ((player as any).waId ?? "") ||
     wspConsent !== ((player as any).wspConsent ?? false) ||
-    categoriesChanged;
+    (isAdmin && categoriesChanged);
 
   const activeSports = clubSports.filter((s) => s.active);
 
   return (
     <div className="max-w-md mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link
-          href={`/jugadores/${id}`}
-          className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <Link href={`/jugadores/${id}`} className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <div>
@@ -242,7 +234,6 @@ export default function EditarJugador() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6">
-        {/* Avatar preview */}
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-2xl font-bold text-primary">
             {name.trim() ? initials(name.trim()) : "?"}
@@ -250,7 +241,6 @@ export default function EditarJugador() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nombre completo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium flex items-center justify-between">
               <span>{t.fullName} <span className="text-destructive">*</span></span>
@@ -262,16 +252,11 @@ export default function EditarJugador() {
               disabled={!isAdmin}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej: Carlos Lopez"
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors ${
-                isAdmin
-                  ? "bg-background border-input focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                  : "bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
-              }`}
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors ${isAdmin ? "bg-background border-input focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" : "bg-muted/40 border-border text-muted-foreground cursor-not-allowed"}`}
               autoFocus={isAdmin}
             />
           </div>
 
-          {/* Apodo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium flex items-center justify-between">
               <span>{t.nickname} <span className="text-muted-foreground text-xs">{t.nicknameOptional}</span></span>
@@ -283,11 +268,7 @@ export default function EditarJugador() {
               disabled={!isAdmin}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="Ej: El Rayo"
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors ${
-                isAdmin
-                  ? "bg-background border-input focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                  : "bg-muted/40 border-border text-muted-foreground cursor-not-allowed"
-              }`}
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none transition-colors ${isAdmin ? "bg-background border-input focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" : "bg-muted/40 border-border text-muted-foreground cursor-not-allowed"}`}
             />
           </div>
 
@@ -297,17 +278,12 @@ export default function EditarJugador() {
             </p>
           )}
 
-          {/* Selector de Idioma de la Aplicación */}
           <div className="space-y-1.5 pt-1">
             <label className="text-sm font-medium flex items-center gap-1.5">
               <Globe size={14} className="text-muted-foreground" />
               {t.appLanguage}
             </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
-            >
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground">
               <option value="es">Español (ES)</option>
               <option value="en">English (EN)</option>
               <option value="pt">Português (PT)</option>
@@ -316,7 +292,6 @@ export default function EditarJugador() {
 
           <hr className="border-border/60 my-3" />
 
-          {/* Deportes & Categorías */}
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Trophy size={13} />
@@ -328,39 +303,19 @@ export default function EditarJugador() {
             ) : (
               <div className="space-y-3">
                 {activeSports.map((sport) => {
-                  // Filtrar categorías correspondientes a este deporte del club
-                  const sportCategories = clubCategories.filter(
-                    (cat) => cat.clubSportId === sport.id || cat.sportId === sport.id
-                  );
-
+                  const sportCategories = clubCategories.filter((cat) => cat.clubSportId === sport.id || cat.sportId === sport.id);
                   return (
                     <div key={sport.id} className="bg-muted/30 border border-border/60 rounded-lg p-3 space-y-2">
-                      <span className="text-xs font-bold text-foreground block">
-                        {sport.name}
-                      </span>
+                      <span className="text-xs font-bold text-foreground block">{sport.name}</span>
                       {sportCategories.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground italic">
-                          Sin categorías definidas por el club.
-                        </p>
+                        <p className="text-[11px] text-muted-foreground italic">Sin categorías definidas por el club.</p>
                       ) : (
                         <div className="grid grid-cols-2 gap-2 pt-1">
                           {sportCategories.map((cat) => {
                             const isChecked = selectedCategoryIds.includes(cat.id);
                             return (
-                              <label
-                                key={cat.id}
-                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs cursor-pointer transition-colors select-none ${
-                                  isChecked
-                                    ? "bg-primary/10 border-primary/40 text-primary font-medium"
-                                    : "bg-background border-input hover:bg-muted/50 text-foreground"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => handleCategoryToggle(cat.id)}
-                                  className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
-                                />
+                              <label key={cat.id} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs select-none ${isAdmin ? "cursor-pointer transition-colors" : "cursor-not-allowed opacity-70"} ${isChecked ? "bg-primary/10 border-primary/40 text-primary font-medium" : "bg-background border-input text-foreground"}`}>
+                                <input type="checkbox" checked={isChecked} disabled={!isAdmin} onChange={() => handleCategoryToggle(cat.id)} className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5" />
                                 <span className="truncate">{cat.name}</span>
                               </label>
                             );
@@ -376,74 +331,30 @@ export default function EditarJugador() {
 
           <hr className="border-border/60 my-3" />
 
-          {/* Contacto & Notificaciones */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t.contactHeader}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.contactHeader}</p>
 
-            {/* Teléfono */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <Phone size={14} className="text-muted-foreground" />
-                {t.phone} <span className="text-muted-foreground text-xs">{t.optional}</span>
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Ej: +56912345678"
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
+              <label className="text-sm font-medium flex items-center gap-1.5"><Phone size={14} className="text-muted-foreground" />{t.phone} <span className="text-muted-foreground text-xs">{t.optional}</span></label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: +56912345678" className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
             </div>
 
-            {/* WhatsApp ID / Username */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <MessageSquare size={14} className="text-muted-foreground" />
-                {t.waId} <span className="text-muted-foreground text-xs">{t.optional}</span>
-              </label>
-              <input
-                type="text"
-                value={waId}
-                onChange={(e) => setWaId(e.target.value)}
-                placeholder="Ej: @carlos_padel"
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
+              <label className="text-sm font-medium flex items-center gap-1.5"><MessageSquare size={14} className="text-muted-foreground" />{t.waId} <span className="text-muted-foreground text-xs">{t.optional}</span></label>
+              <input type="text" value={waId} onChange={(e) => setWaId(e.target.value)} placeholder="Ej: @carlos_padel" className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
             </div>
 
-            {/* Consentimiento */}
             <label className="flex items-start gap-2.5 pt-1 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={wspConsent}
-                onChange={(e) => setWspConsent(e.target.checked)}
-                className="mt-0.5 rounded border-input text-primary focus:ring-primary h-4 w-4"
-              />
-              <span className="text-xs text-muted-foreground leading-relaxed">
-                {t.consent}
-              </span>
+              <input type="checkbox" checked={wspConsent} onChange={(e) => setWspConsent(e.target.checked)} className="mt-0.5 rounded border-input text-primary focus:ring-primary h-4 w-4" />
+              <span className="text-xs text-muted-foreground leading-relaxed">{t.consent}</span>
             </label>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-2 pt-1">
-            <Link
-              href={`/jugadores/${id}`}
-              className="flex-1 text-center border border-border rounded-lg py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
-            >
-              {t.cancel}
-            </Link>
-            <button
-              type="submit"
-              disabled={updateMutation.isPending || (isAdmin && !name.trim()) || !isDirty}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Link href={`/jugadores/${id}`} className="flex-1 text-center border border-border rounded-lg py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors">{t.cancel}</Link>
+            <button type="submit" disabled={updateMutation.isPending || (isAdmin && !name.trim()) || !isDirty} className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
               <Save size={14} />
               {updateMutation.isPending ? t.saving : t.save}
             </button>
@@ -451,10 +362,7 @@ export default function EditarJugador() {
         </form>
       </div>
 
-      {/* Info note */}
-      <p className="text-xs text-muted-foreground text-center">
-        {t.infoNote}
-      </p>
+      <p className="text-xs text-muted-foreground text-center">{t.infoNote}</p>
     </div>
   );
 }
