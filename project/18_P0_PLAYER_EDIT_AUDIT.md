@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-09-07
 - **Rama:** `p0/community-isolation`
-- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO
+- **Estado:** CORRECCIÓN ESTRUCTURAL APLICADA / CONTRATO ALINEADO / DELETE DESTRUCTIVO BLOQUEADO / UI SIN ELIMINACIÓN
 - **Alcance:** Editar Player completo, no solo apodo
 
 ## 1. Hallazgo que inició la auditoría
@@ -76,11 +76,11 @@ La documentación canónica ya define esos perfiles deportivos. Su implementaci�
 
 ## 5. Deuda encontrada fuera del formulario
 
-Durante la auditoría también queda registrado:
+Durante la auditoría global también queda registrado:
 
 - el PATCH legacy de `players.ts` sigue existiendo detrás de la nueva ruta y debe retirarse/refactorizarse en una limpieza posterior;
 - el endpoint DELETE legacy de Player realizaba eliminación física, lo que contradice P73 (**Player nunca se elimina físicamente**);
-- para evitar que esa deuda pueda destruir datos durante P0, `playerEdit.ts` ahora registra primero un `DELETE /players/:id` que devuelve `410 Gone` y no toca la base de datos. El legacy permanece en código, pero queda protegido por la frontera nueva mientras se diseña el reemplazo por estados;
+- para evitar que esa deuda pueda destruir datos durante P0, `playerEdit.ts` registra primero un `DELETE /players/:id` que devuelve `410 Gone` y no toca la base de datos. El legacy permanece en código, pero queda protegido por la frontera nueva mientras se diseña el reemplazo por estados;
 - el contrato OpenAPI/generated client inicialmente describía `PlayerUpdate` únicamente con `name` y `nickname`, mientras la frontera real ya validaba además teléfono, WhatsApp, consentimiento, idioma y categorías.
 
 ### 5.0 Alineación del contrato de edición
@@ -109,11 +109,11 @@ El modelo `players` auditado contiene identidad, contacto, idioma, club, ELO y f
 
 Esto significa que **no es seguro reemplazar ahora DELETE por un supuesto `status` inventado**. La solución correcta requiere cerrar primero el diseño de estado Player/Membership y su persistencia, y luego implementar la transición de forma no destructiva. No se agrega una columna ni se hace migración durante P0.
 
-### UI de Jugadores: 🔴 acción de eliminar actualmente expuesta
+### UI de Jugadores: 🟢 acción destructiva retirada
 
-`Jugadores.tsx` mantiene botón de papelera para cada Player y llama `useDeletePlayer`; el diálogo confirma literalmente que la eliminación "no se puede deshacer".
+`Jugadores.tsx` ya no expone el botón de papelera, no importa `useDeletePlayer` y no ejecuta ninguna mutación DELETE. La lista conserva las acciones válidas de WhatsApp, edición y navegación al perfil.
 
-El backend ya bloquea la operación destructiva, pero la UI todavía presenta una acción contradictoria. La corrección definitiva debe retirar la semántica de eliminación y reemplazarla por las acciones de estado autorizadas que se definan.
+Esto deja la UI coherente con P73: mientras no exista el flujo formal de estados, no se ofrece al usuario una acción que sugiera eliminación física. El backend mantiene además el guard `410 Gone` como segunda barrera.
 
 ### Decisión de alcance P0
 
@@ -149,6 +149,7 @@ Los datos deportivos sensibles y las correcciones de hechos oficiales permanecen
 - `a2c5df0b252441efe00256fe292b326aabb8e568` — `fix: align generated player schema with edit response`
 - `4663da1f10863bfac322f7f3b2cd445e7f5c0d9e` — `fix: align generated Player contract with edit API`
 - `ab9ec0b31ff3db8eeee85fff0f3237be558d6fa3` — `fix: block destructive player deletion at community boundary`
+- `293ca9ab9c10009f72a16c974587157e1a62bad6` — `fix: remove destructive player delete action from UI`
 
 ## 8. Verificación
 
@@ -164,6 +165,7 @@ La aceptación funcional mínima continúa siendo:
 6. Payload con `clubId` → no debe mover al Player de comunidad mediante este endpoint.
 7. DELETE Player → debe responder 410 y no eliminar el registro.
 8. Confirmar que ELO/historial/ranking no cambian.
+9. Jugadores → comprobar que ya no existe acción de eliminación física en la UI.
 
 ## 9. Regla de continuidad
 
