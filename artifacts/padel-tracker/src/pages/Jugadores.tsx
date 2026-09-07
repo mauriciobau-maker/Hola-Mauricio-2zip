@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListPlayers, useDeletePlayer, getListPlayersQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, Search, MessageCircle } from "lucide-react";
+import { useListPlayers } from "@workspace/api-client-react";
+import { Plus, Pencil, Search, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function initials(name: string) {
@@ -22,25 +21,10 @@ export default function Jugadores() {
   const { data: players, isLoading } = useListPlayers();
   const [search, setSearch] = useState("");
 
-  const queryClient = useQueryClient();
-  const deleteMutation = useDeletePlayer({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListPlayersQueryKey() });
-      },
-    },
-  });
-
   const filteredPlayers = players?.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     (p.nickname && p.nickname.toLowerCase().includes(search.toLowerCase()))
   );
-
-  const handleDelete = (id: number, name: string) => {
-    if (confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) {
-      deleteMutation.mutate({ id });
-    }
-  };
 
   const openWhatsApp = (phone: string) => {
     // Limpia el número quitando caracteres no numéricos
@@ -87,7 +71,7 @@ export default function Jugadores() {
         <div className="text-center py-20 text-muted-foreground">Sin jugadores registrados</div>
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
-          {filteredPlayers?.map((player: any, idx) => {
+          {filteredPlayers?.map((player, idx) => {
             const points = player.elo ?? 1500;
 
             return (
@@ -110,7 +94,7 @@ export default function Jugadores() {
                 <div className="flex items-center gap-1">
                   {player.phone && (
                     <button
-                      onClick={() => openWhatsApp(player.phone)}
+                      onClick={() => openWhatsApp(player.phone!)}
                       title="Enviar WhatsApp"
                       className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-500 transition-colors"
                     >
@@ -120,9 +104,6 @@ export default function Jugadores() {
                   <Link href={`/jugadores/${player.id}/editar`} className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors">
                     <Pencil size={14} />
                   </Link>
-                  <button onClick={() => handleDelete(player.id, player.name)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               </div>
             );
