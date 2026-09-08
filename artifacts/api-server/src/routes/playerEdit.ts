@@ -30,9 +30,7 @@ const PlayerEditBody = z.object({
 function formatName(input: string): string {
   return input
     .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase()
-    .replace(/(?:^|\s|-)\S/g, (a) => a.toUpperCase());
+    .replace(/\s+/g, " ");
 }
 
 async function enrichPlayer(player: typeof playersTable.$inferSelect) {
@@ -75,12 +73,6 @@ async function enrichPlayer(player: typeof playersTable.$inferSelect) {
   };
 }
 
-/**
- * Definitive player-edit boundary for personal data and club category assignment.
- * This route is registered before the legacy PATCH in players.ts so the legacy
- * handler cannot silently accept an empty update or confuse Club Admin with
- * Super Admin.
- */
 router.patch(
   "/players/:id",
   requireCommunityAccess,
@@ -235,13 +227,6 @@ router.patch(
   },
 );
 
-/**
- * Player records are historical official facts and must never be physically deleted.
- * The legacy DELETE handler in players.ts remains behind this guard for now, but
- * this route is registered first and makes the destructive operation unreachable.
- * State transitions (INACTIVE/SUSPENDED/EXPELLED) require the approved state model
- * and are intentionally not invented here because the current schema has no state.
- */
 router.delete(
   "/players/:id",
   requireCommunityAccess,
