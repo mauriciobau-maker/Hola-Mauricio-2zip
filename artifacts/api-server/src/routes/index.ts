@@ -13,6 +13,7 @@ import adminRouter from "./admin";
 import cobrosRouter from "./cobros";
 import sportsRouter from "./sports";
 import categoriesRouter from "./categories";
+import clubCategoriesP0Router from "./clubCategoriesP0";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,9 @@ router.use(matchesRouter);
 router.use(rankingRouter);
 router.use(parejasRouter);
 router.use("/encuentros", encuentrosRouter);
+
+// P0: persisted community categories must win over the legacy mock/local handler.
+router.use(clubCategoriesP0Router);
 router.use(clubRouter);
 router.use(adminRouter);
 router.use("/cobros", cobrosRouter);
