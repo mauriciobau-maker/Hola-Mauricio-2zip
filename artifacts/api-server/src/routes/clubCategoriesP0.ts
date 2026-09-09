@@ -6,7 +6,12 @@ import {
   clubSportsTable,
   sportsTable,
 } from "@workspace/db";
-import { getCurrentClubId, requireCommunityAccess } from "../middlewares/requireCommunity";
+import {
+  getCurrentClubId,
+  isClubAdminUser,
+  isSuperAdminUser,
+  requireCommunityAccess,
+} from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -27,10 +32,7 @@ router.get("/club/categories", requireCommunityAccess, async (req, res): Promise
         name: clubSportCategoriesTable.name,
       })
       .from(clubSportCategoriesTable)
-      .innerJoin(
-        clubSportsTable,
-        eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id),
-      )
+      .innerJoin(clubSportsTable, eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id))
       .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
       .where(eq(clubSportsTable.clubId, clubId));
 
@@ -43,6 +45,12 @@ router.get("/club/categories", requireCommunityAccess, async (req, res): Promise
 
 // Accept sportId from the UI and resolve the community-specific clubSportId server-side.
 router.post("/club/categories", requireCommunityAccess, async (req, res): Promise<void> => {
+  const user = req.user as any;
+  if (!isSuperAdminUser(user) && !isClubAdminUser(user)) {
+    res.status(403).json({ error: "Solo la administración del club puede configurar categorías" });
+    return;
+  }
+
   const clubId = getCurrentClubId(req);
   if (!clubId) {
     res.status(403).json({ error: "No hay una comunidad activa" });
@@ -74,10 +82,7 @@ router.post("/club/categories", requireCommunityAccess, async (req, res): Promis
       .values({ clubSportId: clubSport.id, name })
       .returning();
 
-    res.status(201).json({
-      ...created,
-      sportId,
-    });
+    res.status(201).json({ ...created, sportId });
   } catch (error) {
     console.error("Error en POST /club/categories:", error);
     res.status(500).json({ error: "Error interno al crear la categoría" });
