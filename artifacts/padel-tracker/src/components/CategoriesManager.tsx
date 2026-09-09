@@ -1,14 +1,12 @@
-import { useState } from "react";
-import { Plus, Trash2, ShieldCheck, Trophy, Layers, Check, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Category {
   id: number;
   sportId: number;
+  clubSportId: number;
   name: string;
-  levelType: "numeric" | "descriptive" | "age";
-  description?: string;
-  active: boolean;
 }
 
 interface Sport {
@@ -26,68 +24,99 @@ interface CategoriesManagerProps {
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
   padel: ["1ª Categoría", "2ª Categoría", "3ª Categoría", "4ª Categoría", "Principiantes"],
   tenis: ["Singles A", "Singles B", "Dobles", "Senior"],
-  futbol: ["Libre / Open", "Senior +35", "Mixto", "Empresas"]
+  futbol: ["Libre / Open", "Senior +35", "Mixto", "Empresas"],
 };
 
-export default function CategoriesManager({ clubId, sports }: CategoriesManagerProps) {
+export default function CategoriesManager({ sports }: CategoriesManagerProps) {
   const [selectedSportId, setSelectedSportId] = useState<number>(sports[0]?.id || 1);
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 1, sportId: 1, name: "1ª Categoría", levelType: "numeric", description: "Jugadores avanzados y profesionales", active: true },
-    { id: 2, sportId: 1, name: "2ª Categoría", levelType: "numeric", description: "Jugadores intermedios altos", active: true },
-    { id: 3, sportId: 2, name: "Singles A", levelType: "descriptive", description: "Torneo abierto principal", active: true },
-  ]);
-
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState("");
-  const [newCatDesc, setNewCatDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const activeSports = sports.filter(s => s.active !== false);
-  const currentSport = activeSports.find(s => s.id === selectedSportId) || activeSports[0];
-  const currentCategories = categories.filter(c => c.sportId === selectedSportId);
+  const activeSports = useMemo(() => sports.filter((sport) => sport.active !== false), [sports]);
+  const currentSport = activeSports.find((sport) => sport.id === selectedSportId) || activeSports[0];
+  const currentCategories = categories.filter((category) => category.sportId === currentSport?.id);
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (activeSports.length > 0 && !activeSports.some((sport) => sport.id === selectedSportId)) {
+      setSelectedSportId(activeSports[0].id);
+    }
+  }, [activeSports, selectedSportId]);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await fetch("/api/club/categories", { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "No se pudieron cargar las categorías");
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error cargando categorías del club:", err);
+      setError("No se pudieron cargar las categorías del club.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCategories();
+  }, []);
+
+  const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCatName.trim()) return;
+    if (!currentSport || !newCatName.trim()) return;
 
-    const newCategory: Category = {
-      id: Date.now(),
-      sportId: selectedSportId,
-      name: newCatName.trim(),
-      levelType: "descriptive",
-      description: newCatDesc.trim(),
-      active: true
-    };
+    const normalizedName = newCatName.trim();
+    if (currentCategories.some((category) => category.name.toLowerCase() === normalizedName.toLowerCase())) {
+      setError("Ya existe una categoría con ese nombre para este deporte.");
+      return;
+    }
 
-    setCategories(prev => [...prev, newCategory]);
-    setNewCatName("");
-    setNewCatDesc("");
+    try {
+      setSaving(true);
+      setError("");
+      const response = await fetch("/api/club/categories", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sportId: currentSport.id, name: normalizedName }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "No se pudo crear la categoría");
+      setCategories((previous) => [...previous, data]);
+      setNewCatName("");
+    } catch (err) {
+      console.error("Error creando categoría:", err);
+      setError("No se pudo guardar la categoría.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleCategoryActive = (catId: number) => {
-    setCategories(prev => prev.map(c => c.id === catId ? { ...c, active: !c.active } : c));
-  };
-
-  const deleteCategory = (catId: number) => {
-    setCategories(prev => prev.filter(c => c.id !== catId));
-  };
-
-  const loadDefaults = () => {
+  const loadDefaults = async () => {
     if (!currentSport) return;
     const defaults = DEFAULT_CATEGORIES[currentSport.slug] || ["Categoría General"];
+    const existingNames = new Set(currentCategories.map((category) => category.name.toLowerCase()));
 
-    const existingNames = new Set(currentCategories.map(c => c.name));
-    const added: Category[] = defaults
-      .filter(name => !existingNames.has(name))
-      .map((name, idx) => ({
-        id: Date.now() + idx,
-        sportId: currentSport.id,
-        name,
-        levelType: "descriptive",
-        description: "Categoría predeterminada del sistema",
-        active: true
-      }));
-
-    setCategories(prev => [...prev, ...added]);
+    for (const name of defaults.filter((candidate) => !existingNames.has(candidate.toLowerCase()))) {
+      try {
+        const response = await fetch("/api/club/categories", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sportId: currentSport.id, name }),
+        });
+        if (response.ok) {
+          const created = await response.json();
+          setCategories((previous) => [...previous, created]);
+        }
+      } catch (err) {
+        console.error("Error cargando categoría sugerida:", err);
+      }
+    }
   };
 
   return (
@@ -97,116 +126,76 @@ export default function CategoriesManager({ clubId, sports }: CategoriesManagerP
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Trophy size={20} className="text-primary" /> Gestión de Categorías y Niveles
           </h2>
-          <p className="text-xs text-muted-foreground">Configura los niveles de competencia por cada deporte activo del club.</p>
+          <p className="text-xs text-muted-foreground">Las categorías se guardan en la configuración real de la comunidad.</p>
         </div>
-
         <button
-          onClick={loadDefaults}
+          onClick={() => void loadDefaults()}
           type="button"
-          className="px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 self-start"
+          disabled={saving || loading || !currentSport}
+          className="px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-50"
         >
-          <Layers size={14} /> Cargar Sugeridas
+          Cargar sugeridas
         </button>
       </div>
 
-      {/* Selector de Deporte */}
       <div className="flex flex-wrap gap-2">
-        {activeSports.map(sport => (
+        {activeSports.map((sport) => (
           <button
             key={sport.id}
             type="button"
             onClick={() => setSelectedSportId(sport.id)}
             className={cn(
-              "px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-2",
-              selectedSportId === sport.id 
-                ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                : "bg-background text-muted-foreground border-input hover:bg-muted"
+              "px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border",
+              selectedSportId === sport.id
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-background text-muted-foreground border-input hover:bg-muted",
             )}
           >
-            <span>{sport.name}</span>
+            {sport.name}
           </button>
         ))}
       </div>
 
-      {/* Formulario para añadir nueva categoría */}
       <form onSubmit={handleAddCategory} className="bg-muted/30 border p-4 rounded-xl space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">➕ Añadir Nueva Categoría para {currentSport?.name}</h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Nombre de la Categoría</label>
-            <input
-              placeholder="Ej. 1ª Categoría / Singles A"
-              className="w-full p-2 border rounded-lg text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-              value={newCatName}
-              onChange={e => setNewCatName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Descripción / Restricción (Opcional)</label>
-            <input
-              placeholder="Ej. Solo jugadores federados o nivel avanzado"
-              className="w-full p-2 border rounded-lg text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-              value={newCatDesc}
-              onChange={e => setNewCatDesc(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end pt-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Añadir categoría para {currentSport?.name || "el deporte"}
+        </h3>
+        <div className="flex gap-2">
+          <input
+            placeholder="Ej. 1ª Categoría"
+            className="flex-1 p-2 border rounded-lg text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            required
+          />
           <button
             type="submit"
-            className="bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            disabled={saving || loading || !currentSport}
+            className="bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
-            <Plus size={14} /> Registrar Categoría
+            <Plus size={14} /> Registrar
           </button>
         </div>
       </form>
 
-      {/* Listado de Categorías Actuales */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">📋 Categorías Activas en {currentSport?.name} ({currentCategories.length})</h3>
+      {error && <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</p>}
 
-        {currentCategories.length === 0 ? (
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Categorías configuradas en {currentSport?.name} ({currentCategories.length})
+        </h3>
+
+        {loading ? (
+          <p className="text-xs text-muted-foreground italic">Cargando categorías...</p>
+        ) : currentCategories.length === 0 ? (
           <div className="text-center py-8 border border-dashed rounded-xl text-muted-foreground text-xs italic">
-            No hay categorías registradas para este deporte. Usa el botón "Cargar Sugeridas" o añade una arriba.
+            No hay categorías registradas para este deporte.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {currentCategories.map(cat => (
-              <div key={cat.id} className={cn("border p-3.5 rounded-xl flex items-center justify-between gap-3 transition-all", cat.active ? "bg-card shadow-sm" : "bg-muted/40 opacity-60")}>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm">{cat.name}</span>
-                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold", cat.active ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive")}>
-                      {cat.active ? "Activa" : "Inactiva"}
-                    </span>
-                  </div>
-                  {cat.description && (
-                    <p className="text-xs text-muted-foreground">{cat.description}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleCategoryActive(cat.id)}
-                    className={cn("p-1.5 rounded-lg border text-xs transition-colors cursor-pointer", cat.active ? "text-destructive hover:bg-destructive/10" : "text-emerald-600 hover:bg-emerald-500/10")}
-                    title={cat.active ? "Desactivar" : "Activar"}
-                  >
-                    {cat.active ? <X size={14} /> : <Check size={14} />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteCategory(cat.id)}
-                    className="p-1.5 rounded-lg border text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                    title="Eliminar categoría"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+            {currentCategories.map((category) => (
+              <div key={category.id} className="border p-3.5 rounded-xl bg-card shadow-sm">
+                <span className="font-bold text-sm">{category.name}</span>
               </div>
             ))}
           </div>
