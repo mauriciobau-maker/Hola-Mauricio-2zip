@@ -10,7 +10,7 @@ import NuevoJugador from "@/pages/NuevoJugador";
 import JugadorDetalle from "@/pages/JugadorDetalle";
 import Partidos from "@/pages/Partidos";
 import NuevoPartido from "@/pages/NuevoPartido";
-import EditarJugador from "@/pages/EditarJugador";
+import EditarJugador from "@/pages/EditarJugadorV2";
 import EditarPartido from "@/pages/EditarPartido";
 import Ranking from "@/pages/Ranking";
 import Parejas from "@/pages/Parejas";
@@ -59,9 +59,7 @@ function installActiveClubContextFetch(): void {
     }
 
     url.searchParams.set("clubId", String(activeClubId));
-    if (typeof input === "string" || input instanceof URL) {
-      return originalFetch(url.toString(), init);
-    }
+    if (typeof input === "string" || input instanceof URL) return originalFetch(url.toString(), init);
     return originalFetch(new Request(url.toString(), input), init);
   };
 
@@ -88,74 +86,32 @@ function ContextGuard({ children }: { children: React.ReactNode }) {
   const explicitGlobal = hasExplicitGlobalQuery();
 
   useEffect(() => {
-    if (pathname !== "/") {
-      setGlobalContextReady(true);
-      return;
-    }
-
-    if (clubEntry) {
-      setGlobalContextReady(true);
-      return;
-    }
-
-    if (!explicitGlobal) {
-      setGlobalContextReady(true);
-      return;
-    }
+    if (pathname !== "/") { setGlobalContextReady(true); return; }
+    if (clubEntry) { setGlobalContextReady(true); return; }
+    if (!explicitGlobal) { setGlobalContextReady(true); return; }
 
     let cancelled = false;
     setGlobalContextReady(false);
-
-    fetch("/api/clubs/active/clear", {
-      method: "POST",
-      credentials: "include",
-      headers: { Accept: "application/json" },
-    })
+    fetch("/api/clubs/active/clear", { method: "POST", credentials: "include", headers: { Accept: "application/json" } })
       .catch((error) => console.error("Error restableciendo contexto global:", error))
-      .finally(() => {
-        if (!cancelled) setGlobalContextReady(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) setGlobalContextReady(true); });
+    return () => { cancelled = true; };
   }, [location, pathname, clubEntry, explicitGlobal]);
 
-  if (pathname === "/" && !globalContextReady) {
-    return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Preparando tu panel...</div>;
-  }
-
+  if (pathname === "/" && !globalContextReady) return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Preparando tu panel...</div>;
   return <>{children}</>;
 }
 
 function ClubEntryContext() {
   const [ready, setReady] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
-
-    queryClient.removeQueries({
-      predicate: (query) => query.queryKey[0] !== "/api/auth/user",
-    });
-
-    queryClient.invalidateQueries().finally(() => {
-      if (!cancelled) setReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "/api/auth/user" });
+    queryClient.invalidateQueries().finally(() => { if (!cancelled) setReady(true); });
+    return () => { cancelled = true; };
   }, []);
-
-  if (!ready) {
-    return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Cargando el club...</div>;
-  }
-
-  return (
-    <Layout>
-      <Dashboard />
-    </Layout>
-  );
+  if (!ready) return <div className="min-h-[60vh] flex items-center justify-center text-sm text-muted-foreground">Cargando el club...</div>;
+  return <Layout><Dashboard /></Layout>;
 }
 
 function Router() {
@@ -166,13 +122,8 @@ function Router() {
   const isClubEntry = pathname === "/" && params.get(CLUB_ENTRY_QUERY) === "1";
   const isPublicClubPath = /^\/[^/]+$/.test(pathname) && !reservedSingleSegmentRoutes.has(pathname);
 
-  if (isClubEntry) {
-    return <ClubEntryContext />;
-  }
-
-  if (isPublicClubPath) {
-    return <PublicClub />;
-  }
+  if (isClubEntry) return <ClubEntryContext />;
+  if (isPublicClubPath) return <PublicClub />;
 
   return (
     <ContextGuard>
