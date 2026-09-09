@@ -42,7 +42,7 @@ function getActiveClubIdFromCookie(): number | null {
 function installActiveClubContextFetch(): void {
   if (typeof window === "undefined" || typeof window.fetch !== "function") return;
   const marker = "__padelTrackerActiveClubFetchInstalled";
-  const globalWindow = window as Window & Record<string, boolean | undefined>;
+  const globalWindow = window as unknown as Window & Record<string, boolean | undefined>;
   if (globalWindow[marker]) return;
   const originalFetch = window.fetch.bind(window);
 
