@@ -572,12 +572,23 @@ export default function Admin() {
       const data = await res.json();
       const updatedData = data.club || data;
 
+      const failedSports: string[] = [];
+
       for (const sportState of editForm.sports) {
-        await fetch(`/api/admin/clubs/${editingClub.id}/sports`, {
+        const sport = availableSportsList.find(s => s.id === sportState.id);
+        const sportRes = await fetch(`/api/admin/clubs/${editingClub.id}/sports`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sportId: sportState.id, active: sportState.active }),
-        }).catch(() => {});
+        });
+
+        if (!sportRes.ok) {
+          failedSports.push(sport?.name || `ID ${sportState.id}`);
+        }
+      }
+
+      if (failedSports.length > 0) {
+        throw new Error(`No se pudieron actualizar estos deportes: ${failedSports.join(", ")}. Los datos del club sí fueron guardados.`);
       }
 
       const refreshedSports = availableSportsList.map(s => {
@@ -1134,17 +1145,15 @@ export default function Admin() {
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.history.pushState({}, "", clubLink);
-                      window.dispatchEvent(new PopStateEvent("popstate"));
-                    }}
-                    className="p-2 border rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1.5 cursor-pointer"
+                  <a
+                    href={clubLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 border rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1.5"
                     title="Visitar club"
                   >
                     <ExternalLink size={14} /> {t("visit")}
-                  </button>
+                  </a>
 
                   <button
                     onClick={() => openEditModal(club)}
