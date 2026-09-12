@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 
 interface Category {
   id: number;
-  sportId: number;
   clubSportId: number;
   name: string;
 }
@@ -27,23 +26,45 @@ const DEFAULT_CATEGORIES: Record<string, string[]> = {
   futbol: ["Libre / Open", "Senior +35", "Mixto", "Empresas"],
 };
 
-export default function CategoriesManager({ sports }: CategoriesManagerProps) {
+export default function CategoriesManager({ clubId, sports }: CategoriesManagerProps) {
   const [selectedSportId, setSelectedSportId] = useState<number>(sports[0]?.id || 1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clubSportMap, setClubSportMap] = useState<Map<number, number>>(new Map());
 
   const activeSports = useMemo(() => sports.filter((sport) => sport.active !== false), [sports]);
   const currentSport = activeSports.find((sport) => sport.id === selectedSportId) || activeSports[0];
-  const currentCategories = categories.filter((category) => category.sportId === currentSport?.id);
+  const currentClubSportId = clubSportMap.get(currentSport?.id || 0);
+  const currentCategories = categories.filter((category) => category.clubSportId === currentClubSportId);
 
   useEffect(() => {
     if (activeSports.length > 0 && !activeSports.some((sport) => sport.id === selectedSportId)) {
       setSelectedSportId(activeSports[0].id);
     }
   }, [activeSports, selectedSportId]);
+
+  const loadClubSports = async () => {
+    try {
+      const response = await fetch("/api/club", { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "No se pudo cargar información del club");
+      
+      const sportMap = new Map<number, number>();
+      if (Array.isArray(data?.sports)) {
+        data.sports.forEach((clubSport: any) => {
+          if (clubSport.id && clubSport.sportId) {
+            sportMap.set(clubSport.sportId, clubSport.id);
+          }
+        });
+      }
+      setClubSportMap(sportMap);
+    } catch (err) {
+      console.error("Error cargando deportes del club:", err);
+    }
+  };
 
   const loadCategories = async () => {
     try {
@@ -62,12 +83,16 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
   };
 
   useEffect(() => {
+    void loadClubSports();
+  }, [clubId]);
+
+  useEffect(() => {
     void loadCategories();
   }, []);
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentSport || !newCatName.trim()) return;
+    if (!currentSport || !newCatName.trim() || !currentClubSportId) return;
 
     const normalizedName = newCatName.trim();
     if (currentCategories.some((category) => category.name.toLowerCase() === normalizedName.toLowerCase())) {
@@ -82,7 +107,7 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sportId: currentSport.id, name: normalizedName }),
+        body: JSON.stringify({ clubSportId: currentClubSportId, name: normalizedName }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "No se pudo crear la categoría");
@@ -97,7 +122,7 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
   };
 
   const loadDefaults = async () => {
-    if (!currentSport) return;
+    if (!currentSport || !currentClubSportId) return;
     const defaults = DEFAULT_CATEGORIES[currentSport.slug] || ["Categoría General"];
     const existingNames = new Set(currentCategories.map((category) => category.name.toLowerCase()));
 
@@ -107,7 +132,7 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sportId: currentSport.id, name }),
+          body: JSON.stringify({ clubSportId: currentClubSportId, name }),
         });
         if (response.ok) {
           const created = await response.json();
@@ -131,7 +156,7 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
         <button
           onClick={() => void loadDefaults()}
           type="button"
-          disabled={saving || loading || !currentSport}
+          disabled={saving || loading || !currentSport || !currentClubSportId}
           className="px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-50"
         >
           Cargar sugeridas
@@ -167,10 +192,11 @@ export default function CategoriesManager({ sports }: CategoriesManagerProps) {
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             required
+            disabled={!currentClubSportId}
           />
           <button
             type="submit"
-            disabled={saving || loading || !currentSport}
+            disabled={saving || loading || !currentSport || !currentClubSportId}
             className="bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-50"
           >
             <Plus size={14} /> Registrar
