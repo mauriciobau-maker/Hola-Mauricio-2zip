@@ -109,7 +109,7 @@ export default function JugadorDetalle() {
               <span
                 className={cn(
                   "text-xs font-semibold tabular-nums",
-                  eloDiff > 0 ? "text-green-400" : "text-red-400",
+                  eloDiff > 0 ? "text-green-400" : "text-red-400"
                 )}
               >
                 {eloDiff > 0 ? "+" : ""}{eloDiff}
@@ -165,7 +165,7 @@ export default function JugadorDetalle() {
       {/* Sets stats */}
       {stats && (
         <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="font-semibold text-sm mb-3">Estadisticas de sets</h3>
+          <h3 className="font-semibold text-sm mb-3">Estadísticas de sets</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold text-primary">{stats.setsWon}</p>
@@ -202,7 +202,7 @@ export default function JugadorDetalle() {
                   <div
                     className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
-                      positive ? "bg-green-500/15" : "bg-red-500/15",
+                      positive ? "bg-green-500/15" : "bg-red-500/15"
                     )}
                   >
                     {positive ? (
@@ -221,7 +221,7 @@ export default function JugadorDetalle() {
                     <span
                       className={cn(
                         "font-bold tabular-nums w-10 text-right",
-                        positive ? "text-green-400" : "text-red-400",
+                        positive ? "text-green-400" : "text-red-400"
                       )}
                     >
                       {positive ? "+" : ""}{entry.eloChange}
@@ -238,29 +238,25 @@ export default function JugadorDetalle() {
       {stats && (stats.recentMatches ?? []).length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="font-semibold text-sm">Ultimos partidos</h3>
+            <h3 className="font-semibold text-sm">Últimos partidos</h3>
           </div>
           <div className="divide-y divide-border">
             {(stats.recentMatches ?? []).map((m) => {
-              const onTeam1 = m.team1Player1Id === id || m.team1Player2Id === id;
-              const won = onTeam1
-                ? m.team1SetsWon > m.team2SetsWon
-                : m.team2SetsWon > m.team1SetsWon;
-              const myTeam = onTeam1
-                ? `${m.team1Player1Name} / ${m.team1Player2Name}`
-                : `${m.team2Player1Name} / ${m.team2Player2Name}`;
-              const rivalTeam = onTeam1
-                ? `${m.team2Player1Name} / ${m.team2Player2Name}`
-                : `${m.team1Player1Name} / ${m.team1Player2Name}`;
-              const myScore = onTeam1 ? m.team1SetsWon : m.team2SetsWon;
-              const rivalScore = onTeam1 ? m.team2SetsWon : m.team1SetsWon;
+              const onTeam1 = m.team1Players.some((p: any) => p.id === id);
+              const team1 = m.team1Players.map((p: any) => p.name).join(" / ");
+              const team2 = m.team2Players.map((p: any) => p.name).join(" / ");
+              const myTeam = onTeam1 ? team1 : team2;
+              const rivalTeam = onTeam1 ? team2 : team1;
+              const myScore = onTeam1 ? m.team1Score : m.team2Score;
+              const rivalScore = onTeam1 ? m.team2Score : m.team1Score;
+              const won = onTeam1 ? m.result === "team1" : m.result === "team2";
 
               return (
                 <div key={m.id} className="flex items-center gap-3 px-4 py-3">
                   <span
                     className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
-                      won ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive",
+                      won ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"
                     )}
                   >
                     {won ? "V" : "D"}
@@ -366,7 +362,7 @@ function StatTile({
     <div
       className={cn(
         "rounded-xl border p-4 text-center",
-        accent ? "bg-primary/10 border-primary/20" : "bg-card border-border",
+        accent ? "bg-primary/10 border-primary/20" : "bg-card border-border"
       )}
     >
       <div className="flex justify-center mb-1">{icon}</div>
