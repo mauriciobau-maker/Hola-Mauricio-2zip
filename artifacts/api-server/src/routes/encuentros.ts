@@ -9,34 +9,27 @@ import {
   sportModalitiesTable,
 } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getCurrentClubId, isSuperAdminUser, requireCommunityAccess } from "../middlewares/requireCommunity";
+import { requireCommunityAccess } from "../middlewares/requireCommunity";
 
 const router = Router();
 
-function requestClubId(req: Request): number | null {
-  return getCurrentClubId(req);
+/** Extrae el clubId del usuario autenticado (null/undefined = Super Admin sin scope) */
+function getClubId(req: Request): number | null {
+  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  return clubId ?? null;
 }
 
-async function getScopedEncuentro(encuentroId: number, req: Request) {
-  const clubId = requestClubId(req);
-  const [encuentro] = await db
-    .select()
-    .from(encuentrosTable)
-    .where(
-      clubId == null
-        ? eq(encuentrosTable.id, encuentroId)
-        : and(eq(encuentrosTable.id, encuentroId), eq(encuentrosTable.clubId, clubId)),
-    );
-  return encuentro;
-}
-
-router.use(requireCommunityAccess);
-
-async function getAsistenciaList(encuentroId: number, clubId: number | null) {
-  const players = clubId == null
-    ? await db.select().from(playersTable)
-    : await db.select().from(playersTable).where(eq(playersTable.clubId, clubId));
-  const playerMap: Record<number, { name: string; nickname: string | null; phone: string | null; language: string | null }> = {};
+async function getAsistenciaList(encuentroId: number) {
+  const players = await db.select().from(playersTable);
+  const playerMap: Record<
+    number,
+    {
+      name: string;
+      nickname: string | null;
+      phone: string | null;
+      language: string | null;
+    }
+  > = {};
 
   for (const p of players) {
     playerMap[p.id] = {
@@ -64,7 +57,7 @@ async function getAsistenciaList(encuentroId: number, clubId: number | null) {
     }
   }
 
-  const cleanRows = Array.from(uniqueRowsMap.values()).filter((row) => playerMap[row.playerId]);
+  const cleanRows = Array.from(uniqueRowsMap.values());
 
   return cleanRows.map((r) => ({
     id: r.id,
@@ -87,15 +80,16 @@ async function getAsistenciaList(encuentroId: number, clubId: number | null) {
   }));
 }
 
-router.get("/", async (req: Request, res: Response): Promise<void> => {
+// GET /api/encuentros
+router.get("/", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
-    const clubId = requestClubId(req);
-    const list = clubId == null
-      ? await db.select().from(encuentrosTable)
-      : await db.select().from(encuentrosTable).where(eq(encuentrosTable.clubId, clubId));
+    const clubId = getClubId(req);
+    const list = clubId
+      ? await db.select().from(encuentrosTable).where(eq(encuentrosTable.clubId, clubId))
+      : await db.select().from(encuentrosTable); // solo Super Admin llega aquí sin clubId
     const result = await Promise.all(
       list.map(async (e) => {
-        const asistencia = await getAsistenciaList(e.id, e.clubId);
+        const asistencia = await getAsistenciaList(e.id);
         const formattedEncuentro = {
           ...e,
           dateTime:
@@ -121,17 +115,26 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get("/:id", async (req: Request, res: Response): Promise<void> => {
+// GET /api/encuentros/:id
+router.get("/:id", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const rawId = req.params.id;
     const id = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const e = await getScopedEncuentro(id, req);
+    const clubId = getClubId(req);
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(
+        clubId
+          ? and(eq(encuentrosTable.id, id), eq(encuentrosTable.clubId, clubId))
+          : eq(encuentrosTable.id, id)
+      );
     if (!e) {
       res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
 
-    const asistencia = await getAsistenciaList(id, e.clubId);
+    const asistencia = await getAsistenciaList(id);
     res.json({
       encuentro: {
         ...e,
@@ -151,32 +154,13 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post("/", async (req: Request, res: Response): Promise<void> => {
+// POST /api/encuentros
+router.post("/", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ message: "No autenticado" });
-      return;
-    }
 
     const bodyData = req.body.data ?? req.body;
     const { title, dateTime, location, maxSpots, notes, playerIds } = bodyData;
-    const clubId = requestClubId(req);
-
-    if (!Number.isInteger(clubId) || clubId! <= 0) {
-      res.status(400).json({ message: "Debes seleccionar un club activo para crear un encuentro" });
-      return;
-    }
-
-    if (Array.isArray(playerIds) && playerIds.length > 0) {
-      const clubPlayers = await db.select({ id: playersTable.id }).from(playersTable)
-        .where(eq(playersTable.clubId, clubId!));
-      const allowedPlayerIds = new Set(clubPlayers.map((player) => player.id));
-      if (playerIds.map(Number).some((playerId: number) => !allowedPlayerIds.has(playerId))) {
-        res.status(400).json({ message: "Uno o más jugadores no pertenecen al club del encuentro" });
-        return;
-      }
-    }
 
     const [created] = await db
       .insert(encuentrosTable)
@@ -187,7 +171,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         maxSpots: maxSpots ? parseInt(maxSpots, 10) : null,
         notes: notes || null,
         organizerId: user.id,
-        clubId,
+        clubId: getClubId(req), // ancla el encuentro a la comunidad del creador
       })
       .returning();
 
@@ -202,7 +186,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const asistencia = await getAsistenciaList(created.id, created.clubId);
+    const asistencia = await getAsistenciaList(created.id);
     res.status(201).json({
       encuentro: {
         ...created,
@@ -222,70 +206,55 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
+// POST /api/encuentros/:id/rsvp
+router.post("/:id/rsvp", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ message: "No autenticado" });
-      return;
-    }
+    const clubId = getClubId(req);
 
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
     const { status, playerId: reqPlayerId } = req.body;
-    const requestedPlayerId = reqPlayerId === undefined || reqPlayerId === null
-      ? null
-      : Number(reqPlayerId);
 
-    const e = await getScopedEncuentro(encuentroId, req);
-    if (!e) {
-      res.status(404).json({ message: "Encuentro no encontrado" });
-      return;
-    }
-
-    const isOrganizer = e.organizerId === user.id;
-    const isSuperAdmin = isSuperAdminUser(user);
-
-    if (requestedPlayerId !== null && !isOrganizer && !isSuperAdmin) {
-      res.status(403).json({ message: "Solo el organizador o un Super Admin puede actualizar la asistencia de otro jugador" });
-      return;
-    }
-
-    const targetPlayerId = requestedPlayerId ?? user.playerId;
+    const targetPlayerId = reqPlayerId ? Number(reqPlayerId) : user.playerId;
 
     if (!targetPlayerId) {
-      res.status(400).json({ message: "No se encontró un jugador válido para actualizar" });
+      res
+        .status(400)
+        .json({ message: "No se encontró un jugador válido para actualizar" });
       return;
     }
 
-    const [targetPlayer] = await db
-      .select({ id: playersTable.id })
-      .from(playersTable)
-      .where(and(eq(playersTable.id, Number(targetPlayerId)), eq(playersTable.clubId, e.clubId!)));
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
 
-    if (!targetPlayer) {
-      res.status(403).json({ message: "El jugador no pertenece al club del encuentro" });
+    if (!e || (clubId && e.clubId !== clubId)) {
+      // Mismo mensaje tanto si no existe como si es de otra comunidad:
+      // así no revelamos que el id pertenece a otro club.
+      res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
 
     let finalStatus = status;
 
     if (status === "confirmed") {
-      const asistenciaActual = await getAsistenciaList(encuentroId, e.clubId);
+      const asistenciaActual = await getAsistenciaList(encuentroId);
       const confirmedCount = asistenciaActual.filter(
-        (a) => a.status === "confirmed" && a.playerId !== Number(targetPlayerId)
+        (a) => a.status === "confirmed" && a.playerId !== targetPlayerId
       ).length;
 
       if (e.maxSpots && confirmedCount >= e.maxSpots) {
         const waitlistCount = asistenciaActual.filter(
           (a) =>
             (a.status === "waitlist" || a.status === "reserva") &&
-            a.playerId !== Number(targetPlayerId)
+            a.playerId !== targetPlayerId
         ).length;
 
         if (waitlistCount >= 3) {
           res.status(400).json({
-            message: "El encuentro y la lista de reserva (máximo 3 cupos) están completamente llenos.",
+            message: `El encuentro y la lista de reserva (máximo 3 cupos) están completamente llenos.`,
           });
           return;
         }
@@ -300,7 +269,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
       .where(
         and(
           eq(asistenciaTable.encuentroId, encuentroId),
-          eq(asistenciaTable.playerId, Number(targetPlayerId))
+          eq(asistenciaTable.playerId, targetPlayerId)
         )
       );
 
@@ -313,20 +282,24 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
 
       if (existingRows.length > 1) {
         for (let i = 1; i < existingRows.length; i++) {
-          await db.delete(asistenciaTable).where(eq(asistenciaTable.id, existingRows[i].id));
+          await db
+            .delete(asistenciaTable)
+            .where(eq(asistenciaTable.id, existingRows[i].id));
         }
       }
     } else {
       await db.insert(asistenciaTable).values({
         encuentroId,
-        playerId: Number(targetPlayerId),
+        playerId: targetPlayerId,
         status: finalStatus,
         respondedAt: new Date(),
       });
     }
 
-    let asistenciaActualizada = await getAsistenciaList(encuentroId, e.clubId);
-    const confirmedActual = asistenciaActualizada.filter((a) => a.status === "confirmed").length;
+    let asistenciaActualizada = await getAsistenciaList(encuentroId);
+    const confirmedActual = asistenciaActualizada.filter(
+      (a) => a.status === "confirmed"
+    ).length;
 
     if (!e.maxSpots || confirmedActual < e.maxSpots) {
       const enReserva = asistenciaActualizada
@@ -343,15 +316,22 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
           .update(asistenciaTable)
           .set({ status: "confirmed", respondedAt: new Date() })
           .where(eq(asistenciaTable.id, promovido.id));
-        asistenciaActualizada = await getAsistenciaList(encuentroId, e.clubId);
+
+        asistenciaActualizada = await getAsistenciaList(encuentroId);
       }
     }
 
     res.json({
       encuentro: {
         ...e,
-        dateTime: e?.dateTime instanceof Date ? e.dateTime.toISOString() : String(e?.dateTime),
-        createdAt: e?.createdAt instanceof Date ? e.createdAt.toISOString() : String(e?.createdAt),
+        dateTime:
+          e?.dateTime instanceof Date
+            ? e.dateTime.toISOString()
+            : String(e?.dateTime),
+        createdAt:
+          e?.createdAt instanceof Date
+            ? e.createdAt.toISOString()
+            : String(e?.createdAt),
       },
       asistencia: asistenciaActualizada,
       assignedStatus: finalStatus,
@@ -361,37 +341,43 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
+// DELETE /api/encuentros/:id
+router.delete("/:id", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ message: "No autenticado" });
-      return;
-    }
+    const clubId = getClubId(req);
 
     const rawId = req.params.id;
     const id = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const e = await getScopedEncuentro(id, req);
-    if (!e) {
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, id));
+    if (!e || (clubId && e.clubId !== clubId)) {
       res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
 
     if (e.organizerId !== user.id && !user.isAdmin) {
-      res.status(403).json({ message: "No tienes permiso para eliminar este encuentro" });
+      res
+        .status(403)
+        .json({ message: "No tienes permiso para eliminar este encuentro" });
       return;
     }
 
+    // 🧹 Limpieza en cascada: eliminar partidos y relaciones antes del encuentro
     const existingMatches = await db
       .select({ id: matchesTable.id })
       .from(matchesTable)
-      .where(and(eq(matchesTable.encuentroId, id), eq(matchesTable.clubId, e.clubId!)));
+      .where(eq(matchesTable.encuentroId, id));
 
     for (const match of existingMatches) {
-      await db.delete(matchPlayersTable).where(eq(matchPlayersTable.matchId, match.id));
+      await db
+        .delete(matchPlayersTable)
+        .where(eq(matchPlayersTable.matchId, match.id));
     }
 
-    await db.delete(matchesTable).where(and(eq(matchesTable.encuentroId, id), eq(matchesTable.clubId, e.clubId!)));
+    await db.delete(matchesTable).where(eq(matchesTable.encuentroId, id));
     await db.delete(asistenciaTable).where(eq(asistenciaTable.encuentroId, id));
     await db.delete(encuentrosTable).where(eq(encuentrosTable.id, id));
 
@@ -401,12 +387,18 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> => {
+// GET /api/encuentros/:id/partidos
+router.get("/:id/partidos", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const encuentro = await getScopedEncuentro(encuentroId, req);
-    if (!encuentro) {
+    const clubId = getClubId(req);
+
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+    if (!e || (clubId && e.clubId !== clubId)) {
       res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
@@ -414,12 +406,9 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
     const rawMatches = await db
       .select()
       .from(matchesTable)
-      .where(and(eq(matchesTable.encuentroId, encuentroId), eq(matchesTable.clubId, encuentro.clubId!)));
+      .where(eq(matchesTable.encuentroId, encuentroId));
 
-    const allPlayers = await db
-      .select()
-      .from(playersTable)
-      .where(eq(playersTable.clubId, encuentro.clubId!));
+    const allPlayers = await db.select().from(playersTable);
     const playerMap = new Map(allPlayers.map((p) => [p.id, p.name]));
 
     const formattedMatches = await Promise.all(
@@ -431,11 +420,17 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
 
         const team1 = matchPlayers
           .filter((mp) => mp.team === "team1")
-          .map((mp) => ({ id: mp.playerId, name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}` }));
+          .map((mp) => ({
+            id: mp.playerId,
+            name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}`,
+          }));
 
         const team2 = matchPlayers
           .filter((mp) => mp.team === "team2")
-          .map((mp) => ({ id: mp.playerId, name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}` }));
+          .map((mp) => ({
+            id: mp.playerId,
+            name: playerMap.get(mp.playerId) ?? `Jugador ${mp.playerId}`,
+          }));
 
         return {
           id: match.id,
@@ -447,7 +442,10 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
           result: match.result,
           sets: match.sets,
           pendingResult: match.result === "pending",
-          playedAt: match.playedAt instanceof Date ? match.playedAt.toISOString() : String(match.playedAt),
+          playedAt:
+            match.playedAt instanceof Date
+              ? match.playedAt.toISOString()
+              : String(match.playedAt),
         };
       })
     );
@@ -458,19 +456,28 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
   }
 });
 
-router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Promise<void> => {
+// PATCH /api/encuentros/:id/partidos/:matchId -> Guardar resultado / sets del partido
+router.patch("/:id/partidos/:matchId", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
     const rawMatchId = req.params.matchId;
     const matchId = parseInt(Array.isArray(rawMatchId) ? rawMatchId[0] : rawMatchId, 10);
-    const encuentro = await getScopedEncuentro(encuentroId, req);
-    if (!encuentro) {
+    const clubId = getClubId(req);
+
+    // Verificamos que el encuentro es del club del usuario Y que el partido
+    // realmente pertenece a ese encuentro (antes no se validaba ninguna de las dos cosas).
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+    if (!e || (clubId && e.clubId !== clubId)) {
       res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
 
     const { team1Score, team2Score, result, sets } = req.body;
+
     const updateData: Record<string, any> = {};
     if (team1Score !== undefined) updateData.team1Score = team1Score;
     if (team2Score !== undefined) updateData.team2Score = team2Score;
@@ -480,11 +487,7 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
     const [updated] = await db
       .update(matchesTable)
       .set(updateData)
-      .where(and(
-        eq(matchesTable.id, matchId),
-        eq(matchesTable.encuentroId, encuentroId),
-        eq(matchesTable.clubId, encuentro.clubId!),
-      ))
+      .where(and(eq(matchesTable.id, matchId), eq(matchesTable.encuentroId, encuentroId)))
       .returning();
 
     if (!updated) {
@@ -498,18 +501,25 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
   }
 });
 
-router.post("/:id/generar-partidos", async (req: Request, res: Response): Promise<void> => {
+// POST /api/encuentros/:id/generar-partidos
+router.post("/:id/generar-partidos", requireCommunityAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const { formato, sportId, teamSize, modalityId } = req.body;
-    const encuentro = await getScopedEncuentro(encuentroId, req);
-    if (!encuentro) {
+    const clubId = getClubId(req);
+
+    const [e] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+    if (!e || (clubId && e.clubId !== clubId)) {
       res.status(404).json({ message: "Encuentro no encontrado" });
       return;
     }
 
-    const asistencia = await getAsistenciaList(encuentroId, encuentro.clubId);
+    const { formato, sportId, teamSize, modalityId } = req.body;
+
+    const asistencia = await getAsistenciaList(encuentroId);
     const confirmados = asistencia.filter((a) => a.status === "confirmed");
 
     const idDeDeporte = sportId ? Number(sportId) : 1;
@@ -521,13 +531,12 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
     const modality = modalityId
       ? modalityRows.find((row) => row.id === Number(modalityId))
       : modalityRows.find((row) => row.teamSize === sizePorEquipo && row.active);
-
     if (!modality) {
       res.status(400).json({ message: "No existe una modalidad válida para el deporte seleccionado." });
       return;
     }
-
     const minJugadores = sizePorEquipo * 2;
+
     if (confirmados.length < minJugadores) {
       res.status(400).json({
         message: `Se requieren al menos ${minJugadores} jugadores confirmados para generar partidos (Tamaño por equipo requerido: ${sizePorEquipo}).`,
@@ -535,18 +544,20 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       return;
     }
 
+    // 🧹 Limpieza preventiva de partidos previamente generados para este encuentro
     const oldMatches = await db
       .select({ id: matchesTable.id })
       .from(matchesTable)
-      .where(and(eq(matchesTable.encuentroId, encuentroId), eq(matchesTable.clubId, encuentro.clubId!)));
+      .where(eq(matchesTable.encuentroId, encuentroId));
 
     for (const oldMatch of oldMatches) {
-      await db.delete(matchPlayersTable).where(eq(matchPlayersTable.matchId, oldMatch.id));
+      await db
+        .delete(matchPlayersTable)
+        .where(eq(matchPlayersTable.matchId, oldMatch.id));
     }
-
     await db
       .delete(matchesTable)
-      .where(and(eq(matchesTable.encuentroId, encuentroId), eq(matchesTable.clubId, encuentro.clubId!)));
+      .where(eq(matchesTable.encuentroId, encuentroId));
 
     const playerIds = confirmados.map((c) => c.playerId);
     const crucesPartidos: Array<{ team1: number[]; team2: number[] }> = [];
@@ -571,7 +582,10 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       for (let i = 0; i <= playerIds.length - (sizePorEquipo * 2); i += (sizePorEquipo * 2)) {
         const team1Players = playerIds.slice(i, i + sizePorEquipo);
         const team2Players = playerIds.slice(i + sizePorEquipo, i + (sizePorEquipo * 2));
-        crucesPartidos.push({ team1: team1Players, team2: team2Players });
+        crucesPartidos.push({
+          team1: team1Players,
+          team2: team2Players,
+        });
       }
     }
 
@@ -582,7 +596,6 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
         .insert(matchesTable)
         .values({
           encuentroId,
-          clubId: encuentro.clubId,
           sportId: idDeDeporte,
           modalityId: modality.id,
           team1Score: 0,
