@@ -407,7 +407,8 @@ router.patch("/matches/:id", async (req, res): Promise<void> => {
     const user = req.user as { clubId?: number | null } | undefined;
     const clubId = existing.clubId;
     if (!isSuperAdminUser(req.user) && existing.clubId !== user?.clubId) {
-      res.status(403).json({ error: "Forbidden" });
+      // 404 en vez de 403: no confirmamos que el partido existe en otro club.
+      res.status(404).json({ error: "Partido no encontrado" });
       return;
     }
     if (clubId == null) {
@@ -522,7 +523,8 @@ router.delete("/matches/:id", async (req, res): Promise<void> => {
   }
 
   if (!isSuperAdminUser(req.user) && existing.clubId !== user?.clubId) {
-    res.status(403).json({ error: "Forbidden" });
+    // 404 en vez de 403: no confirmamos que el partido existe en otro club.
+    res.status(404).json({ error: "Partido no encontrado" });
     return;
   }
 
