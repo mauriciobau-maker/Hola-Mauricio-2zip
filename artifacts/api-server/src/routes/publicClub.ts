@@ -40,14 +40,14 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       console.error("⚠️ Error cargando deportes del club público:", e);
     }
 
+    // Solo el nombre del admin es público. Email y teléfono son datos
+    // personales y no deben quedar expuestos sin autenticación.
     let admin: any = null;
     try {
       const [clubAdmin] = await db
         .select({
           name: usersTable.name,
           nickname: usersTable.nickname,
-          email: usersTable.email,
-          phone: usersTable.phone,
         })
         .from(usersTable)
         .where(and(eq(usersTable.clubId, club.id), eq(usersTable.isClubAdmin, 1)))
@@ -74,8 +74,6 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       defaultLanguage: (club as any).defaultLanguage || "es",
       sports,
       adminName: admin?.name || admin?.nickname || null,
-      adminEmail: admin?.email || null,
-      adminPhone: admin?.phone || null,
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
     });
   } catch (error) {
