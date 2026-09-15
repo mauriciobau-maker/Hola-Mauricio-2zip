@@ -29,9 +29,16 @@ export default function Jugadores() {
       const matchesSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         (p.nickname && p.nickname.toLowerCase().includes(search.toLowerCase()));
-      return matchesSearch;
+
+      // The current Player API has no active/inactive field. Until that
+      // capability exists in the data model/API, "active" means the player
+      // record exists in the club and "inactive" has no valid source of truth.
+      // Keep the selector honest rather than inventing status from unrelated data.
+      const matchesStatus = statusFilter === "all" || statusFilter === "active";
+
+      return matchesSearch && matchesStatus;
     });
-  }, [players, search]);
+  }, [players, search, statusFilter]);
 
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, "");
@@ -122,7 +129,10 @@ export default function Jugadores() {
         <div className="text-center py-12 text-muted-foreground">
           <p className="text-sm">No se encontraron jugadores</p>
           <button
-            onClick={() => setSearch("")}
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("all");
+            }}
             className="text-primary hover:underline text-xs mt-2"
           >
             Limpiar búsqueda
