@@ -42,6 +42,7 @@ export const cobrosTable = pgTable("cobros", {
   gastoId: integer("gasto_id").references(() => gastosTable.id, { onDelete: "set null" }),
   monto: integer("monto").notNull().default(0),
   estado: text("estado").notNull().default("pendiente"),
+  comprobanteUrl: text("comprobante_url"),
   pagadoAt: timestamp("pagado_at", { withTimezone: true }),
   confirmadoPor: text("confirmado_por"),
   notas: text("notas"),
