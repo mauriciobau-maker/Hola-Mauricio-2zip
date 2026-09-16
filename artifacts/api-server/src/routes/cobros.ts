@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, cobrosTable, playersTable } from "@workspace/db";
 import {
   isSuperAdminUser,
+  isClubAdminUser,
   requireCommunityAccess,
 } from "../middlewares/requireCommunity";
 
@@ -12,23 +13,54 @@ router.use(requireCommunityAccess);
 
 function getSessionUser(req: Request) {
   return req.user as {
+    id?: string;
+    firstName?: string | null;
+    lastName?: string | null;
     clubId?: number | null;
+    playerId?: number | null;
     isAdmin?: number | boolean | null;
+    isClubAdmin?: number | boolean | null;
   };
 }
 
-// GET: Super Admin puede consultar globalmente; usuarios normales solo su club.
+function isAdminUser(user: ReturnType<typeof getSessionUser>): boolean {
+  return isSuperAdminUser(user) || isClubAdminUser(user);
+}
+
+// GET: Admin (club/super) ve todos los cobros de su alcance.
+// Un jugador normal solo ve SUS propios cobros, nunca los de otros jugadores.
 router.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
-    const cobros = isSuperAdminUser(user)
-      ? await db.select().from(cobrosTable)
-      : await db
-          .select()
-          .from(cobrosTable)
-          .where(eq(cobrosTable.clubId, user.clubId!));
 
-    res.json(cobros);
+    if (isSuperAdminUser(user)) {
+      res.json(await db.select().from(cobrosTable));
+      return;
+    }
+
+    if (isAdminUser(user)) {
+      res.json(
+        await db.select().from(cobrosTable).where(eq(cobrosTable.clubId, user.clubId!)),
+      );
+      return;
+    }
+
+    if (!user.playerId) {
+      res.json([]);
+      return;
+    }
+
+    res.json(
+      await db
+        .select()
+        .from(cobrosTable)
+        .where(
+          and(
+            eq(cobrosTable.clubId, user.clubId!),
+            eq(cobrosTable.playerId, user.playerId),
+          ),
+        ),
+    );
   } catch (error) {
     console.error("Error al obtener cobros:", error);
     res.status(500).json({ error: "Error al obtener cobros" });
@@ -41,6 +73,14 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
+
+    if (!isAdminUser(user)) {
+      res.status(403).json({
+        error: "Solo un administrador del club puede registrar cobros",
+      });
+      return;
+    }
+
     const { playerId, monto, notas } = req.body;
     const targetClubId = isSuperAdminUser(user)
       ? Number(req.body.clubId)
@@ -92,7 +132,10 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// PATCH: actualizar estado solo dentro del ámbito permitido.
+// PATCH: el admin puede confirmar/editar libremente dentro de su alcance.
+// Un jugador solo puede tocar SU PROPIO cobro, y únicamente para adjuntar
+// un comprobante y marcarlo como "reportado" (nunca "pagado" directamente:
+// esa confirmación final es siempre del administrador).
 router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
@@ -103,6 +146,8 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: "ID inválido" });
       return;
     }
+
+    const admin = isAdminUser(user);
 
     const [existing] = await db
       .select()
@@ -118,12 +163,43 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { estado } = req.body;
+    if (admin) {
+      const { estado, notas } = req.body;
+      const [updated] = await db
+        .update(cobrosTable)
+        .set({
+          ...(estado !== undefined ? { estado } : {}),
+          ...(notas !== undefined ? { notas } : {}),
+          pagadoAt: estado === "pagado" ? new Date() : existing.pagadoAt,
+          confirmadoPor:
+            estado === "pagado"
+              ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.id || "admin"
+              : existing.confirmadoPor,
+        })
+        .where(eq(cobrosTable.id, id))
+        .returning();
+
+      res.json(updated);
+      return;
+    }
+
+    // Camino del jugador: solo sobre su propio cobro.
+    if (!user.playerId || existing.playerId !== user.playerId) {
+      res.status(404).json({ error: "Cobro no encontrado" });
+      return;
+    }
+
+    if (existing.estado === "pagado") {
+      res.status(400).json({ error: "Este cobro ya fue confirmado como pagado" });
+      return;
+    }
+
+    const { comprobanteUrl } = req.body;
     const [updated] = await db
       .update(cobrosTable)
       .set({
-        estado,
-        pagadoAt: estado === "pagado" ? new Date() : null,
+        comprobanteUrl: comprobanteUrl ?? existing.comprobanteUrl,
+        estado: "reportado", // el jugador solo puede reportar, nunca autoconfirmarse como pagado
       })
       .where(eq(cobrosTable.id, id))
       .returning();
