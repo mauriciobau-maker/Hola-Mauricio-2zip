@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Check, AlertCircle, Upload, Plus, Image as ImageIcon } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useListPlayers } from "@workspace/api-client-react";
 
 interface Cobro {
   id: number;
@@ -72,7 +73,8 @@ export default function Cobros() {
   const isAdmin = !!user && (!!user.isAdmin || !!user.isClubAdmin);
 
   const [cobros, setCobros] = useState<Cobro[]>([]);
-  const [players, setPlayers] = useState<PlayerOption[]>([]);
+  const { data: playersData } = useListPlayers();
+  const players: PlayerOption[] = (playersData as any) || [];
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,14 +99,8 @@ export default function Cobros() {
   useEffect(() => {
     if (authLoading) return;
     loadCobros();
-    if (isAdmin) {
-      fetch("/api/players")
-        .then((res) => res.json())
-        .then((data) => setPlayers(Array.isArray(data) ? data : []))
-        .catch(() => setPlayers([]));
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAdmin]);
+  }, [authLoading]);
 
   const nombreJugador = (playerId: number) =>
     players.find((p) => p.id === playerId)?.name || `Jugador #${playerId}`;
