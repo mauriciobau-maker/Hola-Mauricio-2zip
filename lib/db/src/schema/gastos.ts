@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { encuentrosTable } from "./encuentros";
@@ -41,6 +41,9 @@ export const cobrosTable = pgTable("cobros", {
   encuentroId: integer("encuentro_id").references(() => encuentrosTable.id, { onDelete: "set null" }),
   gastoId: integer("gasto_id").references(() => gastosTable.id, { onDelete: "set null" }),
   monto: integer("monto").notNull().default(0),
+  // Desglose libre: [{ concepto: "Cancha 14/9", monto: 7500 }, { concepto: "Saldo a favor", monto: -14 }, ...]
+  // "monto" de arriba siempre es la suma de estos items (se recalcula en el backend).
+  items: jsonb("items").$type<{ concepto: string; monto: number }[]>(),
   estado: text("estado").notNull().default("pendiente"),
   comprobanteUrl: text("comprobante_url"),
   pagadoAt: timestamp("pagado_at", { withTimezone: true }),
@@ -49,8 +52,24 @@ export const cobrosTable = pgTable("cobros", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Calculadora de torneo: solo la llena el administrador. Reparte el costo
+// (proveedores - descuento) entre los jugadores seleccionados, y puede
+// aplicarse como un ítem de cobro a cada uno de ellos.
+export const torneoCalculosTable = pgTable("torneo_calculos", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull().references(() => clubsTable.id),
+  nombre: text("nombre").notNull(),
+  items: jsonb("items").notNull().$type<{ concepto: string; monto: number }[]>(),
+  descuento: integer("descuento").notNull().default(0),
+  jugadorIds: jsonb("jugador_ids").notNull().$type<number[]>(),
+  aplicado: boolean("aplicado").notNull().default(false),
+  creadoPor: text("creado_por"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertGastoSchema = createInsertSchema(gastosTable).omit({ id: true, createdAt: true });
 export type InsertGasto = z.infer<typeof insertGastoSchema>;
 export type Gasto = typeof gastosTable.$inferSelect;
 export type GastoParticipante = typeof gastoParticipantesTable.$inferSelect;
 export type Cobro = typeof cobrosTable.$inferSelect;
+export type TorneoCalculo = typeof torneoCalculosTable.$inferSelect;
