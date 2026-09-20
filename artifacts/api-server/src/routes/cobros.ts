@@ -27,6 +27,26 @@ function isAdminUser(user: ReturnType<typeof getSessionUser>): boolean {
   return isSuperAdminUser(user) || isClubAdminUser(user);
 }
 
+type CobroItem = { concepto: string; monto: number };
+
+// Valida un desglose libre: cada línea necesita un concepto (texto) y un
+// monto numérico. El monto puede ser negativo (ej. "Saldo a favor").
+function normalizeItems(raw: unknown): CobroItem[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const items: CobroItem[] = [];
+  for (const entry of raw) {
+    const concepto = typeof entry?.concepto === "string" ? entry.concepto.trim() : "";
+    const monto = Number(entry?.monto);
+    if (!concepto || !Number.isFinite(monto)) return null;
+    items.push({ concepto, monto });
+  }
+  return items;
+}
+
+function sumItems(items: CobroItem[]): number {
+  return items.reduce((acc, it) => acc + it.monto, 0);
+}
+
 // GET: Admin (club/super) ve todos los cobros de su alcance.
 // Un jugador normal solo ve SUS propios cobros, nunca los de otros jugadores.
 router.get("/", async (req: Request, res: Response): Promise<void> => {
@@ -67,9 +87,9 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST: clubId nunca proviene de un usuario normal; el Super Admin debe
-// indicar explícitamente el club objetivo. El jugador también debe pertenecer
-// al mismo club para impedir asociaciones cruzadas.
+// POST: clubId ya viene resuelto por requireCommunityAccess (incluyendo el
+// club activo de un Super Admin). El jugador debe pertenecer a ese mismo
+// club para impedir asociaciones cruzadas.
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
@@ -81,14 +101,20 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { playerId, monto, notas } = req.body;
-    const targetClubId = isSuperAdminUser(user)
-      ? Number(req.body.clubId)
-      : user.clubId;
-
-    if (!Number.isInteger(targetClubId) || targetClubId! <= 0) {
+    const { playerId, notas } = req.body;
+    const items = normalizeItems(req.body.items);
+    if (!items) {
       res.status(400).json({
-        error: "Debe indicarse un club válido para registrar el cobro",
+        error: "Agrega al menos un concepto con su monto",
+      });
+      return;
+    }
+
+    const targetClubId = Number(user.clubId);
+
+    if (!Number.isInteger(targetClubId) || targetClubId <= 0) {
+      res.status(400).json({
+        error: "Selecciona un club activo antes de registrar el cobro",
       });
       return;
     }
@@ -119,7 +145,8 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       .values({
         playerId: normalizedPlayerId,
         clubId: targetClubId!,
-        monto,
+        monto: sumItems(items),
+        items,
         notas,
         estado: "pendiente",
       })
@@ -165,11 +192,17 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
 
     if (admin) {
       const { estado, notas } = req.body;
+      const newItems = req.body.items !== undefined ? normalizeItems(req.body.items) : undefined;
+      if (req.body.items !== undefined && !newItems) {
+        res.status(400).json({ error: "El desglose debe tener al menos un concepto válido" });
+        return;
+      }
       const [updated] = await db
         .update(cobrosTable)
         .set({
           ...(estado !== undefined ? { estado } : {}),
           ...(notas !== undefined ? { notas } : {}),
+          ...(newItems ? { items: newItems, monto: sumItems(newItems) } : {}),
           pagadoAt: estado === "pagado" ? new Date() : existing.pagadoAt,
           confirmadoPor:
             estado === "pagado"
