@@ -11,6 +11,7 @@ import clubRouter from "./club";
 import publicClubRouter from "./publicClub";
 import adminRouter from "./admin";
 import cobrosRouter from "./cobros";
+import torneoRouter from "./torneo";
 import sportsRouter from "./sports";
 import categoriesRouter from "./categories";
 import clubCategoriesP0Router from "./clubCategoriesP0";
@@ -39,6 +40,7 @@ router.use(clubCategoriesP0Router);
 router.use(clubRouter);
 router.use(adminRouter);
 router.use("/cobros", cobrosRouter);
+router.use("/torneo-calculos", torneoRouter);
 router.use(sportsRouter);
 router.use(categoriesRouter);
 
