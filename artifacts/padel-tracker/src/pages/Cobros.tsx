@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, AlertCircle, Upload, Plus, Trash2, Image as ImageIcon, Calculator } from "lucide-react";
+import { Check, AlertCircle, Upload, Plus, Trash2, Image as ImageIcon, Calculator, Pencil } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useListPlayers } from "@workspace/api-client-react";
 
@@ -24,12 +24,16 @@ interface PlayerOption {
   name: string;
 }
 
+interface TorneoJugador {
+  playerId: number;
+  ajuste: number;
+}
+
 interface TorneoCalculo {
   id: number;
   nombre: string;
   items: CobroItem[];
-  descuento: number;
-  jugadorIds: number[];
+  jugadores: TorneoJugador[];
   aplicado: boolean;
 }
 
@@ -89,6 +93,12 @@ function resizeToDataUrl(file: File, maxSize: number): Promise<string> {
 
 function sumRows(rows: ItemRow[]): number {
   return rows.reduce((acc, r) => acc + (Number(r.monto) || 0), 0);
+}
+
+function rowsToItems(rows: ItemRow[]): CobroItem[] {
+  return rows
+    .filter((r) => r.concepto.trim() && r.monto !== "")
+    .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto) }));
 }
 
 // Editor reutilizable de líneas "concepto + monto" (conceptos libres).
@@ -166,6 +176,11 @@ export default function Cobros() {
   const [formNotas, setFormNotas] = useState("");
   const [savingForm, setSavingForm] = useState(false);
 
+  // Edición de un cobro existente (solo admin, mientras no esté pagado)
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editItems, setEditItems] = useState<ItemRow[]>([{ concepto: "", monto: "" }]);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Comprobante / acción por fila, mientras el jugador la sube
   const [uploadingId, setUploadingId] = useState<number | null>(null);
 
@@ -174,8 +189,8 @@ export default function Cobros() {
   const [calculos, setCalculos] = useState<TorneoCalculo[]>([]);
   const [calcNombre, setCalcNombre] = useState("");
   const [calcItems, setCalcItems] = useState<ItemRow[]>([{ concepto: "", monto: "" }]);
-  const [calcDescuento, setCalcDescuento] = useState("0");
   const [calcJugadores, setCalcJugadores] = useState<number[]>([]);
+  const [calcAjustes, setCalcAjustes] = useState<Record<number, string>>({});
   const [savingCalc, setSavingCalc] = useState(false);
   const [applyingId, setApplyingId] = useState<number | null>(null);
 
@@ -207,9 +222,7 @@ export default function Cobros() {
   const crearCobro = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const items = formItems
-      .filter((r) => r.concepto.trim() && r.monto !== "")
-      .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto) }));
+    const items = rowsToItems(formItems);
 
     if (!formPlayerId) {
       setError("Elige un jugador");
@@ -243,6 +256,43 @@ export default function Cobros() {
       setError(err.message || "No se pudo crear el cobro");
     } finally {
       setSavingForm(false);
+    }
+  };
+
+  const empezarEdicion = (cobro: Cobro) => {
+    setEditingId(cobro.id);
+    setEditItems(
+      cobro.items && cobro.items.length > 0
+        ? cobro.items.map((it) => ({ concepto: it.concepto, monto: String(it.monto) }))
+        : [{ concepto: "", monto: String(cobro.monto) }],
+    );
+  };
+
+  const guardarEdicion = async (id: number) => {
+    setError(null);
+    const items = rowsToItems(editItems);
+    if (items.length === 0) {
+      setError("Agrega al menos un concepto con su monto");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/cobros/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "No se pudo guardar el cambio");
+      }
+      const updated = await res.json();
+      setCobros((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      setEditingId(null);
+    } catch (err: any) {
+      setError(err.message || "No se pudo guardar el cambio");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -303,12 +353,18 @@ export default function Cobros() {
     }
   };
 
+  const toggleJugadorCalc = (id: number) => {
+    setCalcJugadores((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  };
+
+  const seleccionarTodos = () => {
+    setCalcJugadores(calcJugadores.length === players.length ? [] : players.map((p) => p.id));
+  };
+
   const crearCalculo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const items = calcItems
-      .filter((r) => r.concepto.trim() && r.monto !== "")
-      .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto) }));
+    const items = rowsToItems(calcItems);
 
     if (!calcNombre.trim()) {
       setError("Ponle un nombre al torneo/actividad");
@@ -330,8 +386,10 @@ export default function Cobros() {
         body: JSON.stringify({
           nombre: calcNombre.trim(),
           items,
-          descuento: Number(calcDescuento) || 0,
-          jugadorIds: calcJugadores,
+          jugadores: calcJugadores.map((id) => ({
+            playerId: id,
+            ajuste: Number(calcAjustes[id] || 0),
+          })),
         }),
       });
       if (!res.ok) {
@@ -340,8 +398,8 @@ export default function Cobros() {
       }
       setCalcNombre("");
       setCalcItems([{ concepto: "", monto: "" }]);
-      setCalcDescuento("0");
       setCalcJugadores([]);
+      setCalcAjustes({});
       loadCalculos();
     } catch (err: any) {
       setError(err.message || "No se pudo guardar la calculadora");
@@ -368,12 +426,8 @@ export default function Cobros() {
     }
   };
 
-  const toggleJugadorCalc = (id: number) => {
-    setCalcJugadores((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
-  };
-
-  const calcTotal = sumRows(calcItems) - (Number(calcDescuento) || 0);
-  const calcPP = calcJugadores.length > 0 ? Math.round(calcTotal / calcJugadores.length) : 0;
+  const calcTotal = sumRows(calcItems);
+  const calcBasePP = calcJugadores.length > 0 ? Math.round(calcTotal / calcJugadores.length) : 0;
 
   if (loading || authLoading) {
     return <div className="p-6 text-muted-foreground">Cargando cobros...</div>;
@@ -451,7 +505,9 @@ export default function Cobros() {
         <div className="bg-card border rounded-xl p-4 space-y-4 max-w-2xl">
           <h2 className="font-semibold">Calculadora de torneo</h2>
           <p className="text-xs text-muted-foreground">
-            Ingresa los costos (proveedores, cancha, etc.), un descuento si aplica, y a qué jugadores se les reparte. Al aplicar, se crea un cobro con ese monto por persona para cada uno.
+            Ingresa los costos compartidos y a qué jugadores se les reparte en partes iguales. Si a
+            alguien le corresponde un descuento o un saldo pendiente, ajústalo individualmente junto
+            a su nombre — no afecta a los demás.
           </p>
           <form onSubmit={crearCalculo} className="space-y-3">
             <div>
@@ -464,38 +520,48 @@ export default function Cobros() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Costos</label>
+              <label className="block text-sm font-medium mb-1">Costos compartidos</label>
               <ItemRowsEditor rows={calcItems} setRows={setCalcItems} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Descuento</label>
-              <input
-                type="number"
-                value={calcDescuento}
-                onChange={(e) => setCalcDescuento(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Jugadores que lo dividen ({calcJugadores.length})
-              </label>
-              <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                {players.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={calcJugadores.includes(p.id)}
-                      onChange={() => toggleJugadorCalc(p.id)}
-                    />
-                    {p.name}
-                  </label>
-                ))}
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium">
+                  Jugadores que lo dividen ({calcJugadores.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={seleccionarTodos}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {calcJugadores.length === players.length ? "Ninguno" : "Seleccionar todos"}
+                </button>
+              </div>
+              <div className="max-h-56 overflow-y-auto border rounded-lg p-2 space-y-1">
+                {players.map((p) => {
+                  const checked = calcJugadores.includes(p.id);
+                  return (
+                    <div key={p.id} className="flex items-center gap-2 text-sm">
+                      <label className="flex items-center gap-2 flex-1">
+                        <input type="checkbox" checked={checked} onChange={() => toggleJugadorCalc(p.id)} />
+                        {p.name}
+                      </label>
+                      {checked && (
+                        <input
+                          type="number"
+                          placeholder="Ajuste (+/-)"
+                          value={calcAjustes[p.id] ?? ""}
+                          onChange={(e) => setCalcAjustes({ ...calcAjustes, [p.id]: e.target.value })}
+                          className={inputCls + " w-28 text-xs"}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <div className="text-sm bg-muted/50 rounded-lg p-3 flex justify-between">
               <span>Total: ${calcTotal}</span>
-              <span className="font-semibold">Por jugador: ${calcPP}</span>
+              <span className="font-semibold">Parte base por jugador: ${calcBasePP}</span>
             </div>
             <button
               type="submit"
@@ -510,14 +576,16 @@ export default function Cobros() {
             <div className="border-t pt-3 space-y-2">
               <h3 className="text-sm font-medium">Calculadoras guardadas</h3>
               {calculos.map((c) => {
-                const total = c.items.reduce((acc, it) => acc + it.monto, 0) - c.descuento;
-                const pp = c.jugadorIds.length > 0 ? Math.round(total / c.jugadorIds.length) : 0;
+                const totalCostos = c.items.reduce((acc, it) => acc + it.monto, 0);
+                const basePP = c.jugadores.length > 0 ? Math.round(totalCostos / c.jugadores.length) : 0;
+                const conAjuste = c.jugadores.filter((j) => j.ajuste).length;
                 return (
                   <div key={c.id} className="flex items-center justify-between text-sm border rounded-lg p-2">
                     <div>
                       <div className="font-medium">{c.nombre}</div>
                       <div className="text-muted-foreground text-xs">
-                        Total ${total} · {c.jugadorIds.length} jugadores · ${pp} c/u
+                        Total ${totalCostos} · {c.jugadores.length} jugadores · ${basePP} c/u base
+                        {conAjuste > 0 && ` · ${conAjuste} con ajuste individual`}
                       </div>
                     </div>
                     {c.aplicado ? (
@@ -559,78 +627,113 @@ export default function Cobros() {
                 </td>
               </tr>
             )}
-            {cobros.map((cobro) => (
-              <tr key={cobro.id} className="border-b last:border-0 align-top">
-                {isAdmin && <td className="p-3">{nombreJugador(cobro.playerId)}</td>}
-                <td className="p-3 text-xs text-muted-foreground">
-                  {cobro.items && cobro.items.length > 0 ? (
-                    <ul className="space-y-0.5">
-                      {cobro.items.map((it, i) => (
-                        <li key={i}>
-                          {it.concepto}: ${it.monto}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-3 font-medium">${cobro.monto}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-1 rounded text-xs ${ESTADO_STYLES[cobro.estado] || "bg-gray-100 text-gray-800"}`}>
-                    {ESTADO_LABEL[cobro.estado] || cobro.estado}
-                  </span>
-                </td>
-                <td className="p-3">
-                  {cobro.comprobanteUrl ? (
-                    <a href={cobro.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                      <ImageIcon size={14} /> Ver
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-3 text-right">
-                  <div className="flex gap-2 justify-end items-center">
-                    {isAdmin && cobro.estado !== "pagado" && (
-                      <button
-                        onClick={() => confirmarPago(cobro.id)}
-                        className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
-                        title="Confirmar pago"
-                      >
-                        <Check size={16} />
-                      </button>
-                    )}
-                    {!isAdmin && cobro.estado !== "pagado" && (
-                      <>
+            {cobros.map((cobro) => {
+              const enEdicion = editingId === cobro.id;
+              return (
+                <tr key={cobro.id} className="border-b last:border-0 align-top">
+                  {isAdmin && <td className="p-3">{nombreJugador(cobro.playerId)}</td>}
+                  {enEdicion ? (
+                    <td colSpan={2} className="p-3">
+                      <ItemRowsEditor rows={editItems} setRows={setEditItems} />
+                      <div className="flex gap-2 mt-2">
                         <button
-                          onClick={() => marcarComoPagado(cobro.id)}
-                          disabled={uploadingId === cobro.id}
-                          className="px-2 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:opacity-50"
-                          title="Marcar que ya pagué"
+                          onClick={() => guardarEdicion(cobro.id)}
+                          disabled={savingEdit}
+                          className="px-3 py-1 bg-primary text-primary-foreground rounded text-xs disabled:opacity-50"
                         >
-                          Ya pagué
+                          {savingEdit ? "Guardando..." : "Guardar"}
                         </button>
-                        <label className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer" title="Adjuntar comprobante">
-                          {uploadingId === cobro.id ? "..." : <Upload size={16} />}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={uploadingId === cobro.id}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) subirComprobante(cobro.id, file);
-                              e.target.value = "";
-                            }}
-                          />
-                        </label>
-                      </>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="px-3 py-1 border rounded text-xs"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </td>
+                  ) : (
+                    <>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {cobro.items && cobro.items.length > 0 ? (
+                          <ul className="space-y-0.5">
+                            {cobro.items.map((it, i) => (
+                              <li key={i}>
+                                {it.concepto}: ${it.monto}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="p-3 font-medium">${cobro.monto}</td>
+                    </>
+                  )}
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded text-xs ${ESTADO_STYLES[cobro.estado] || "bg-gray-100 text-gray-800"}`}>
+                      {ESTADO_LABEL[cobro.estado] || cobro.estado}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    {cobro.comprobanteUrl ? (
+                      <a href={cobro.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                        <ImageIcon size={14} /> Ver
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="p-3 text-right">
+                    <div className="flex gap-2 justify-end items-center">
+                      {isAdmin && !enEdicion && cobro.estado !== "pagado" && (
+                        <button
+                          onClick={() => empezarEdicion(cobro)}
+                          className="p-2 bg-muted text-foreground rounded hover:bg-muted/70"
+                          title="Editar desglose"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {isAdmin && cobro.estado !== "pagado" && (
+                        <button
+                          onClick={() => confirmarPago(cobro.id)}
+                          className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
+                          title="Confirmar pago"
+                        >
+                          <Check size={16} />
+                        </button>
+                      )}
+                      {!isAdmin && cobro.estado !== "pagado" && (
+                        <>
+                          <button
+                            onClick={() => marcarComoPagado(cobro.id)}
+                            disabled={uploadingId === cobro.id}
+                            className="px-2 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                            title="Marcar que ya pagué"
+                          >
+                            Ya pagué
+                          </button>
+                          <label className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer" title="Adjuntar comprobante">
+                            {uploadingId === cobro.id ? "..." : <Upload size={16} />}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingId === cobro.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) subirComprobante(cobro.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
