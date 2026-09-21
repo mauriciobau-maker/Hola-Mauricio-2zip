@@ -53,15 +53,16 @@ export const cobrosTable = pgTable("cobros", {
 });
 
 // Calculadora de torneo: solo la llena el administrador. Reparte el costo
-// (proveedores - descuento) entre los jugadores seleccionados, y puede
-// aplicarse como un ítem de cobro a cada uno de ellos.
+// entre los jugadores seleccionados en partes iguales, y permite un ajuste
+// individual por jugador (positivo o negativo) para casos como "a este le
+// toca descuento" o "este arrastra saldo pendiente". Al aplicar, crea un
+// cobro por jugador con su parte + su ajuste, como ítems separados.
 export const torneoCalculosTable = pgTable("torneo_calculos", {
   id: serial("id").primaryKey(),
   clubId: integer("club_id").notNull().references(() => clubsTable.id),
   nombre: text("nombre").notNull(),
   items: jsonb("items").notNull().$type<{ concepto: string; monto: number }[]>(),
-  descuento: integer("descuento").notNull().default(0),
-  jugadorIds: jsonb("jugador_ids").notNull().$type<number[]>(),
+  jugadores: jsonb("jugadores").notNull().$type<{ playerId: number; ajuste: number }[]>(),
   aplicado: boolean("aplicado").notNull().default(false),
   creadoPor: text("creado_por"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
