@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { encuentrosTable } from "./encuentros";
@@ -41,10 +41,30 @@ export const cobrosTable = pgTable("cobros", {
   encuentroId: integer("encuentro_id").references(() => encuentrosTable.id, { onDelete: "set null" }),
   gastoId: integer("gasto_id").references(() => gastosTable.id, { onDelete: "set null" }),
   monto: integer("monto").notNull().default(0),
+  // Desglose libre: [{ concepto: "Cancha 14/9", monto: 7500 }, { concepto: "Saldo a favor", monto: -14 }, ...]
+  // "monto" de arriba siempre es la suma de estos items (se recalcula en el backend).
+  items: jsonb("items").$type<{ concepto: string; monto: number }[]>(),
   estado: text("estado").notNull().default("pendiente"),
+  comprobanteUrl: text("comprobante_url"),
   pagadoAt: timestamp("pagado_at", { withTimezone: true }),
   confirmadoPor: text("confirmado_por"),
   notas: text("notas"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Calculadora de torneo: solo la llena el administrador. Reparte el costo
+// entre los jugadores seleccionados en partes iguales, y permite un ajuste
+// individual por jugador (positivo o negativo) para casos como "a este le
+// toca descuento" o "este arrastra saldo pendiente". Al aplicar, crea un
+// cobro por jugador con su parte + su ajuste, como ítems separados.
+export const torneoCalculosTable = pgTable("torneo_calculos", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull().references(() => clubsTable.id),
+  nombre: text("nombre").notNull(),
+  items: jsonb("items").notNull().$type<{ concepto: string; monto: number }[]>(),
+  jugadores: jsonb("jugadores").notNull().$type<{ playerId: number; ajuste: number }[]>(),
+  aplicado: boolean("aplicado").notNull().default(false),
+  creadoPor: text("creado_por"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -53,3 +73,4 @@ export type InsertGasto = z.infer<typeof insertGastoSchema>;
 export type Gasto = typeof gastosTable.$inferSelect;
 export type GastoParticipante = typeof gastoParticipantesTable.$inferSelect;
 export type Cobro = typeof cobrosTable.$inferSelect;
+export type TorneoCalculo = typeof torneoCalculosTable.$inferSelect;
