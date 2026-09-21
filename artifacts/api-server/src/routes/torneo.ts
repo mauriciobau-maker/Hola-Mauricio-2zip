@@ -65,7 +65,20 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST: crea una calculadora (proveedores/costos + descuento + jugadores que lo dividen).
+function normalizeJugadores(raw: unknown): { playerId: number; ajuste: number }[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const jugadores: { playerId: number; ajuste: number }[] = [];
+  for (const entry of raw) {
+    const playerId = Number(entry?.playerId);
+    const ajuste = Number(entry?.ajuste ?? 0);
+    if (!Number.isInteger(playerId) || playerId <= 0 || !Number.isFinite(ajuste)) return null;
+    jugadores.push({ playerId, ajuste });
+  }
+  return jugadores;
+}
+
+// POST: crea una calculadora (costos compartidos + jugadores que lo dividen,
+// cada uno con su propio ajuste opcional).
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
@@ -77,10 +90,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 
     const nombre = typeof req.body.nombre === "string" ? req.body.nombre.trim() : "";
     const items = normalizeItems(req.body.items);
-    const descuento = Number(req.body.descuento ?? 0);
-    const jugadorIds = Array.isArray(req.body.jugadorIds)
-      ? req.body.jugadorIds.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
-      : [];
+    const jugadores = normalizeJugadores(req.body.jugadores);
 
     if (!nombre) {
       res.status(400).json({ error: "Ponle un nombre al torneo/actividad" });
@@ -90,11 +100,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: "Agrega al menos un concepto de costo" });
       return;
     }
-    if (!Number.isFinite(descuento)) {
-      res.status(400).json({ error: "Descuento inválido" });
-      return;
-    }
-    if (jugadorIds.length === 0) {
+    if (!jugadores) {
       res.status(400).json({ error: "Selecciona al menos un jugador para repartir el costo" });
       return;
     }
@@ -105,7 +111,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       .from(playersTable)
       .where(and(eq(playersTable.clubId, clubId)));
     const validIds = new Set(validPlayers.map((p) => p.id));
-    if (!jugadorIds.every((id: number) => validIds.has(id))) {
+    if (!jugadores.every((j) => validIds.has(j.playerId))) {
       res.status(400).json({ error: "Uno o más jugadores no pertenecen a este club" });
       return;
     }
@@ -116,8 +122,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         clubId,
         nombre,
         items,
-        descuento,
-        jugadorIds,
+        jugadores,
         creadoPor: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.id || "admin",
       })
       .returning();
@@ -129,8 +134,9 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST /:id/aplicar: crea un ítem de cobro "nombre del torneo: pp" para cada
-// jugador seleccionado. pp = (suma de items - descuento) / cantidad de jugadores.
+// POST /:id/aplicar: reparte el costo total en partes iguales entre todos los
+// jugadores, y a cada uno le suma su propio ajuste (si lo tiene) como una
+// línea aparte, para que quede claro en su detalle de dónde viene cada peso.
 router.post("/:id/aplicar", async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getSessionUser(req);
@@ -156,20 +162,24 @@ router.post("/:id/aplicar", async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const total = calculo.items.reduce((acc, it) => acc + it.monto, 0) - calculo.descuento;
-    const jugadorIds = calculo.jugadorIds;
-    const pp = Math.round(total / jugadorIds.length);
+    const totalCostos = calculo.items.reduce((acc, it) => acc + it.monto, 0);
+    const jugadores = calculo.jugadores;
+    const basePP = Math.round(totalCostos / jugadores.length);
 
     const nuevosCobros = await db
       .insert(cobrosTable)
       .values(
-        jugadorIds.map((playerId) => ({
-          playerId,
-          clubId: calculo.clubId,
-          monto: pp,
-          items: [{ concepto: calculo.nombre, monto: pp }],
-          estado: "pendiente" as const,
-        })),
+        jugadores.map(({ playerId, ajuste }) => {
+          const items = [{ concepto: calculo.nombre, monto: basePP }];
+          if (ajuste) items.push({ concepto: "Ajuste", monto: ajuste });
+          return {
+            playerId,
+            clubId: calculo.clubId,
+            monto: basePP + ajuste,
+            items,
+            estado: "pendiente" as const,
+          };
+        }),
       )
       .returning();
 
@@ -178,7 +188,7 @@ router.post("/:id/aplicar", async (req: Request, res: Response): Promise<void> =
       .set({ aplicado: true })
       .where(eq(torneoCalculosTable.id, id));
 
-    res.status(201).json({ pp, total, cobrosCreados: nuevosCobros.length });
+    res.status(201).json({ basePP, totalCostos, cobrosCreados: nuevosCobros.length });
   } catch (error) {
     console.error("Error al aplicar calculadora de torneo:", error);
     res.status(500).json({ error: "Error al aplicar calculadora de torneo" });
