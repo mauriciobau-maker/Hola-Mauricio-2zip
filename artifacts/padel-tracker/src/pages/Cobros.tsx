@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Check, AlertCircle, Upload, Plus, Trash2, Image as ImageIcon, Calculator, Pencil } from "lucide-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { useListPlayers } from "@workspace/api-client-react";
 
 interface CobroItem {
