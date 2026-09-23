@@ -1,5 +1,5 @@
 import { useListEncuentros } from "@workspace/api-client-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
