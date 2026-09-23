@@ -1,4 +1,4 @@
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
