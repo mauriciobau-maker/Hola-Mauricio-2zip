@@ -1,16 +1,8 @@
-import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
-import {
-  clearSession,
-  getOidcConfig,
-  getSessionId,
-  getSession,
-  updateSession,
-  type SessionData,
-} from "../lib/auth";
+import { clerkMiddleware, getAuth, clerkClient } from "@clerk/express";
 
 declare global {
   namespace Express {
@@ -28,71 +20,25 @@ declare global {
   }
 }
 
-async function refreshIfExpired(
-  sid: string,
-  session: SessionData,
-): Promise<SessionData | null> {
-  const now = Math.floor(Date.now() / 1000);
-  if (!session.expires_at || now <= session.expires_at) return session;
-
-  if (!session.refresh_token) return null;
-
-  try {
-    const config = await getOidcConfig();
-    const tokens = await oidc.refreshTokenGrant(
-      config,
-      session.refresh_token,
-    );
-    session.access_token = tokens.access_token;
-    session.refresh_token = tokens.refresh_token ?? session.refresh_token;
-    session.expires_at = tokens.expiresIn()
-      ? now + tokens.expiresIn()!
-      : session.expires_at;
-    await updateSession(sid, session);
-    return session;
-  } catch {
-    return null;
-  }
-}
+// Lee la cookie/header de sesión de Clerk y, si existe, deja el resultado
+// disponible vía getAuth(req). No golpea la base de datos ni la red de
+// Clerk por sí sola — debe ir antes de authMiddleware.
+export const clerkAuth = clerkMiddleware();
 
 /**
- * The session contains a snapshot of the user. Authorization attributes that
- * live in the application database must not become stale after an admin/club
- * change, so refresh them for each authenticated request.
+ * A partir del usuario ya verificado por Clerk, resuelve (o crea, la
+ * primera vez que ese usuario de Clerk aparece) la fila correspondiente
+ * en nuestra propia tabla `users` — la misma tabla y las mismas columnas
+ * (clubId, playerId, isAdmin, isClubAdmin) que ya usaba todo el resto de
+ * la aplicación. Así ninguna ruta existente (requireCommunityAccess,
+ * isSuperAdminUser, etc.) necesita enterarse de que cambió el proveedor
+ * de login.
  *
- * Authorization flags are normalized here to the canonical numeric form used
- * by the existing RBAC layer. This prevents a boolean/string representation
- * mismatch from making the same Super Admin appear authorized in the client
- * but unauthorized to a protected API route.
+ * Igual que el middleware anterior, los datos de autorización se leen
+ * frescos de la base en cada request — si un admin cambia el rol o el
+ * club de alguien, se refleja de inmediato, sin esperar a que expire
+ * ninguna sesión cacheada.
  */
-async function hydrateCurrentUser(session: SessionData): Promise<SessionData> {
-  const [dbUser] = await db
-    .select({
-      id: usersTable.id,
-      email: usersTable.email,
-      firstName: usersTable.firstName,
-      lastName: usersTable.lastName,
-      profileImageUrl: usersTable.profileImageUrl,
-      clubId: usersTable.clubId,
-      isAdmin: usersTable.isAdmin,
-      isClubAdmin: usersTable.isClubAdmin,
-      playerId: usersTable.playerId,
-    })
-    .from(usersTable)
-    .where(eq(usersTable.id, session.user.id));
-
-  if (!dbUser) return session;
-
-  session.user = {
-    ...session.user,
-    ...dbUser,
-    isAdmin: dbUser.isAdmin ? 1 : 0,
-    isClubAdmin: dbUser.isClubAdmin ? 1 : 0,
-  } as AuthUser;
-
-  return session;
-}
-
 export async function authMiddleware(
   req: Request,
   res: Response,
@@ -102,32 +48,53 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  const sid = getSessionId(req);
-  if (!sid) {
-    next();
-    return;
-  }
-
-  const session = await getSession(sid);
-  if (!session?.user?.id) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
-  const refreshed = await refreshIfExpired(sid, session);
-  if (!refreshed) {
-    await clearSession(res, sid);
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
     next();
     return;
   }
 
   try {
-    const hydrated = await hydrateCurrentUser(refreshed);
-    req.user = hydrated.user;
+    let [dbUser] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId));
+
+    if (!dbUser) {
+      // Primera vez que este usuario de Clerk hace un pedido autenticado:
+      // le creamos su fila en nuestra tabla. Si ya tenías una cuenta previa
+      // (de Replit Auth) que quieras conservar, se vincula a mano una sola
+      // vez asignándole este mismo clerkUserId — no se hace automático
+      // por email, para no vincular cuentas por error.
+      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      [dbUser] = await db
+        .insert(usersTable)
+        .values({
+          clerkUserId,
+          email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
+          firstName: clerkUser.firstName ?? null,
+          lastName: clerkUser.lastName ?? null,
+          profileImageUrl: clerkUser.imageUrl ?? null,
+        })
+        .returning();
+    }
+
+    req.user = {
+      id: dbUser.id,
+      email: dbUser.email,
+      firstName: dbUser.firstName,
+      lastName: dbUser.lastName,
+      profileImageUrl: dbUser.profileImageUrl,
+      playerId: dbUser.playerId,
+      clubId: dbUser.clubId,
+      isAdmin: dbUser.isAdmin ? 1 : 0,
+      isClubAdmin: dbUser.isClubAdmin ? 1 : 0,
+    } as AuthUser;
   } catch (error) {
-    console.error("Error actualizando autorización del usuario:", error);
-    req.user = refreshed.user;
+    console.error("Error resolviendo el usuario autenticado con Clerk:", error);
+    // No autenticamos silenciosamente en falso: si algo falla acá, seguimos
+    // sin req.user, y las rutas protegidas rechazarán el pedido como
+    // corresponde, en vez de dejar pasar algo a medio resolver.
   }
 
   next();
