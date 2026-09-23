@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { Building2, ArrowRight, UserPlus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
