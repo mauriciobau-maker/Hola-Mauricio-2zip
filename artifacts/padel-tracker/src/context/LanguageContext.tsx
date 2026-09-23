@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { translations, Language, TranslationKey } from "../lib/translations";
-import { useAuth } from "@workspace/replit-auth-web"; // 👈 1. Importamos la autenticación
+import { useAuth } from "@/lib/useAuth"; // 👈 1. Importamos la autenticación
 
 // 👈 Solución: Re-exportamos el tipo Language para que otros archivos puedan importarlo desde aquí
 export type { Language };
