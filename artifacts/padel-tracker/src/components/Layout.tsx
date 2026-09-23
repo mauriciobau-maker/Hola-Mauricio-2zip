@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, ChevronDown, Check, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslationKey } from "../lib/translations";
 import { useQueryClient } from "@tanstack/react-query";
