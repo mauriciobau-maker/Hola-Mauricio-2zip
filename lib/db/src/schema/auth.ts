@@ -2,7 +2,10 @@ import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { clubsTable } from "./clubs";
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// (IMPORTANT) This table was mandatory for Replit Auth. Ya no se usa desde
+// que la app pasó a Clerk (Clerk maneja sus propias sesiones). Se deja sin
+// borrar por ahora — no molesta, y borrar tablas no es algo para hacer de
+// pasada.
 export const sessionsTable = pgTable(
   "sessions",
   {
@@ -13,9 +16,11 @@ export const sessionsTable = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Id del usuario en Clerk. Nulo para cuentas viejas de Replit Auth que
+  // todavía no se vincularon a un login de Clerk.
+  clerkUserId: varchar("clerk_user_id").unique(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
