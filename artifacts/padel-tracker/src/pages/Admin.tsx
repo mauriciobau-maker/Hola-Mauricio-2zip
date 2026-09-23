@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/useAuth";
 import { useLanguage } from "../context/LanguageContext";
 import CategoriesManager from "@/components/CategoriesManager";
 import { 
