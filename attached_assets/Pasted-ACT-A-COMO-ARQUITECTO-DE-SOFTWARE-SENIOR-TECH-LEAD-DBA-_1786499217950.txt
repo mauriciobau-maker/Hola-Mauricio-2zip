@@ -1,0 +1,1059 @@
+ACTÚA COMO ARQUITECTO DE SOFTWARE SENIOR + TECH LEAD + DBA POSTGRESQL + QA LEAD.
+
+OBJETIVO:
+Implementar de forma DEFINITIVA y profesional la arquitectura de Deportes, Modalidades, Partidos y Elo de Padel Tracker.
+
+QUIERO UNA SOLA IMPLEMENTACIÓN COHERENTE.
+NO quiero una cadena de parches.
+NO quiero soluciones temporales que después haya que rehacer.
+NO quiero refactors innecesarios.
+NO quiero gastar créditos de Replit en cambios que no sean imprescindibles.
+
+Antes de modificar cualquier archivo, INSPECCIONA el código y la base de datos real.
+
+============================================================
+0. CONTEXTO CRÍTICO
+============================================================
+
+La base PostgreSQL REAL fue inspeccionada y actualmente contiene estas tablas:
+
+asistencia
+club_sport_categories
+club_sports
+clubs
+cobros
+elo_history
+encuentros
+gasto_participantes
+gastos
+match_players
+matches
+memberships
+notification_subscriptions
+player_categories
+players
+sessions
+sports
+users
+
+Las tablas relacionadas con partidos y Elo contienen actualmente SOLO DATOS DE PRUEBA.
+
+Por lo tanto:
+
+NO es necesario conservar ni migrar los partidos existentes.
+NO es necesario conservar el Elo existente.
+NO es necesario reconstruir historial histórico.
+NO es necesario hacer backfill de modalidad de partidos antiguos.
+
+Los datos de prueba de:
+
+- matches
+- match_players
+- elo_history
+
+pueden eliminarse.
+
+También puede limpiarse:
+
+- player_sport_ratings
+
+si la tabla ya existiera.
+
+PERO NO eliminar ni modificar innecesariamente:
+
+- clubs
+- players
+- sports
+- club_sports
+- club_sport_categories
+- player_categories
+- users
+- memberships
+- encuentros
+- asistencia
+- gastos
+- gasto_participantes
+- cobros
+- notification_subscriptions
+- sessions
+
+salvo que una modificación sea estrictamente necesaria por FK o integridad referencial.
+
+============================================================
+1. ESQUEMA ACTUAL CONFIRMADO
+============================================================
+
+players:
+
+id
+name
+nickname
+elo
+phone
+wa_id
+wsp_consent
+language
+club_id
+created_at
+
+sports:
+
+id
+name
+slug
+team_size
+min_team_size
+max_team_size
+use_sets
+active
+
+matches:
+
+id
+club_id
+sport_id
+encuentro_id
+team1_score
+team2_score
+sets
+result
+status
+played_at
+created_at
+
+match_players:
+
+id
+match_id
+player_id
+team
+
+elo_history:
+
+id
+player_id
+match_id
+sport_id
+elo_before
+elo_after
+elo_change
+created_at
+
+============================================================
+2. PRINCIPIO ARQUITECTÓNICO DEFINITIVO
+============================================================
+
+IMPORTANTE:
+
+SPORT ≠ MODALITY.
+
+Un deporte puede tener varias modalidades.
+
+El tamaño de los equipos NO debe ser una propiedad definitiva del deporte.
+
+El tamaño del equipo pertenece a la modalidad.
+
+Ejemplos:
+
+PÁDEL:
+- Individual = 1 vs 1
+- Dobles = 2 vs 2
+
+TENIS:
+- Individual = 1 vs 1
+- Dobles = 2 vs 2
+
+FÚTBOL:
+- Fútbol 5 = 5 vs 5
+- Fútbol 7 = 7 vs 7
+- Fútbol 8 = 8 vs 8
+- Fútbol 11 = 11 vs 11
+
+El diseño debe permitir agregar nuevas modalidades en el futuro sin modificar el código.
+
+============================================================
+3. CREAR sport_modalities
+============================================================
+
+Crear tabla:
+
+sport_modalities
+
+Campos:
+
+id SERIAL PRIMARY KEY
+
+sport_id INTEGER NOT NULL
+REFERENCES sports(id)
+ON DELETE CASCADE
+
+name TEXT NOT NULL
+
+slug TEXT NOT NULL
+
+team_size INTEGER NOT NULL
+
+min_team_size INTEGER
+
+max_team_size INTEGER
+
+use_sets BOOLEAN NOT NULL DEFAULT true
+
+active BOOLEAN NOT NULL DEFAULT true
+
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+Constraint:
+
+UNIQUE(sport_id, slug)
+
+Crear índice:
+
+sport_modalities_sport_id_idx
+
+sobre sport_id.
+
+IMPORTANTE:
+
+No crear otra tabla equivalente si ya existe.
+
+Primero comprobar el esquema real.
+
+============================================================
+4. MODALIDADES INICIALES
+============================================================
+
+Crear estas modalidades iniciales únicamente si no existen:
+
+PÁDEL:
+
+name: Individual
+slug: individual
+team_size: 1
+
+name: Dobles
+slug: dobles
+team_size: 2
+
+TENIS:
+
+name: Individual
+slug: individual
+team_size: 1
+
+name: Dobles
+slug: dobles
+team_size: 2
+
+FÚTBOL:
+
+name: Fútbol 5
+slug: futbol-5
+team_size: 5
+
+name: Fútbol 7
+slug: futbol-7
+team_size: 7
+
+name: Fútbol 8
+slug: futbol-8
+team_size: 8
+
+name: Fútbol 11
+slug: futbol-11
+team_size: 11
+
+IMPORTANTE:
+
+No asumir IDs específicos.
+Buscar los sports por slug o nombre existente y utilizar sus IDs reales.
+
+Si alguno de estos deportes no existe, NO inventar otro deporte ni modificar la estructura sin avisar.
+
+============================================================
+5. MODIFICAR matches
+============================================================
+
+Agregar:
+
+modality_id INTEGER
+
+FK:
+
+REFERENCES sport_modalities(id)
+
+NO eliminar sport_id.
+
+El partido debe conservar:
+
+sport_id
+modality_id
+
+porque:
+
+sport_id identifica el deporte.
+
+modality_id identifica la modalidad.
+
+Validar que:
+
+sport_modalities.sport_id = matches.sport_id
+
+para todo partido.
+
+IMPORTANTE:
+
+Como los partidos actuales son datos de prueba, NO hacer backfill.
+
+Después de implementar la estructura:
+
+ELIMINAR los partidos de prueba existentes.
+
+============================================================
+6. REGLA DE TAMAÑO DE EQUIPO
+============================================================
+
+El backend debe obtener:
+
+team_size
+
+desde:
+
+sport_modalities.team_size
+
+NO desde:
+
+sports.team_size
+
+sports.team_size se mantiene temporalmente por compatibilidad.
+
+No eliminar todavía:
+
+sports.team_size
+sports.min_team_size
+sports.max_team_size
+
+Pero ninguna nueva lógica de partidos debe depender de esas columnas para determinar el tamaño real de los equipos.
+
+============================================================
+7. VALIDACIÓN DE PARTIDOS
+============================================================
+
+Al crear o editar un partido:
+
+1. sportId debe existir.
+2. modalityId debe existir.
+3. modalityId debe pertenecer al sportId seleccionado.
+4. Obtener team_size desde sport_modalities.
+5. team1PlayerIds.length debe ser igual a team_size.
+6. team2PlayerIds.length debe ser igual a team_size.
+7. Un jugador no puede estar en ambos equipos.
+8. Todos los jugadores deben pertenecer al club actual.
+9. No permitir jugadores duplicados dentro de un equipo.
+10. No permitir crear un partido con equipos incompletos.
+
+Ejemplos:
+
+Pádel Individual:
+
+1 vs 1 → válido
+2 vs 2 → inválido con modalidad Individual
+
+Pádel Dobles:
+
+2 vs 2 → válido
+1 vs 1 → inválido
+
+Tenis Individual:
+
+1 vs 1 → válido
+
+Tenis Dobles:
+
+2 vs 2 → válido
+
+Fútbol 5:
+
+5 vs 5 → válido
+
+Fútbol 7:
+
+7 vs 7 → válido
+
+etc.
+
+NO hardcodear estas reglas en múltiples lugares.
+
+Crear una única función reutilizable para obtener/validar la configuración de modalidad.
+
+============================================================
+8. ELO: ARQUITECTURA DEFINITIVA
+============================================================
+
+El Elo debe pertenecer a:
+
+JUGADOR + DEPORTE
+
+NO a:
+
+JUGADOR + MODALIDAD.
+
+Esto significa:
+
+Mauricio:
+
+Pádel = 1580
+Tenis = 1515
+Fútbol = 1500
+
+Y:
+
+Pádel Individual
+Pádel Dobles
+
+comparten el mismo Elo de Pádel.
+
+La modalidad determina cómo se juega.
+El deporte determina el rating.
+
+============================================================
+9. CREAR player_sport_ratings
+============================================================
+
+Crear:
+
+player_sport_ratings
+
+Campos:
+
+id SERIAL PRIMARY KEY
+
+player_id INTEGER NOT NULL
+REFERENCES players(id)
+ON DELETE CASCADE
+
+sport_id INTEGER NOT NULL
+REFERENCES sports(id)
+ON DELETE CASCADE
+
+elo INTEGER NOT NULL DEFAULT 1500
+
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+Constraint:
+
+UNIQUE(player_id, sport_id)
+
+Crear índices:
+
+player_sport_ratings_player_id_idx
+
+player_sport_ratings_sport_id_idx
+
+============================================================
+10. players.elo
+============================================================
+
+NO eliminar players.elo todavía.
+
+Mantenerlo temporalmente por compatibilidad.
+
+Pero:
+
+players.elo NO será la fuente oficial del ranking.
+
+La fuente oficial será:
+
+player_sport_ratings.elo
+
+No hacer una migración innecesaria de todos los usos del campo si no están relacionados con esta funcionalidad.
+
+Identificar específicamente:
+
+- ranking
+- cálculo Elo
+- historial Elo
+- dashboard que muestre Elo
+
+y cambiar esos usos a player_sport_ratings cuando corresponda.
+
+============================================================
+11. CREACIÓN DE ELO PARA JUGADORES
+============================================================
+
+Cuando un jugador participe por primera vez en un deporte:
+
+crear:
+
+player_sport_ratings
+
+con:
+
+elo = 1500
+
+No crear ratings para modalidades.
+
+Ejemplo:
+
+Jugador nuevo + Pádel Dobles
+
+crear:
+
+player_sport_ratings(player, Pádel, 1500)
+
+NO crear:
+
+player + Pádel Dobles
+
+============================================================
+12. MOTOR ELO
+============================================================
+
+Mantener:
+
+STARTING_ELO = 1500
+
+K_FACTOR = 32
+
+Mantener el algoritmo actual de:
+
+expectedScore()
+
+calculateMatchEloChanges()
+
+Debe continuar soportando:
+
+1 vs 1
+2 vs 2
+N vs N
+
+NO crear un algoritmo diferente por deporte.
+
+El algoritmo debe recibir:
+
+team1
+team2
+team1Won
+isDraw
+
+y utilizar el Elo correspondiente al deporte.
+
+El Elo de los jugadores debe obtenerse desde:
+
+player_sport_ratings
+
+usando:
+
+player_id + sport_id
+
+============================================================
+13. PARTIDOS Y match_players
+============================================================
+
+NO cambiar estructuralmente match_players.
+
+Debe continuar siendo la fuente oficial de participantes:
+
+match_id
+player_id
+team
+
+Los jugadores de un partido SIEMPRE deben determinarse desde match_players.
+
+No duplicar jugadores en matches.
+
+============================================================
+14. ELO HISTORY
+============================================================
+
+Mantener elo_history.
+
+Campos actuales:
+
+player_id
+match_id
+sport_id
+elo_before
+elo_after
+elo_change
+created_at
+
+Esto es correcto.
+
+NO agregar modality_id salvo que exista una razón técnica real y documentada.
+
+La modalidad no crea un Elo independiente.
+
+============================================================
+15. RECONSTRUCCIÓN DE DATOS DE PRUEBA
+============================================================
+
+TODOS los partidos existentes son de prueba.
+
+Antes de las pruebas finales:
+
+DELETE de:
+
+elo_history
+match_players
+matches
+
+Respetando las FK.
+
+Si existen dependencias adicionales sobre matches, inspeccionarlas primero.
+
+NO borrar:
+
+clubs
+players
+sports
+users
+memberships
+etc.
+
+Los jugadores existentes deben comenzar nuevamente con rating 1500 por deporte.
+
+============================================================
+16. RANKING
+============================================================
+
+El ranking debe ser por deporte.
+
+Ejemplo conceptual:
+
+GET /ranking?sportId=1
+
+Debe utilizar:
+
+player_sport_ratings.elo
+
+No:
+
+players.elo
+
+Las estadísticas deben calcularse exclusivamente sobre:
+
+matches
++
+match_players
+
+y solo considerar:
+
+status = confirmed
+
+y resultados válidos:
+
+team1
+team2
+draw
+
+El ranking debe devolver:
+
+playerId
+playerName
+nickname
+sportId
+elo
+points
+wins
+losses
+draws
+totalMatches
+winRate
+rank
+
+Orden:
+
+1. Elo descendente
+2. Victorias descendente
+3. Menos derrotas
+
+Siempre limitar al club actual.
+
+============================================================
+17. DASHBOARD
+============================================================
+
+NO rediseñar dashboard.
+
+No agregar funcionalidades nuevas.
+
+Solo corregir las fuentes de datos relacionadas con Elo si actualmente utilizan:
+
+players.elo
+
+Cuando el dashboard necesite Elo de un deporte, utilizar:
+
+player_sport_ratings.
+
+============================================================
+18. API / FRONTEND
+============================================================
+
+Revisar dónde actualmente se crea un partido.
+
+El formulario debe permitir:
+
+Deporte
+Modalidad
+Jugadores equipo 1
+Jugadores equipo 2
+Resultado
+Sets cuando corresponda
+Fecha
+
+La selección de modalidad debe depender del deporte seleccionado.
+
+Ejemplo:
+
+Deporte:
+Pádel
+
+Modalidad:
+Individual
+Dobles
+
+Si se selecciona Individual:
+
+permitir exactamente 1 jugador por equipo.
+
+Si se selecciona Dobles:
+
+permitir exactamente 2 jugadores por equipo.
+
+No hardcodear modalidades en frontend.
+
+Cargarlas desde:
+
+sport_modalities
+
+============================================================
+19. SPORTS.TEAM_SIZE
+============================================================
+
+NO eliminar ahora:
+
+team_size
+min_team_size
+max_team_size
+
+Esto evita romper código existente innecesariamente.
+
+Pero documentar claramente:
+
+Estas columnas quedan LEGACY.
+
+La fuente oficial para nuevas funcionalidades es:
+
+sport_modalities.team_size
+
+No duplicar lógica de configuración.
+
+============================================================
+20. MIGRACIÓN
+============================================================
+
+Crear una migración limpia y única.
+
+Antes:
+
+- inspeccionar migraciones existentes
+- inspeccionar schema Drizzle
+- comprobar si las tablas ya existen
+- comprobar si modality_id ya existe
+
+No crear duplicados.
+
+La migración debe:
+
+1. Crear sport_modalities.
+2. Crear player_sport_ratings.
+3. Agregar modality_id a matches.
+4. Crear FK.
+5. Crear índices.
+6. Crear constraints.
+7. Insertar modalidades iniciales.
+8. Limpiar datos de prueba de matches/match_players/elo_history.
+9. Dejar ratings iniciales en 1500.
+10. No eliminar información real fuera del módulo de partidos/Elo.
+
+============================================================
+21. TRANSACCIONES E INTEGRIDAD
+============================================================
+
+Cuando sea apropiado, utilizar transacciones para operaciones relacionadas:
+
+crear partido
+crear match_players
+actualizar Elo
+crear elo_history
+
+Evitar dejar:
+
+match creado pero sin jugadores
+
+o:
+
+Elo actualizado sin historial
+
+si una operación falla.
+
+No convertir toda la aplicación a transacciones si no es necesario.
+
+Aplicar transacciones donde aporten integridad real.
+
+============================================================
+22. CONCURRENCIA
+============================================================
+
+No implementar un sistema excesivamente complejo.
+
+Pero evitar que dos confirmaciones simultáneas de partidos produzcan una corrupción evidente del Elo.
+
+Si el código actual no maneja concurrencia:
+
+identificarlo.
+
+Aplicar una solución razonable y simple dentro del alcance.
+
+No introducir Redis, colas, microservicios ni infraestructura adicional.
+
+============================================================
+23. CALIDAD DEL CÓDIGO
+============================================================
+
+No duplicar:
+
+- validaciones de modalidad
+- obtención de team_size
+- obtención de rating
+- cálculo de Elo
+
+Crear funciones reutilizables cuando corresponda.
+
+No crear abstracciones innecesarias.
+
+Priorizar código simple, legible y mantenible.
+
+============================================================
+24. DATOS INICIALES
+============================================================
+
+Los sports existentes deben conservarse.
+
+No crear deportes duplicados.
+
+Buscar por slug.
+
+Esperamos:
+
+padel
+tenis
+futbol
+
+Si el slug actual difiere:
+
+NO modificarlo automáticamente.
+
+Informar la diferencia y utilizar el registro existente.
+
+============================================================
+25. PRUEBAS OBLIGATORIAS
+============================================================
+
+Después de la migración probar:
+
+A. Pádel Individual
+
+1 vs 1
+
+Debe crear correctamente.
+
+Debe actualizar Elo Pádel.
+
+B. Pádel Dobles
+
+2 vs 2
+
+Debe crear correctamente.
+
+Debe actualizar Elo Pádel.
+
+C. Tenis Individual
+
+1 vs 1
+
+Debe crear correctamente.
+
+Debe actualizar Elo Tenis.
+
+D. Tenis Dobles
+
+2 vs 2
+
+Debe crear correctamente.
+
+Debe actualizar Elo Tenis.
+
+E. Fútbol 5
+
+5 vs 5
+
+Debe validar correctamente.
+
+F. Fútbol 7
+
+7 vs 7
+
+Debe validar correctamente.
+
+G. Validación negativa:
+
+Pádel Individual 2 vs 2
+
+Debe rechazar.
+
+H. Validación negativa:
+
+Pádel Dobles 1 vs 1
+
+Debe rechazar.
+
+I. Validación negativa:
+
+jugador repetido
+
+Debe rechazar.
+
+J. Validación negativa:
+
+jugador de otro club
+
+Debe rechazar.
+
+K. Elo independiente:
+
+Jugar partido de Pádel.
+
+Verificar que:
+
+rating Pádel cambia.
+
+rating Tenis NO cambia.
+
+L. Elo compartido entre modalidades:
+
+Jugar Pádel Individual.
+
+Verificar que cambia el Elo Pádel.
+
+Luego jugar Pádel Dobles.
+
+Verificar que utiliza el mismo rating de Pádel.
+
+M. Ranking:
+
+Pádel debe mostrar solamente rating Pádel.
+
+Tenis debe mostrar solamente rating Tenis.
+
+============================================================
+26. BUILD Y TYPECHECK
+============================================================
+
+Al terminar:
+
+ejecutar typecheck.
+
+ejecutar build.
+
+ejecutar tests existentes.
+
+Si hay errores:
+
+NO hacer cambios aleatorios.
+
+Identificar causa.
+
+Corregir solamente los errores producidos por esta implementación.
+
+============================================================
+27. REGLA CRÍTICA DE AHORRO DE CRÉDITOS
+============================================================
+
+NO realizar:
+
+- refactor general
+- limpieza general del proyecto
+- migraciones no relacionadas
+- rediseño visual
+- cambios de autenticación
+- cambios de WhatsApp
+- cambios de encuentros
+- cambios de pagos
+- cambios de usuarios
+- cambios de clubes
+- cambios de notificaciones
+- optimizaciones prematuras
+- nuevas funcionalidades
+
+El objetivo es dejar DEFINITIVO el núcleo:
+
+DEPORTE
+→ MODALIDAD
+→ PARTIDO
+→ JUGADORES
+→ ELO POR DEPORTE
+→ RANKING
+
+============================================================
+28. ANTES DE EJECUTAR
+============================================================
+
+NO empieces modificando archivos inmediatamente.
+
+Primero entrega un diagnóstico breve:
+
+1. Archivos que vas a modificar.
+2. Archivos nuevos que vas a crear.
+3. Migración que vas a crear.
+4. Tablas que vas a crear.
+5. Tabla que vas a modificar.
+6. Datos de prueba que vas a eliminar.
+7. Posibles incompatibilidades detectadas.
+
+Después de mostrar ese diagnóstico:
+
+EJECUTA la implementación completa.
+
+No pidas confirmación para cada archivo individual.
+
+============================================================
+29. AL FINAL ENTREGAR
+============================================================
+
+Informe final obligatorio:
+
+- Migración creada:
+- Tablas creadas:
+- Tablas modificadas:
+- Archivos modificados:
+- Archivos nuevos:
+- Datos de prueba eliminados:
+- Modalidades creadas:
+- Fuente oficial del Elo:
+- Resultado de typecheck:
+- Resultado de build:
+- Resultado de tests:
+- Pruebas 1v1:
+- Pruebas 2v2:
+- Pruebas fútbol:
+- Validaciones negativas:
+- Problemas encontrados:
+- Problemas pendientes:
+
+NO realizar otra modificación después de este informe.
+
+Esperar instrucciones posteriores.

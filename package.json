@@ -1,0 +1,33 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "workspaces": [
+    "artifacts/*",
+    "lib/*",
+    "scripts"
+  ],
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "npm run build --workspace=@workspace/padel-tracker",
+    "start": "NODE_ENV=production tsx server.ts",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "npm run typecheck:libs",
+    "seed:demo": "tsx scripts/seed_demo.ts",
+    "lint": "tsc --build --noEmit"
+  },
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@google/genai": "^2.26.0",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "0.45.2",
+    "express": "^5.2.1",
+    "tsx": "^4.23.1",
+    "vite": "^7.3.2"
+  }
+}

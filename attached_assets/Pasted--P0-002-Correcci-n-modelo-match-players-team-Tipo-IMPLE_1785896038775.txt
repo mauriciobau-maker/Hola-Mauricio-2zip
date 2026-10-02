@@ -1,0 +1,196 @@
+# P0-002 — Corrección modelo match_players.team
+
+Tipo:
+IMPLEMENTACIÓN
+
+Prioridad:
+P0
+
+Objetivo:
+
+Corregir la inconsistencia del campo match_players.team para que todo el sistema utilice un único formato estándar.
+
+El formato oficial del sistema es:
+
+"team1"
+"team2"
+
+NO utilizar valores numéricos.
+
+---
+
+## Contexto
+
+La auditoría detectó que:
+
+encuentros.ts genera partidos insertando:
+
+team: 1
+team: 2
+
+usando además:
+
+as any
+
+Esto provoca que PostgreSQL almacene:
+
+"1"
+"2"
+
+Mientras el resto del backend espera:
+
+"team1"
+"team2"
+
+Consecuencia:
+
+Los partidos generados desde encuentros no participan correctamente en:
+
+- Ranking
+- Elo
+- Parejas
+- Estadísticas
+
+---
+
+# Alcance permitido
+
+Modificar únicamente:
+
+artifacts/api-server/src/routes/encuentros.ts
+
+No modificar ningún otro archivo.
+
+---
+
+# Cambios requeridos
+
+## 1. Generación de partidos
+
+En la creación de match_players:
+
+Cambiar:
+
+team: 1
+
+por:
+
+team: "team1"
+
+
+Cambiar:
+
+team: 2
+
+por:
+
+team: "team2"
+
+
+Eliminar cualquier uso de:
+
+as any
+
+relacionado con esta inserción.
+
+La inserción debe respetar completamente el tipo definido por Drizzle.
+
+---
+
+## 2. Lectura de equipos dentro de encuentros.ts
+
+Existe una lógica que actualmente utiliza:
+
+Number(mp.team) === 1
+
+y
+
+Number(mp.team) === 2
+
+
+Cambiarla para utilizar directamente:
+
+mp.team === "team1"
+
+y
+
+mp.team === "team2"
+
+
+Eliminar conversiones numéricas innecesarias.
+
+---
+
+# Restricciones estrictas
+
+NO:
+
+- modificar schema Drizzle.
+- crear migraciones.
+- modificar base de datos.
+- modificar ranking.ts.
+- modificar elo.ts.
+- modificar parejas.ts.
+- modificar players.ts.
+- modificar matches.ts.
+- modificar frontend.
+- instalar dependencias.
+- realizar refactors adicionales.
+
+El cambio debe ser quirúrgico.
+
+---
+
+# Validaciones requeridas
+
+Después del cambio verificar:
+
+1.
+
+Que TypeScript compile correctamente.
+
+2.
+
+Que no exista ningún:
+
+team: 1
+
+team: 2
+
+en la generación de partidos de encuentros.
+
+3.
+
+Que no exista:
+
+as any
+
+en esa inserción.
+
+4.
+
+Que el flujo existente de partidos manuales siga funcionando.
+
+5.
+
+Que el servidor inicie correctamente.
+
+---
+
+# Entregable
+
+Entregar:
+
+1. Archivos modificados.
+
+2. Explicación exacta del cambio.
+
+3. Confirmación de archivos NO modificados.
+
+4. Resultado de pruebas.
+
+5. Confirmación de que el formato final utilizado es:
+
+team1 / team2
+
+No realizar ningún cambio adicional fuera del alcance.

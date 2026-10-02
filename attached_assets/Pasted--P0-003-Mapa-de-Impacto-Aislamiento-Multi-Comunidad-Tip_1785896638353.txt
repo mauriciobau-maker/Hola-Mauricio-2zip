@@ -1,0 +1,159 @@
+# P0-003 — Mapa de Impacto Aislamiento Multi-Comunidad
+
+Tipo:
+ANÁLISIS
+
+Prioridad:
+P0
+
+Objetivo:
+
+NO implementar cambios.
+
+NO modificar código.
+
+NO crear archivos.
+
+NO realizar migraciones.
+
+El objetivo es analizar completamente el aislamiento entre comunidades.
+
+---
+
+## Contexto
+
+La plataforma utiliza arquitectura multi-comunidad.
+
+Cada usuario pertenece a una comunidad mediante:
+
+user.clubId
+
+La regla de negocio es:
+
+Un usuario nunca puede visualizar, modificar o eliminar información perteneciente a otra comunidad.
+
+---
+
+## Auditoría inicial detectó posibles problemas:
+
+1.
+
+GET /encuentros podría devolver encuentros de todas las comunidades.
+
+2.
+
+POST/PATCH/DELETE de partidos podrían no validar pertenencia al club.
+
+3.
+
+Existen rutas con filtros inconsistentes.
+
+---
+
+## Analizar:
+
+### 1. Todas las rutas Express existentes
+
+Para cada endpoint indicar:
+
+- Archivo.
+- Método HTTP.
+- Ruta.
+- Tipo de operación:
+  - Lectura.
+  - Creación.
+  - Modificación.
+  - Eliminación.
+
+---
+
+### 2. Validación de comunidad
+
+Para cada endpoint indicar:
+
+¿Valida clubId?
+
+Valores posibles:
+
+✅ Correcto
+
+🟡 Parcial
+
+🔴 No valida
+
+
+---
+
+### 3. Identificar:
+
+Todos los lugares donde se usa:
+
+req.user.clubId
+
+user.clubId
+
+clubId
+
+
+Indicar:
+
+- Archivo.
+- Función.
+- Propósito.
+
+---
+
+### 4. Identificar si existe:
+
+- Middleware global de autorización por comunidad.
+- Middleware reutilizable de validación.
+- Función helper existente.
+
+---
+
+### 5. Proponer solución de menor impacto
+
+NO implementar.
+
+Solo recomendar:
+
+Opción A:
+Middleware central.
+
+Opción B:
+Correcciones por router.
+
+Opción C:
+Otra alternativa.
+
+Explicar:
+
+- Cantidad aproximada de archivos afectados.
+- Riesgos.
+- Orden recomendado de implementación.
+
+---
+
+IMPORTANTE:
+
+No modificar ningún archivo.
+
+No ejecutar comandos destructivos.
+
+No crear migraciones.
+
+Solo entregar análisis.
+
+---
+
+ENTREGABLE:
+
+1. Tabla completa de endpoints.
+
+2. Estado de aislamiento.
+
+3. Archivos críticos.
+
+4. Riesgos.
+
+5. Recomendación técnica.

@@ -1,0 +1,1030 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Padel Tracker IA API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Autenticación y usuarios
+  - name: players
+    description: Gestión de jugadores
+  - name: matches
+    description: Gestión de partidos
+  - name: ranking
+    description: Ranking de jugadores
+  - name: stats
+    description: Estadísticas
+  - name: encuentros
+    description: Gestión de encuentros y asistencia
+
+paths:
+  /auth/user:
+    get:
+      tags: [auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /auth/link-player:
+    post:
+      tags: [auth]
+      operationId: linkPlayerAccount
+      summary: Vincular cuenta de usuario a un jugador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkPlayerInput'
+      responses:
+        '200':
+          description: Vinculado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '401':
+          description: No autenticado
+        '404':
+          description: Jugador no encontrado
+
+  /login:
+    get:
+      tags: [auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      responses:
+        '302':
+          description: Redirect to returnTo path on success.
+
+  /logout:
+    get:
+      tags: [auth]
+      operationId: logoutBrowserSession
+      summary: Clear session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to OIDC provider logout URL.
+
+  /encuentros:
+    get:
+      tags: [encuentros]
+      operationId: listEncuentros
+      summary: Listar todos los encuentros
+      responses:
+        '200':
+          description: Lista de encuentros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Encuentro'
+    post:
+      tags: [encuentros]
+      operationId: createEncuentro
+      summary: Crear un encuentro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncuentroInput'
+      responses:
+        '201':
+          description: Encuentro creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Encuentro'
+        '401':
+          description: No autenticado
+
+  /encuentros/{id}:
+    get:
+      tags: [encuentros]
+      operationId: getEncuentro
+      summary: Obtener encuentro con lista de asistencia
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalle del encuentro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EncuentroDetail'
+        '404':
+          description: No encontrado
+    patch:
+      tags: [encuentros]
+      operationId: updateEncuentro
+      summary: Actualizar encuentro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncuentroUpdate'
+      responses:
+        '200':
+          description: Encuentro actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Encuentro'
+        '401':
+          description: No autenticado
+        '404':
+          description: No encontrado
+    delete:
+      tags: [encuentros]
+      operationId: deleteEncuentro
+      summary: Eliminar encuentro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Eliminado
+        '401':
+          description: No autenticado
+        '404':
+          description: No encontrado
+
+  /encuentros/{id}/rsvp:
+    post:
+      tags: [encuentros]
+      operationId: respondEncuentro
+      summary: Responder a un encuentro (asistir / no asistir / pendiente)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RsvpInput'
+      responses:
+        '200':
+          description: Respuesta registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsistenciaEntry'
+        '401':
+          description: No autenticado
+        '404':
+          description: Encuentro no encontrado
+
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /players:
+    get:
+      operationId: listPlayers
+      tags: [players]
+      summary: Listar todos los jugadores
+      responses:
+        "200":
+          description: Lista de jugadores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Player"
+    post:
+      operationId: createPlayer
+      tags: [players]
+      summary: Crear un nuevo jugador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerInput"
+      responses:
+        "201":
+          description: Jugador creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "400":
+          description: Datos inválidos
+
+  /players/{id}:
+    get:
+      operationId: getPlayer
+      tags: [players]
+      summary: Obtener jugador por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Jugador encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "404":
+          description: Jugador no encontrado
+    patch:
+      operationId: updatePlayer
+      tags: [players]
+      summary: Actualizar jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerUpdate"
+      responses:
+        "200":
+          description: Jugador actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "404":
+          description: Jugador no encontrado
+    delete:
+      operationId: deletePlayer
+      tags: [players]
+      summary: Eliminar jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Jugador eliminado
+        "404":
+          description: Jugador no encontrado
+
+  /players/{id}/stats:
+    get:
+      operationId: getPlayerStats
+      tags: [stats]
+      summary: Estadísticas detalladas de un jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Estadísticas del jugador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStats"
+        "404":
+          description: Jugador no encontrado
+
+  /players/{id}/elo-history:
+    get:
+      operationId: getPlayerEloHistory
+      tags: [stats]
+      summary: Historial de cambios Elo de un jugador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Historial Elo del jugador
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EloHistoryEntry"
+        "404":
+          description: Jugador no encontrado
+
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: Listar todos los partidos
+      responses:
+        "200":
+          description: Lista de partidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+    post:
+      operationId: createMatch
+      tags: [matches]
+      summary: Registrar un partido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchInput"
+      responses:
+        "201":
+          description: Partido registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "400":
+          description: Datos inválidos
+
+  /matches/{id}:
+    get:
+      operationId: getMatch
+      tags: [matches]
+      summary: Obtener partido por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Partido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "404":
+          description: Partido no encontrado
+    patch:
+      operationId: updateMatch
+      tags: [matches]
+      summary: Actualizar partido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchUpdate"
+      responses:
+        "200":
+          description: Partido actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Match"
+        "400":
+          description: Datos inválidos
+        "404":
+          description: Partido no encontrado
+    delete:
+      operationId: deleteMatch
+      tags: [matches]
+      summary: Eliminar partido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Partido eliminado
+        "404":
+          description: Partido no encontrado
+
+  /ranking:
+    get:
+      operationId: getRanking
+      tags: [ranking]
+      summary: Obtener ranking de jugadores ordenado por puntos
+      responses:
+        "200":
+          description: Ranking de jugadores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankingEntry"
+
+  /parejas:
+    get:
+      operationId: listParejas
+      tags: [stats]
+      summary: Estadísticas de todas las parejas
+      responses:
+        "200":
+          description: Lista de estadísticas por pareja
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParejaStats"
+
+  /parejas/{player1Id}/{player2Id}:
+    get:
+      operationId: getParejaDetail
+      tags: [stats]
+      summary: Detalle de una pareja con historial de partidos
+      parameters:
+        - name: player1Id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: player2Id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detalle de la pareja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParejaDetail"
+        "404":
+          description: Pareja no encontrada
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [stats]
+      summary: Resumen general del dashboard
+      responses:
+        "200":
+          description: Resumen del dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
+  schemas:
+    AuthUser:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        playerId:
+          type: ["integer", "null"]
+        isAdmin:
+          type: integer
+
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+
+    LinkPlayerInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId:
+          type: integer
+
+    ExchangeMobileAuthorizationCodeBody:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+        code_verifier:
+          type: string
+        redirect_uri:
+          type: string
+        state:
+          type: string
+        nonce:
+          type: string
+
+    ExchangeMobileAuthorizationCodeResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    LogoutMobileSessionResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    Encuentro:
+      type: object
+      required: [id, title, dateTime, location, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        dateTime:
+          type: string
+        location:
+          type: string
+        maxSpots:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        organizerId:
+          type: ["string", "null"]
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+        createdAt:
+          type: string
+
+    EncuentroInput:
+      type: object
+      required: [title, dateTime, location]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        dateTime:
+          type: string
+        location:
+          type: string
+          minLength: 1
+        maxSpots:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+        playerIds:
+          type: array
+          items:
+            type: integer
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+
+    EncuentroUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        dateTime:
+          type: string
+        location:
+          type: string
+          minLength: 1
+        maxSpots:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        notificationEmail:
+          type: boolean
+        notificationWhatsapp:
+          type: boolean
+
+    AsistenciaEntry:
+      type: object
+      required: [id, encuentroId, playerId, playerName, status, createdAt]
+      properties:
+        id:
+          type: integer
+        encuentroId:
+          type: integer
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        playerNickname:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [confirmed, declined, pending]
+        respondedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RsvpInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [confirmed, declined, pending]
+
+    EncuentroDetail:
+      type: object
+      required: [encuentro, asistencia]
+      properties:
+        encuentro:
+          $ref: '#/components/schemas/Encuentro'
+        asistencia:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsistenciaEntry'
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Player:
+      type: object
+      required: [id, name, elo, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nickname:
+          type: ["string", "null"]
+        avatarInitials:
+          type: string
+        elo:
+          type: integer
+        createdAt:
+          type: string
+
+    PlayerInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        nickname:
+          type: string
+
+    PlayerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        nickname:
+          type: ["string", "null"]
+
+    PlayerStats:
+      type: object
+      required: [playerId, playerName, totalMatches, wins, losses, winRate, points, setsWon, setsLost, currentStreak]
+      properties:
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        totalMatches:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        points:
+          type: integer
+        setsWon:
+          type: integer
+        setsLost:
+          type: integer
+        currentStreak:
+          type: integer
+        recentMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+
+    EloChange:
+      type: object
+      required: [playerId, playerName, eloBefore, eloAfter, eloChange]
+      properties:
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        eloBefore:
+          type: integer
+        eloAfter:
+          type: integer
+        eloChange:
+          type: integer
+
+    EloHistoryEntry:
+      type: object
+      required: [id, playerId, matchId, eloBefore, eloAfter, eloChange, matchPlayedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        playerId:
+          type: integer
+        matchId:
+          type: integer
+        eloBefore:
+          type: integer
+        eloAfter:
+          type: integer
+        eloChange:
+          type: integer
+        matchPlayedAt:
+          type: string
+        createdAt:
+          type: string
+
+    Match:
+      type: object
+      required: [id, team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, team1SetsWon, team2SetsWon, sets, playedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        team1SetsWon:
+          type: integer
+        team2SetsWon:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+        createdAt:
+          type: string
+        team1Player1Name:
+          type: ["string", "null"]
+        team1Player2Name:
+          type: ["string", "null"]
+        team2Player1Name:
+          type: ["string", "null"]
+        team2Player2Name:
+          type: ["string", "null"]
+        eloChanges:
+          type: array
+          items:
+            $ref: "#/components/schemas/EloChange"
+
+    SetScore:
+      type: object
+      required: [setNumber, team1Games, team2Games]
+      properties:
+        setNumber:
+          type: integer
+        team1Games:
+          type: integer
+        team2Games:
+          type: integer
+
+    MatchInput:
+      type: object
+      required: [team1Player1Id, team1Player2Id, team2Player1Id, team2Player2Id, sets, playedAt]
+      properties:
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+
+    MatchUpdate:
+      type: object
+      properties:
+        team1Player1Id:
+          type: integer
+        team1Player2Id:
+          type: integer
+        team2Player1Id:
+          type: integer
+        team2Player2Id:
+          type: integer
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetScore"
+        playedAt:
+          type: string
+
+    RankingEntry:
+      type: object
+      required: [rank, playerId, playerName, elo, points, wins, losses, totalMatches, winRate]
+      properties:
+        rank:
+          type: integer
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        nickname:
+          type: ["string", "null"]
+        elo:
+          type: integer
+        points:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        totalMatches:
+          type: integer
+        winRate:
+          type: number
+
+    ParejaDetail:
+      type: object
+      required: [stats, matches]
+      properties:
+        stats:
+          $ref: "#/components/schemas/ParejaStats"
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+
+    ParejaStats:
+      type: object
+      required: [player1Id, player1Name, player2Id, player2Name, totalMatches, wins, losses, winRate, setsWon, setsLost, gamesWon, gamesLost, gameDiff, avgElo]
+      properties:
+        player1Id:
+          type: integer
+        player1Name:
+          type: string
+        player1Nickname:
+          type: ["string", "null"]
+        player2Id:
+          type: integer
+        player2Name:
+          type: string
+        player2Nickname:
+          type: ["string", "null"]
+        totalMatches:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        setsWon:
+          type: integer
+        setsLost:
+          type: integer
+        gamesWon:
+          type: integer
+        gamesLost:
+          type: integer
+        gameDiff:
+          type: integer
+        avgElo:
+          type: number
+
+    DashboardSummary:
+      type: object
+      required: [totalPlayers, totalMatches, topPlayer, recentMatches]
+      properties:
+        totalPlayers:
+          type: integer
+        totalMatches:
+          type: integer
+        topPlayer:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            points:
+              type: integer
+        recentMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"

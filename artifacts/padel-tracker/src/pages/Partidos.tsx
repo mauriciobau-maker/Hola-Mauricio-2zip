@@ -1,0 +1,309 @@
+import { Link } from "wouter";
+import {
+  useListMatches,
+  useDeleteMatch,
+  getListMatchesQueryKey,
+  getGetRankingQueryKey,
+  getGetDashboardQueryKey,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown, Check, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@workspace/replit-auth-web";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("es-ES", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+  });
+}
+
+type EloChange = { playerId: number; playerName: string; eloBefore: number; eloAfter: number; eloChange: number };
+type TeamPlayer = { id: number; name: string };
+
+export default function Partidos() {
+  const { data: matches, isLoading } = useListMatches();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const deleteMutation = useDeleteMatch({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      },
+    },
+  });
+
+  const handleConfirmMatch = async (matchId: number) => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/confirm`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      } else {
+        alert(data.error || "No se pudo confirmar el partido");
+      }
+    } catch {
+      alert("Error de conexión al confirmar el partido.");
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (confirm("¿Eliminar este partido? Esta acción no se puede deshacer.")) {
+      deleteMutation.mutate({ id });
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Partidos</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {matches?.length ?? 0} partido{(matches?.length ?? 0) !== 1 ? "s" : ""} registrado{(matches?.length ?? 0) !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Link
+          href="/partidos/nuevo"
+          className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          <Plus size={15} /> Registrar
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 bg-card rounded-xl border border-border animate-pulse" />
+          ))}
+        </div>
+      ) : !matches?.length ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <Calendar size={28} className="text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-semibold">Sin partidos aún</p>
+            <p className="text-sm text-muted-foreground">Registra el primer partido para empezar</p>
+          </div>
+          <Link
+            href="/partidos/nuevo"
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            Registrar partido
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {matches.map((m: any) => {
+            const team1Players: TeamPlayer[] = m.team1Players ?? [];
+            const team2Players: TeamPlayer[] = m.team2Players ?? [];
+            const team1Won = m.result === "team1";
+            const isDraw = m.result === "draw";
+            const eloChanges: EloChange[] = m.eloChanges ?? [];
+            const team1Ids = team1Players.map((p) => p.id);
+            const team2Ids = team2Players.map((p) => p.id);
+            const team1EloChanges = eloChanges.filter((c) => team1Ids.includes(c.playerId));
+            const team2EloChanges = eloChanges.filter((c) => team2Ids.includes(c.playerId));
+            const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | null;
+
+            return (
+              <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
+                {/* Sport badge */}
+                {m.sportName && (
+                  <div className="mb-2">
+                    <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                      {m.sportName}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    {/* Team 1 */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        team1Won ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {team1Won ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
+                      </span>
+                      <p className="text-sm font-medium truncate">
+                        {team1Players.map((p) => p.name).join(" / ") || "—"}
+                      </p>
+                    </div>
+                    {/* Team 2 */}
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        !team1Won && !isDraw ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {!team1Won && !isDraw ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
+                      </span>
+                      <p className="text-sm font-medium truncate">
+                        {team2Players.map((p) => p.name).join(" / ") || "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Score + actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold tabular-nums">
+                        <span className={team1Won ? "text-primary" : "text-muted-foreground"}>
+                          {m.team1Score}
+                        </span>
+                        <span className="text-muted-foreground mx-1 text-lg">-</span>
+                        <span className={!team1Won && !isDraw ? "text-primary" : "text-muted-foreground"}>
+                          {m.team2Score}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sets && sets.length > 0 ? "sets" : "goles"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Link
+                        href={`/partidos/${m.id}/editar`}
+                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sets detail */}
+                {sets && sets.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
+                    {sets.map((s) => (
+                      <div key={s.setNumber} className="text-xs text-muted-foreground">
+                        <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
+                          {s.team1Games}-{s.team2Games}
+                        </span>
+                      </div>
+                    ))}
+                    <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt)}</span>
+                  </div>
+                )}
+
+                {!sets && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt)}</span>
+                  </div>
+                )}
+
+                {/* Elo changes */}
+                {eloChanges.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {[...team1EloChanges, ...team2EloChanges].map((c) => (
+                        <EloChangePill key={c.playerId} change={c} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fair Play Validation Bar */}
+                {m.status === "pending_confirmation" && (
+                  <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        ⚖️ Fair Play:
+                      </span>
+                      <span className="text-muted-foreground ml-1">
+                        {m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para afectar el Elo.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(() => {
+                        const userPlayerId = (user as any)?.playerId;
+                        const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+                        const userInT1 = team1Ids.includes(userPlayerId);
+                        const userInT2 = team2Ids.includes(userPlayerId);
+                        const isRival = m.submittedByPlayerId
+                          ? (userInT1 && !team1Ids.includes(m.submittedByPlayerId)) ||
+                            (userInT2 && !team2Ids.includes(m.submittedByPlayerId))
+                          : userInT1 || userInT2;
+
+                        if (isStaff) {
+                          return (
+                            <button
+                              onClick={() => handleConfirmMatch(m.id)}
+                              className="px-2.5 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium flex items-center gap-1"
+                            >
+                              <ShieldCheck size={13} />
+                              Aprobar como Admin
+                            </button>
+                          );
+                        }
+
+                        if (isRival) {
+                          return (
+                            <button
+                              onClick={() => handleConfirmMatch(m.id)}
+                              className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium flex items-center gap-1"
+                            >
+                              <Check size={13} />
+                              Aprobar como Rival
+                            </button>
+                          );
+                        }
+
+                        if (userInT1 || userInT2) {
+                          return (
+                            <span className="text-[11px] text-amber-500">
+                              Esperando aprobación de tus rivales...
+                            </span>
+                          );
+                        }
+
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EloChangePill({ change }: { change: EloChange }) {
+  const positive = change.eloChange > 0;
+  const neutral = change.eloChange === 0;
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      {positive ? (
+        <TrendingUp size={10} className="text-green-400" />
+      ) : neutral ? null : (
+        <TrendingDown size={10} className="text-red-400" />
+      )}
+      <span className="text-muted-foreground truncate max-w-[80px]">
+        {change.playerName.split(" ")[0]}
+      </span>
+      <span className={cn(
+        "font-bold tabular-nums",
+        positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
+      )}>
+        {positive ? "+" : ""}{change.eloChange}
+      </span>
+      <span className="text-muted-foreground/60 tabular-nums">({change.eloAfter})</span>
+    </div>
+  );
+}
