@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, CalendarDays } from "lucide-react";
+import { ArrowLeft, CalendarDays, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { format, isValid } from "date-fns";
@@ -92,6 +92,7 @@ export function NuevoEncuentro() {
   const [courtsAvailable, setCourtsAvailable] = useState<string>("1");
   const [notes, setNotes] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!user) {
     return (
@@ -152,9 +153,9 @@ export function NuevoEncuentro() {
       } else {
         navigate("/encuentros");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al crear encuentro:", error);
-      alert(t.errorCreating);
+      setFormError(error?.message || t.errorCreating);
     }
   }
 
@@ -166,6 +167,13 @@ export function NuevoEncuentro() {
         </Button>
         <h1 className="text-xl font-bold">{t.title}</h1>
       </div>
+
+      {formError && (
+        <div className="bg-destructive/15 border border-destructive/30 text-destructive text-sm p-3 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{formError}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">

@@ -10,9 +10,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown, Check, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useLanguage } from "@/context/LanguageContext";
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
+function formatDate(iso: string, language: string) {
+  const loc = language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-ES";
+  return new Date(iso).toLocaleDateString(loc, {
     weekday: "short", day: "numeric", month: "short", year: "numeric",
   });
 }
@@ -21,6 +23,7 @@ type EloChange = { playerId: number; playerName: string; eloBefore: number; eloA
 type TeamPlayer = { id: number; name: string };
 
 export default function Partidos() {
+  const { t, language } = useLanguage();
   const { data: matches, isLoading } = useListMatches();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -54,7 +57,7 @@ export default function Partidos() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm("¿Eliminar este partido? Esta acción no se puede deshacer.")) {
+    if (confirm(t("partidos.deleteConfirm"))) {
       deleteMutation.mutate({ id });
     }
   };
@@ -63,16 +66,16 @@ export default function Partidos() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Partidos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("partidos.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {matches?.length ?? 0} partido{(matches?.length ?? 0) !== 1 ? "s" : ""} registrado{(matches?.length ?? 0) !== 1 ? "s" : ""}
+            {t("partidos.count", { count: matches?.length ?? 0 })}
           </p>
         </div>
         <Link
           href="/partidos/nuevo"
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
-          <Plus size={15} /> Registrar
+          <Plus size={15} /> {t("partidos.new")}
         </Link>
       </div>
 
@@ -88,14 +91,14 @@ export default function Partidos() {
             <Calendar size={28} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="font-semibold">Sin partidos aún</p>
-            <p className="text-sm text-muted-foreground">Registra el primer partido para empezar</p>
+            <p className="font-semibold">{t("partidos.noMatches")}</p>
+            <p className="text-sm text-muted-foreground">{t("partidos.noMatchesDesc")}</p>
           </div>
           <Link
             href="/partidos/nuevo"
             className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Registrar partido
+            {t("partidos.new")}
           </Link>
         </div>
       ) : (
@@ -114,6 +117,12 @@ export default function Partidos() {
             const team1EloChanges = eloChanges.filter((c) => team1Ids.includes(c.playerId));
             const team2EloChanges = eloChanges.filter((c) => team2Ids.includes(c.playerId));
             const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | null;
+
+            const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+            const userPlayerId = (user as any)?.playerId;
+            const isParticipant = userPlayerId && (team1Ids.includes(userPlayerId) || team2Ids.includes(userPlayerId));
+            const canEdit = isStaff || isParticipant;
+            const canDelete = isStaff;
 
             return (
               <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
@@ -171,19 +180,25 @@ export default function Partidos() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Link
-                        href={`/partidos/${m.id}/editar`}
-                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <Pencil size={14} />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(m.id)}
-                        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {canEdit && (
+                        <Link
+                          href={`/partidos/${m.id}/editar`}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                          title="Editar marcador del partido"
+                        >
+                          <Pencil size={14} />
+                        </Link>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          disabled={deleteMutation.isPending}
+                          title="Eliminar partido (Solo Administrador)"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -198,13 +213,13 @@ export default function Partidos() {
                         </span>
                       </div>
                     ))}
-                    <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt)}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt, language)}</span>
                   </div>
                 )}
 
                 {!sets && (
                   <div className="mt-2.5 pt-2.5 border-t border-border">
-                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt)}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt, language)}</span>
                   </div>
                 )}
 

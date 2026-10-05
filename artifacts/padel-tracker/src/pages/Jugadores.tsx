@@ -4,6 +4,7 @@ import { useListPlayers, useDeletePlayer, getListPlayersQueryKey } from "@worksp
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Pencil, Search, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
 function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -19,6 +20,7 @@ const avatarColors = [
 ];
 
 export default function Jugadores() {
+  const { t } = useLanguage();
   const { data: players, isLoading } = useListPlayers();
   const [search, setSearch] = useState("");
 
@@ -37,7 +39,7 @@ export default function Jugadores() {
   );
 
   const handleDelete = (id: number, name: string) => {
-    if (confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) {
+    if (confirm(t("jugadores.deleteConfirm", { name }))) {
       deleteMutation.mutate({ id });
     }
   };
@@ -52,9 +54,9 @@ export default function Jugadores() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jugadores</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("jugadores.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {players?.length ?? 0} registrados
+            {t("jugadores.count", { count: players?.length ?? 0 })}
           </p>
         </div>
         <Link
@@ -62,7 +64,7 @@ export default function Jugadores() {
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
           <Plus size={15} />
-          Nuevo
+          {t("jugadores.new")}
         </Link>
       </div>
 
@@ -70,7 +72,7 @@ export default function Jugadores() {
         <Search className="absolute left-3 top-3 text-muted-foreground" size={16} />
         <input
           type="text"
-          placeholder="Buscar por nombre o apodo..."
+          placeholder={t("jugadores.search")}
           className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -84,7 +86,7 @@ export default function Jugadores() {
           ))}
         </div>
       ) : !players?.length ? (
-        <div className="text-center py-20 text-muted-foreground">Sin jugadores registrados</div>
+        <div className="text-center py-20 text-muted-foreground">{t("jugadores.noPlayers")}</div>
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
           {filteredPlayers?.map((player: any, idx) => {
@@ -111,7 +113,7 @@ export default function Jugadores() {
                   {player.phone && (
                     <button
                       onClick={() => openWhatsApp(player.phone)}
-                      title="Enviar WhatsApp"
+                      title={t("jugadores.chatWhatsApp")}
                       className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-500 transition-colors"
                     >
                       <MessageCircle size={15} />
@@ -128,7 +130,7 @@ export default function Jugadores() {
             );
           })}
           {filteredPlayers?.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">No se encontraron jugadores</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("jugadores.noPlayers")}</div>
           )}
         </div>
       )}

@@ -20,6 +20,8 @@ export const matchesTable = pgTable("matches", {
   sportId: integer("sport_id").notNull().references(() => sportsTable.id, { onDelete: "cascade" }),
   modalityId: integer("modality_id").notNull().references(() => sportModalitiesTable.id, { onDelete: "restrict" }),
   encuentroId: integer("encuentro_id").references(() => encuentrosTable.id, { onDelete: "set null" }),
+  round: integer("round").default(1),
+  court: integer("court").default(1),
   team1Score: integer("team1_score").notNull().default(0),
   team2Score: integer("team2_score").notNull().default(0),
   sets: jsonb("sets").$type<SetScore[]>(),

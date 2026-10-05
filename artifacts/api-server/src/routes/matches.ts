@@ -10,6 +10,7 @@ import {
   clubSportsTable,
   sportModalitiesTable,
   playerSportRatingsTable,
+  encuentrosTable,
 } from "@workspace/db";
 import {
   calculateMatchEloChanges,
@@ -1185,6 +1186,42 @@ router.patch(
       return;
     }
 
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+
+    let isEncuentroOrganizer = false;
+    if (existing.encuentroId) {
+      const [encuentro] = await db
+        .select()
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, existing.encuentroId));
+      if (
+        encuentro &&
+        (String(encuentro.organizerId) === String(user?.id) ||
+          (user?.playerId && String(encuentro.organizerId) === String(user.playerId)))
+      ) {
+        isEncuentroOrganizer = true;
+      }
+    }
+
+    const currentMatchPlayers = await db
+      .select()
+      .from(matchPlayersTable)
+      .where(eq(matchPlayersTable.matchId, id));
+
+    const isParticipant = Boolean(
+      user?.playerId &&
+        currentMatchPlayers.some((p) => p.playerId === user.playerId)
+    );
+
+    if (!isStaff && !isEncuentroOrganizer && !isParticipant) {
+      res.status(403).json({
+        error:
+          "No tienes permisos para modificar este partido. Solo los jugadores del partido, el organizador del encuentro o los administradores pueden editarlo.",
+      });
+      return;
+    }
+
     const {
       team1PlayerIds,
       team2PlayerIds,
@@ -1195,6 +1232,18 @@ router.patch(
       playedAt,
       status,
     } = req.body;
+
+    if (
+      !isStaff &&
+      !isEncuentroOrganizer &&
+      (team1PlayerIds !== undefined || team2PlayerIds !== undefined)
+    ) {
+      res.status(403).json({
+        error:
+          "Solo los administradores del club o el organizador del encuentro pueden modificar la alineación de jugadores.",
+      });
+      return;
+    }
 
     const resultingModalityId =
       modalityId === undefined
@@ -1592,6 +1641,31 @@ router.delete(
           "Forbidden",
       });
 
+      return;
+    }
+
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+
+    let isEncuentroOrganizer = false;
+    if (existing.encuentroId) {
+      const [encuentro] = await db
+        .select()
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, existing.encuentroId));
+      if (
+        encuentro &&
+        (String(encuentro.organizerId) === String(user?.id) ||
+          (user?.playerId && String(encuentro.organizerId) === String(user.playerId)))
+      ) {
+        isEncuentroOrganizer = true;
+      }
+    }
+
+    if (!isStaff && !isEncuentroOrganizer) {
+      res.status(403).json({
+        error: "Solo los administradores del club o el organizador del encuentro pueden eliminar partidos.",
+      });
       return;
     }
 

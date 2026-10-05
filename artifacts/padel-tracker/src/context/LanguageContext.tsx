@@ -9,7 +9,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language, userInitiated?: boolean) => void;
   setClubDefaultLanguage: (lang: string) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -48,15 +48,19 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const t = (key: TranslationKey): string => {
-    if (translations[language] && translations[language][key]) {
-      return translations[language][key];
+  const t = (key: string, vars?: Record<string, string | number>): string => {
+    let text =
+      (translations[language] && translations[language][key]) ||
+      (translations.es && translations.es[key]) ||
+      key;
+
+    if (vars) {
+      Object.entries(vars).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+      });
     }
-    // Fallback a español si no existe en el idioma actual
-    if (translations.es && translations.es[key]) {
-      return translations.es[key];
-    }
-    return key;
+
+    return text;
   };
 
   return (

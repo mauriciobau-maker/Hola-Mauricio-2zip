@@ -11,16 +11,26 @@ export function SecretarioParryn() {
   const { user } = useAuth();
   const { language, t } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState<"chat" | "canchas" | "clima" | "matchmaking">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "canchas" | "clima">("chat");
   const [query, setQuery] = useState("");
   const [chatLog, setChatLog] = useState<Array<{ sender: "user" | "parryn"; text: string }>>([
     {
       sender: "parryn",
-      text: "¡Hola! Soy Parryn, tu Secretario Deportivo. ¿En qué te puedo ayudar hoy? Puedo asistirte en la distribución de turnos, convocatorias urgentes para WhatsApp, canchas techadas ante riesgo de clima o emparejamientos equilibrados.",
+      text: t("parryn.initialGreeting"),
     },
   ]);
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Actualizar saludo de Parryn si cambia el idioma y no hay historial de usuario
+  useEffect(() => {
+    setChatLog((prev) => {
+      if (prev.length === 1 && prev[0].sender === "parryn") {
+        return [{ sender: "parryn", text: t("parryn.initialGreeting") }];
+      }
+      return prev;
+    });
+  }, [language, t]);
 
   // Estados de simulación operativa
   const [clubName, setClubName] = useState("Club Pádel Central");
@@ -66,7 +76,11 @@ export function SecretarioParryn() {
         ...prev,
         {
           sender: "parryn",
-          text: "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero priorizar canchas techadas y confirmar la asistencia de tus jugadores por WhatsApp.",
+          text: language === "en"
+            ? "There was a brief connection hiccup, but I'm here! I suggest prioritizing indoor courts and checking attendance on WhatsApp."
+            : language === "pt"
+            ? "Houve uma breve oscilação de conexão, mas estou aqui! Sugiro priorizar quadras cobertas e confirmar a presença no WhatsApp."
+            : "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero priorizar canchas techadas y confirmar la asistencia de tus jugadores por WhatsApp.",
         },
       ]);
     } finally {
@@ -91,7 +105,13 @@ export function SecretarioParryn() {
       const data = await res.json();
       setSchedulingPlan(data.answer);
     } catch {
-      setSchedulingPlan("Plan de Parryn: Asignar partidos oficiales a pistas techadas con rotación en bloques de 75 min.");
+      setSchedulingPlan(
+        language === "en"
+          ? "Parryn's Plan: Assign official ranking matches to indoor courts with 75-minute rotation blocks."
+          : language === "pt"
+          ? "Plano do Parryn: Alocar partidas oficiais em quadras cobertas com blocos de rotação de 75 min."
+          : "Plan de Parryn: Asignar partidos oficiales a pistas techadas con rotación en bloques de 75 min."
+      );
     } finally {
       setLoading(false);
     }
@@ -111,17 +131,17 @@ export function SecretarioParryn() {
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-emerald-200 text-xs font-semibold backdrop-blur-md">
               <Sparkles className="w-3.5 h-3.5" />
-              Secretario Deportivo Oficial
+              {t("parryn.role")}
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Parryn</h1>
             <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
-              "No juega mejor. No gana partidos. Hace que todos puedan jugar."
+              {t("parryn.motto")}
             </p>
             <div className="pt-2 flex flex-wrap gap-2 text-xs text-emerald-200">
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ Siempre disponible</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ Recuerda todo</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ Organiza todo</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ Respeta el Fair Play</span>
+              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeAlwaysAvailable")}</span>
+              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeRemembersAll")}</span>
+              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeOrganizesAll")}</span>
+              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeFairPlay")}</span>
             </div>
           </div>
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/15 backdrop-blur-lg border border-white/20 flex items-center justify-center text-4xl shadow-inner shrink-0">
@@ -141,7 +161,7 @@ export function SecretarioParryn() {
           }`}
         >
           <Bot className="w-4 h-4" />
-          Asistente Conversacional
+          {t("parryn.conversationalAssistant")}
         </button>
         <button
           onClick={() => setActiveTab("canchas")}
@@ -152,7 +172,7 @@ export function SecretarioParryn() {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          Turnos & Canchas
+          {t("parryn.courtScheduling")}
         </button>
         <button
           onClick={() => setActiveTab("clima")}
@@ -163,7 +183,7 @@ export function SecretarioParryn() {
           }`}
         >
           <CloudRain className="w-4 h-4" />
-          Alertas Climáticas (Techadas vs Abiertas)
+          {t("parryn.weatherAlerts")}
         </button>
       </div>
 
@@ -173,10 +193,10 @@ export function SecretarioParryn() {
           <CardHeader className="pb-3 border-b border-border/50">
             <CardTitle className="text-lg flex items-center gap-2">
               <Bot className="w-5 h-5 text-emerald-500" />
-              Conversación Directa con Parryn
+              {t("parryn.directChat")}
             </CardTitle>
             <CardDescription>
-              Pregúntale sobre cualquier aspecto organizativo de tu club: convocatorias, desempates, cobros o turnos.
+              {t("parryn.chatDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
@@ -207,11 +227,11 @@ export function SecretarioParryn() {
                     >
                       {copiedIndex === idx ? (
                         <>
-                          <Check className="w-3 h-3 text-emerald-500" /> Copiado
+                          <Check className="w-3 h-3 text-emerald-500" /> {t("parryn.copied")}
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3 h-3" /> Copiar texto
+                          <Copy className="w-3 h-3" /> {t("parryn.copyText")}
                         </>
                       )}
                     </button>
@@ -221,7 +241,7 @@ export function SecretarioParryn() {
               {loading && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                   <Sparkles className="w-4 h-4 text-emerald-500 animate-spin" />
-                  <span>Parryn está analizando tu consulta...</span>
+                  <span>{t("parryn.analyzing")}</span>
                 </div>
               )}
             </div>
@@ -230,13 +250,13 @@ export function SecretarioParryn() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Escribe tu consulta a Parryn (ej: '¿Cómo armo un torneo americano de 8 jugadores?')"
+                placeholder={t("parryn.chatPlaceholder")}
                 className="flex-1"
                 disabled={loading}
               />
               <Button type="submit" disabled={loading || !query.trim()} className="gap-1.5">
                 <Send className="w-4 h-4" />
-                Enviar
+                {t("parryn.send")}
               </Button>
             </form>
           </CardContent>
@@ -249,16 +269,16 @@ export function SecretarioParryn() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Calendar className="w-5 h-5 text-emerald-500" />
-              Distribución Inteligente de Pistas
+              {t("parryn.courtTitle")}
             </CardTitle>
             <CardDescription>
-              Configura la infraestructura de tu club para que Parryn distribuya los horarios sin colisiones.
+              {t("parryn.courtDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Pistas Techadas / Indoor</label>
+                <label className="text-xs font-semibold text-muted-foreground">{t("parryn.coveredCourts")}</label>
                 <Input
                   type="number"
                   value={coveredCourts}
@@ -267,7 +287,7 @@ export function SecretarioParryn() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Pistas Abiertas / Outdoor</label>
+                <label className="text-xs font-semibold text-muted-foreground">{t("parryn.openCourts")}</label>
                 <Input
                   type="number"
                   value={openCourts}
@@ -276,28 +296,28 @@ export function SecretarioParryn() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">Pronóstico Actual</label>
+                <label className="text-xs font-semibold text-muted-foreground">{t("parryn.currentWeather")}</label>
                 <select
                   value={weatherCondition}
                   onChange={(e) => setWeatherCondition(e.target.value)}
                   className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
                 >
-                  <option value="good">☀️ Despejado / Óptimo</option>
-                  <option value="rain_risk">🌧️ Riesgo de Lluvia / Viento</option>
+                  <option value="good">{t("parryn.weatherGood")}</option>
+                  <option value="rain_risk">{t("parryn.weatherRain")}</option>
                 </select>
               </div>
             </div>
 
             <Button onClick={handlePlanScheduling} disabled={loading} className="gap-2">
               <Sparkles className="w-4 h-4" />
-              {loading ? "Calculando plan óptimo..." : "Generar Plan con Parryn"}
+              {loading ? t("parryn.calculatingPlan") : t("parryn.generatePlan")}
             </Button>
 
             {schedulingPlan && (
               <div className="p-4 bg-muted/40 rounded-xl border border-border/50 text-sm whitespace-pre-line font-mono">
                 <div className="font-sans font-semibold text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" />
-                  Estrategia Sugerida por Parryn:
+                  {t("parryn.strategySuggested")}
                 </div>
                 {schedulingPlan}
               </div>
@@ -312,25 +332,25 @@ export function SecretarioParryn() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CloudRain className="w-5 h-5 text-blue-500" />
-              Protección de Jornada (Techadas vs Abiertas)
+              {t("parryn.weatherTitle")}
             </CardTitle>
             <CardDescription>
-              Protocolos de contingencia automáticos para no suspender partidos por lluvia.
+              {t("parryn.weatherDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm text-blue-700 dark:text-blue-300 space-y-2">
               <h4 className="font-bold flex items-center gap-1.5">
-                🛡️ Regla de Oro de Parryn para Días de Clima Incierto
+                {t("parryn.goldenRuleTitle")}
               </h4>
               <p>
-                1. <strong>Priorización de Pistas:</strong> Los encuentros con marcador oficial o puntos de ranking Elo se programan primero en las canchas techadas.
+                {t("parryn.rule1")}
               </p>
               <p>
-                2. <strong>Turnos escalonados:</strong> En caso de lluvia que inhabilite las canchas exteriores, los turnos pasan a formato de 60 minutos con desempate rápido para que ningún jugador se quede sin jugar.
+                {t("parryn.rule2")}
               </p>
               <p>
-                3. <strong>Aviso oportuno por WhatsApp:</strong> Parryn puede redactar el comunicado con 2 horas de anticipación para evitar traslados innecesarios.
+                {t("parryn.rule3")}
               </p>
             </div>
           </CardContent>

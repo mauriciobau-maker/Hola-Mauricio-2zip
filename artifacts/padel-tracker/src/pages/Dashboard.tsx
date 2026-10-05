@@ -2,9 +2,11 @@ import { Link } from "wouter";
 import { useGetDashboard, useGetRanking } from "@workspace/api-client-react";
 import { Users, Calendar, Trophy, TrendingUp, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+function formatDate(iso: string, language: string) {
+  const locale = language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-ES";
+  return new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function initials(name: string) {
@@ -12,6 +14,7 @@ function initials(name: string) {
 }
 
 export default function Dashboard() {
+  const { t, language } = useLanguage();
   const { data: dashboard, isLoading: loadingDash } = useGetDashboard();
   const { data: ranking } = useGetRanking();
 
@@ -32,8 +35,8 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Resumen general del club</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("dashboard")}</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{t("dashboard.subtitle")}</p>
         </div>
       </div>
 
@@ -41,27 +44,27 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           icon={<Users size={18} className="text-primary" />}
-          label="Jugadores"
+          label={t("players")}
           value={dashboard?.totalPlayers ?? 0}
           href="/jugadores"
         />
         <StatCard
           icon={<Calendar size={18} className="text-chart-2" />}
-          label="Partidos"
+          label={t("matches")}
           value={dashboard?.totalMatches ?? 0}
           href="/partidos"
         />
         <StatCard
           icon={<Trophy size={18} className="text-yellow-400" />}
-          label="Líder"
+          label={t("dashboard.leader")}
           value={dashboard?.topPlayer?.name ?? "—"}
           sub={dashboard?.topPlayer ? `${(dashboard.topPlayer as any).elo ?? dashboard.topPlayer.points ?? ""} pts` : undefined}
           href="/ranking"
         />
         <StatCard
           icon={<TrendingUp size={18} className="text-chart-3" />}
-          label="Ranking"
-          value={top5.length > 0 ? `${top5.length} activos` : "0"}
+          label={t("ranking")}
+          value={top5.length > 0 ? t("dashboard.activeCount", { count: top5.length }) : "0"}
           href="/ranking"
         />
       </div>
@@ -71,20 +74,20 @@ export default function Dashboard() {
         {/* Recent matches */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-sm">Últimos Partidos</h2>
+            <h2 className="font-semibold text-sm">{t("dashboard.recentMatches")}</h2>
             <Link href="/partidos" className="text-xs text-primary hover:underline flex items-center gap-0.5">
-              Ver todos <ChevronRight size={12} />
+              {t("common.viewAll")} <ChevronRight size={12} />
             </Link>
           </div>
           {!dashboard?.recentMatches?.length ? (
             <EmptyState
-              message="No hay partidos registrados"
-              action={{ label: "Registrar partido", href: "/partidos/nuevo" }}
+              message={t("dashboard.noMatches")}
+              action={{ label: t("partidos.new"), href: "/partidos/nuevo" }}
             />
           ) : (
             <div className="divide-y divide-border">
               {dashboard.recentMatches.map((m: any) => (
-                <MatchRow key={m.id} match={m} />
+                <MatchRow key={m.id} match={m} language={language} />
               ))}
             </div>
           )}
@@ -93,15 +96,15 @@ export default function Dashboard() {
         {/* Top ranking */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-sm">Top Ranking</h2>
+            <h2 className="font-semibold text-sm">{t("dashboard.topRanking")}</h2>
             <Link href="/ranking" className="text-xs text-primary hover:underline flex items-center gap-0.5">
-              Ver ranking <ChevronRight size={12} />
+              {t("dashboard.viewRanking")} <ChevronRight size={12} />
             </Link>
           </div>
           {!top5.length ? (
             <EmptyState
-              message="No hay jugadores registrados"
-              action={{ label: "Crear jugador", href: "/jugadores/nuevo" }}
+              message={t("dashboard.noPlayers")}
+              action={{ label: t("jugadores.new"), href: "/jugadores/nuevo" }}
             />
           ) : (
             <div className="divide-y divide-border">
@@ -160,7 +163,7 @@ function StatCard({ icon, label, value, sub, href }: {
   );
 }
 
-function MatchRow({ match }: { match: any }) {
+function MatchRow({ match, language }: { match: any; language: string }) {
   const team1Players: Array<{ id: number; name: string }> = match.team1Players ?? [];
   const team2Players: Array<{ id: number; name: string }> = match.team2Players ?? [];
   const team1Won = match.result === "team1";
@@ -191,7 +194,7 @@ function MatchRow({ match }: { match: any }) {
         </div>
       </div>
       <div className="flex items-center justify-between mt-1">
-        <p className="text-xs text-muted-foreground">{formatDate(match.playedAt)}</p>
+        <p className="text-xs text-muted-foreground">{formatDate(match.playedAt, language)}</p>
         {match.sportName && (
           <span className="text-xs text-muted-foreground/60">{match.sportName}</span>
         )}

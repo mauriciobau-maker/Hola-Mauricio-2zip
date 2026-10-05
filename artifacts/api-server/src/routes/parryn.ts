@@ -4,12 +4,24 @@ import { requireAuth } from "../middlewares/requireCommunity";
 
 const router: Router = Router();
 
-// Inicialización segura del cliente Gemini con fallback elegante
-let genAI: GoogleGenAI | null = null;
-try {
-  genAI = new GoogleGenAI();
-} catch (e) {
-  console.warn("[Parryn AI] Gemini API key no configurada o cliente local. Modo plantilla activo.");
+// Inicialización segura del cliente Gemini con headers recomendados
+function getGenAI(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) {
+    return null;
+  }
+  try {
+    return new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  } catch (e) {
+    console.warn("[Parryn AI] Error inicializando GoogleGenAI:", e);
+    return null;
+  }
 }
 
 const SYSTEM_INSTRUCTION = `Eres Parryn, el Secretario Deportivo inteligente de Padel Tracker IA.
@@ -18,7 +30,8 @@ Tu personalidad:
 - Hablas en tono cercano, empático, entusiasta y muy organizado.
 - Conoces a fondo el pádel, tenis y fútbol (reglas, Elo, posiciones Drive/Revés, dinámicas de grupo).
 - Nunca te enojas, nunca criticas, siempre propones soluciones y ahorras tiempo al organizador.
-- Escribes mensajes con formato limpio, emojis deportivos y listas claras listas para copiar en WhatsApp.`;
+- Escribes mensajes con formato limpio, emojis deportivos y listas claras listas para copiar en WhatsApp.
+- POLÍGLOTA OBLIGATORIO: Debes responder siempre y sin excepción en el idioma indicado en la consulta ('en' -> English, 'pt' -> Português, 'es' -> Español). Si el usuario habla o solicita en inglés o portugués, tus respuestas y mensajes para WhatsApp deben estar impecablemente redactados en ese idioma.`;
 
 // 1. Convocatoria y Bajas de Última Hora
 router.post("/convocatoria", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -41,9 +54,10 @@ Instrucciones:
 - Si faltan jugadores (ej: ${missingCount}), haz un llamado especial para completar la cancha sin demoras.
 - Incluye el llamado a la acción con link simbólico.`;
 
-    if (genAI && process.env.GEMINI_API_KEY) {
+    const ai = getGenAI();
+    if (ai) {
       try {
-        const response = await genAI.models.generateContent({
+        const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
@@ -52,10 +66,12 @@ Instrucciones:
           },
         });
         const text = response.text || "";
-        res.json({ text, aiPowered: true });
-        return;
+        if (text) {
+          res.json({ text, aiPowered: true });
+          return;
+        }
       } catch (err: any) {
-        console.warn("[Parryn] Fallo en llamada a Gemini, usando generador de respaldo:", err.message);
+        console.warn("[Parryn] Fallo en llamada a Gemini convocatoria:", err.message);
       }
     }
 
@@ -96,9 +112,10 @@ Tu objetivo como Parryn:
 2. En Pádel, cuida que una pareja idealmente tenga un jugador de Drive y uno de Revés (o Ambos), evitando juntar a dos de Drive exclusivo.
 3. Explica brevemente la lógica de paridad competitiva para el organizador.`;
 
-    if (genAI && process.env.GEMINI_API_KEY) {
+    const ai = getGenAI();
+    if (ai) {
       try {
-        const response = await genAI.models.generateContent({
+        const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
@@ -106,8 +123,11 @@ Tu objetivo como Parryn:
             temperature: 0.4,
           },
         });
-        res.json({ analysis: response.text || "", aiPowered: true });
-        return;
+        const analysis = response.text || "";
+        if (analysis) {
+          res.json({ analysis, aiPowered: true });
+          return;
+        }
       } catch (err: any) {
         console.warn("[Parryn] Fallo en Gemini matchmaking:", err.message);
       }
@@ -142,9 +162,10 @@ Estructura:
 - Movimiento o impacto en el Ranking Elo de la comunidad.
 - Recordatorio sutil de consultar la app para ver estadísticas completas.`;
 
-    if (genAI && process.env.GEMINI_API_KEY) {
+    const ai = getGenAI();
+    if (ai) {
       try {
-        const response = await genAI.models.generateContent({
+        const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
@@ -152,8 +173,11 @@ Estructura:
             temperature: 0.7,
           },
         });
-        res.json({ text: response.text || "", aiPowered: true });
-        return;
+        const text = response.text || "";
+        if (text) {
+          res.json({ text, aiPowered: true });
+          return;
+        }
       } catch (err: any) {
         console.warn("[Parryn] Fallo en Gemini crónica:", err.message);
       }
@@ -196,9 +220,10 @@ Reglas:
 - Sé súper empático y positivo (nunca acusatorio ni frío).
 - Mantén la armonía del grupo de amigos del club.`;
 
-    if (genAI && process.env.GEMINI_API_KEY) {
+    const ai = getGenAI();
+    if (ai) {
       try {
-        const response = await genAI.models.generateContent({
+        const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
@@ -206,8 +231,11 @@ Reglas:
             temperature: 0.6,
           },
         });
-        res.json({ text: response.text || "", aiPowered: true });
-        return;
+        const text = response.text || "";
+        if (text) {
+          res.json({ text, aiPowered: true });
+          return;
+        }
       } catch (err: any) {
         console.warn("[Parryn] Fallo en Gemini recordatorio cobro:", err.message);
       }
@@ -220,22 +248,30 @@ Reglas:
   }
 });
 
-// 5. Asistente General de Operaciones (Scheduling, Clima, Canchas)
+// 5. Asistente General de Operaciones (Scheduling, Clima, Canchas, Dudas)
 router.post("/asistente", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { query, clubContext = {} } = req.body;
+    const targetLang = (clubContext as any)?.lang || "es";
+    const langName = targetLang === "en" ? "English" : targetLang === "pt" ? "Português" : "Español";
 
-    const prompt = `El organizador del club te consulta: "${query}".
-Contexto operativo del club: ${JSON.stringify(clubContext)}
+    const prompt = `Un usuario del club deportivo te consulta lo siguiente:
+"${query}"
 
-Como Parryn, asesóralo con respuestas ejecutivas, prácticas y accionables respecto a:
-- Distribución de turnos y canchas (techadas vs abiertas ante riesgo de lluvia).
-- Buenas prácticas de rotación y formatos (americana, round robin, torneos).
-- Gestión del fair play y dinámica deportiva.`;
+Contexto del usuario y pantalla:
+${JSON.stringify(clubContext, null, 2)}
 
-    if (genAI && process.env.GEMINI_API_KEY) {
+Instrucciones para Parryn:
+1. Responde DIRECTAMENTE a la pregunta realizada: "${query}".
+2. IDIOMA OBLIGATORIO: Debes redactar tu respuesta y cualquier mensaje para WhatsApp OBLIGATORIAMENTE en ${langName}.
+3. Si el usuario pide un mensaje para WhatsApp (recordatorio, convocatoria, aviso, crónica), escribe el texto completo en ${langName} con formato, emojis y listo para copiar y pegar.
+4. Si el usuario pregunta sobre cobros, prorrateos, canchas techadas, lluvia, reglas, o Fair Play, brinda una respuesta detallada, útil y práctica.
+5. Mantén un tono amigable, enérgico y profesional de Secretario Deportivo.`;
+
+    const ai = getGenAI();
+    if (ai) {
       try {
-        const response = await genAI.models.generateContent({
+        const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
@@ -243,15 +279,38 @@ Como Parryn, asesóralo con respuestas ejecutivas, prácticas y accionables resp
             temperature: 0.7,
           },
         });
-        res.json({ answer: response.text || "", aiPowered: true });
-        return;
+        const answer = response.text || "";
+        if (answer) {
+          res.json({ answer, aiPowered: true });
+          return;
+        }
       } catch (err: any) {
         console.warn("[Parryn] Fallo en Gemini asistente general:", err.message);
       }
     }
 
+    // Fallbacks inteligentes según la temática de la pregunta:
+    const q = (query || "").toLowerCase();
+    let dynamicAnswer = "";
+
+    if (q.includes("recordatorio") || q.includes("cobro") || q.includes("cuota")) {
+      dynamicAnswer = `🎾 *Recordatorio Amable de Cobro para WhatsApp:*\n\n"¡Hola a todos! 👋 Espero que hayan disfrutado los partidos de la semana. Les dejamos el recordatorio para regularizar la cuota de arriendo de pistas y pelotas.\n\nPueden adjuntar su comprobante directo en la app del club o enviárnoslo por aquí para dejarlo confirmado. ¡Muchas gracias por el apoyo de siempre!"`;
+    } else if (q.includes("prorrateo") || q.includes("justo") || q.includes("dividir") || q.includes("costo")) {
+      dynamicAnswer = `💰 *Prorrateo Justo según Parryn:*\nSi un jugador participó en menos partidos o llegó más tarde, la mejor fórmula comunitaria es dividir el valor total de la cancha por minuto/turno jugado, o cobrarle solo la fracción correspondiente a su partido y repartir el arriendo base entre los jugadores de tiempo completo.`;
+    } else if (q.includes("convocatoria") || q.includes("invit") || q.includes("cupo")) {
+      dynamicAnswer = `📢 *Convocatoria de Partidos para WhatsApp:*\n\n"¡Buenas a todos! 🎾 Se abren los cupos para la próxima jornada deportiva del club. Confirmaciones directas por la app oficial para armar el fixture equilibrado y asignar pistas. ¡Asegura tu cupo antes de que se completen!"`;
+    } else if (q.includes("lluvia") || q.includes("clima") || q.includes("techad") || q.includes("suspender")) {
+      dynamicAnswer = `🌧️ *Plan de Contingencia Climática de Parryn:*\n1. Asigna primero los partidos de campeonato o con asistencia completa a las pistas techadas.\n2. Si hay menos canchas cubiertas que partidos, reduce los turnos a 60 minutos con rotación rápida tipo americana para que nadie se quede sin jugar.\n3. Avisa al grupo con al menos 2 horas de anticipación para evitar traslados en vano.`;
+    } else if (q.includes("fair play") || q.includes("cruzada") || q.includes("aprobar") || q.includes("marcador")) {
+      dynamicAnswer = `⚖️ *Validación Cruzada Fair Play:*\nPara cuidar la transparencia de los rankings, cuando un jugador anota el marcador, este queda en estado *Pendiente de Aprobación*. Solo cuando un rival del equipo contrario o el administrador lo confirma, el resultado es oficial y se actualizan los puntos Elo.`;
+    } else if (q.includes("elo") || q.includes("ranking") || q.includes("puntos")) {
+      dynamicAnswer = `📈 *Cómo Funciona el Elo:*\nCada jugador inicia con 1200 puntos. Si vences a una pareja con mayor ranking, sumas muchos más puntos que si vences a un rival de menor nivel. Si pierdes contra un favorito, la penalización es menor. El sistema premia la consistencia y la paridad.`;
+    } else {
+      dynamicAnswer = `🤖 *Respuesta de Parryn:*\nHe analizado tu consulta sobre "${query}". Te recomiendo estructurar los horarios en bloques de 90 minutos con rotación en americana y confirmar a todos los asistentes en la aplicación para evitar canchas vacías. ¿Deseas que redacte algún comunicado para el grupo?`;
+    }
+
     res.json({
-      answer: `🤖 *Parryn te sugiere:* Para optimizar el uso de canchas con pronóstico incierto, asigna primero las canchas techadas a los encuentros con mayor cantidad de confirmados o de competencia oficial. En días con alta demanda, los turnos de 90 minutos con rotación cada 30 minutos maximizan la participación de todos los socios.`,
+      answer: dynamicAnswer,
       aiPowered: false,
     });
   } catch (error: any) {

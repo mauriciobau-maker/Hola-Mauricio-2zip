@@ -150,6 +150,7 @@ export function ParrynFloatingWidget() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // No mostrar en login / onboarding inicial si aún no hay club
@@ -177,6 +178,7 @@ export function ParrynFloatingWidget() {
     if (!textToAsk.trim() || loading) return;
     setLoading(true);
     setResponse(null);
+    setCurrentQuestion(textToAsk.trim());
 
     try {
       const res = await fetch("/api/parryn/asistente", {
@@ -276,6 +278,14 @@ export function ParrynFloatingWidget() {
                 ))}
               </div>
             </div>
+
+            {/* Consulta Actual */}
+            {currentQuestion && (
+              <div className="p-2 rounded-xl bg-muted/60 border border-border/50 text-[11px] text-foreground flex items-start gap-1.5">
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">Pregunta:</span>
+                <span className="line-clamp-2 italic">{currentQuestion}</span>
+              </div>
+            )}
 
             {/* Área de Respuesta de Parryn */}
             {loading && (

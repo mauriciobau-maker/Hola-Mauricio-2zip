@@ -19,11 +19,11 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
   const [error, setError] = useState<string | null>(null);
 
   const defaultLabels = {
-    convocatoria: "🤖 Parryn: Redactar Convocatoria WhatsApp",
-    matchmaking: "🤖 Parryn: Analizar Equilibrio de Cruces",
-    cierre: "🤖 Parryn: Redactar Crónica Oficial WhatsApp",
-    "recordatorio-cobro": "🤖 Parryn: Recordatorio Amable de Cobro",
-    general: "🤖 Consultar al Secretario Parryn",
+    convocatoria: language === "en" ? "🤖 Parryn: Draft WhatsApp Invite" : language === "pt" ? "🤖 Parryn: Redigir Convocação WhatsApp" : "🤖 Parryn: Redactar Convocatoria WhatsApp",
+    matchmaking: language === "en" ? "🤖 Parryn: Analyze Match Balance" : language === "pt" ? "🤖 Parryn: Analisar Equilíbrio dos Jogos" : "🤖 Parryn: Analizar Equilibrio de Cruces",
+    cierre: language === "en" ? "🤖 Parryn: Draft WhatsApp Matchday Recap" : language === "pt" ? "🤖 Parryn: Redigir Crônica WhatsApp" : "🤖 Parryn: Redactar Crónica Oficial WhatsApp",
+    "recordatorio-cobro": language === "en" ? "🤖 Parryn: Friendly Payment Reminder" : language === "pt" ? "🤖 Parryn: Lembrete Amigável de Pagamento" : "🤖 Parryn: Recordatorio Amable de Cobro",
+    general: language === "en" ? "🤖 Consult Secretary Parryn" : language === "pt" ? "🤖 Consultar o Secretário Parryn" : "🤖 Consultar al Secretario Parryn",
   };
 
   const handleGenerate = async () => {
@@ -93,10 +93,16 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
                 <h4 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                   Parryn
                   <span className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-normal">
-                    Secretario Deportivo IA
+                    {t("parryn.role")}
                   </span>
                 </h4>
-                <p className="text-xs text-muted-foreground">Tu asistente para organizar, recordar y comunicar</p>
+                <p className="text-xs text-muted-foreground">
+                  {language === "en"
+                    ? "Your assistant to organize, remind and communicate"
+                    : language === "pt"
+                    ? "Seu assistente para organizar, lembrar e comunicar"
+                    : "Tu asistente para organizar, recordar y comunicar"}
+                </p>
               </div>
             </div>
             <button
@@ -110,16 +116,16 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
           {loading ? (
             <div className="py-6 flex flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               <Sparkles className="w-6 h-6 text-emerald-500 animate-spin" />
-              <p className="text-xs font-medium">Parryn está preparando el mensaje...</p>
+              <p className="text-xs font-medium">{t("parryn.analyzing")}</p>
             </div>
           ) : error ? (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold">Aviso de Parryn</p>
+                <p className="font-semibold">Parryn</p>
                 <p>{error}</p>
                 <Button onClick={handleGenerate} variant="ghost" size="sm" className="mt-2 h-7 text-xs">
-                  Reintentar
+                  {language === "en" ? "Retry" : language === "pt" ? "Tentar novamente" : "Reintentar"}
                 </Button>
               </div>
             </div>
@@ -136,7 +142,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
                   size="sm"
                   className="text-xs h-8 text-muted-foreground hover:text-foreground"
                 >
-                  Regenerar
+                  {language === "en" ? "Regenerate" : language === "pt" ? "Regenerar" : "Regenerar"}
                 </Button>
                 <div className="flex items-center gap-2">
                   <Button
@@ -152,7 +158,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5" />
-                        Copiar para WhatsApp
+                        {language === "en" ? "Copy for WhatsApp" : language === "pt" ? "Copiar para WhatsApp" : "Copiar para WhatsApp"}
                       </>
                     )}
                   </Button>
