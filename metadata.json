@@ -1,0 +1,7 @@
+{
+  "name": "Padel Tracker IA",
+  "description": "Gestión de partidos, torneos y ranking Elo para clubes de pádel.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

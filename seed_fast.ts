@@ -1,0 +1,1 @@
+import { db, sportsTable } from "@workspace/db"; db.insert(sportsTable).values([{ name: "Pádel", slug: "padel" }, { name: "Tenis", slug: "tenis" }, { name: "Multi-deporte", slug: "multi-deporte" }]).then(() => console.log("🎉 ¡Deportes insertados con éxito en la DB!")).catch(console.error);

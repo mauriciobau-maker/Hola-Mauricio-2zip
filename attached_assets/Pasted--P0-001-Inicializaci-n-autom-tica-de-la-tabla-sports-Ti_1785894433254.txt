@@ -1,0 +1,135 @@
+# P0-001 — Inicialización automática de la tabla sports
+
+Tipo:
+FIX
+
+Prioridad:
+P0 (Crítica)
+
+Impacto:
+Alto
+
+Riesgo esperado:
+Muy bajo
+
+Tiempo esperado:
+Bajo
+
+--------------------------------------------
+
+## CONTEXTO
+
+La auditoría arquitectónica detectó que la tabla `sports` existe en la base de datos, pero una instalación nueva queda con cero registros.
+
+Como consecuencia:
+
+- No pueden crearse partidos.
+- Falla la Foreign Key de `sport_id`.
+- El módulo de Encuentros queda bloqueado.
+- El Ranking y el ELO no pueden operar.
+
+Este problema debe resolverse antes de continuar con cualquier otra funcionalidad.
+
+--------------------------------------------
+
+## OBJETIVO
+
+Implementar una inicialización automática (seed seguro) para la tabla `sports`, de forma que cualquier instalación nueva quede operativa sin intervención manual.
+
+--------------------------------------------
+
+## ALCANCE
+
+Implementar una lógica que, durante el inicio del backend:
+
+1. Compruebe si la tabla `sports` contiene registros.
+2. Si está vacía, inserte únicamente los deportes oficiales iniciales:
+   - Pádel
+   - Tenis
+   - Fútbol
+3. Si la tabla ya contiene datos:
+   - No insertar nada.
+   - No actualizar nada.
+   - No eliminar nada.
+   - Continuar normalmente.
+
+La operación debe ser completamente idempotente.
+
+--------------------------------------------
+
+## FUERA DE ALCANCE
+
+Esta tarea NO debe modificar:
+
+- Frontend.
+- Componentes React.
+- Ranking.
+- ELO.
+- Encuentros.
+- Match Players.
+- Usuarios.
+- Comunidades.
+- Permisos.
+- Autenticación.
+- Migraciones.
+- Esquema de la base de datos.
+- Drizzle Schema.
+- Relaciones entre tablas.
+
+No crear nuevas tablas.
+
+No modificar columnas existentes.
+
+No cambiar nombres.
+
+No alterar IDs.
+
+--------------------------------------------
+
+## CRITERIOS DE ACEPTACIÓN
+
+La tarea se considerará completada únicamente si:
+
+✓ Una instalación nueva inicializa automáticamente los deportes.
+
+✓ Una instalación existente no genera registros duplicados.
+
+✓ El backend continúa iniciando normalmente.
+
+✓ No existen cambios funcionales fuera del alcance definido.
+
+--------------------------------------------
+
+## ENTREGABLES
+
+Al finalizar entregar únicamente:
+
+1. Lista de archivos modificados.
+2. Explicación breve de cada modificación.
+3. Confirmación de que no se modificó ningún otro módulo.
+4. Resultado de las pruebas realizadas.
+5. Confirmación de que la solución es idempotente.
+
+--------------------------------------------
+
+## RESTRICCIÓN IMPORTANTE
+
+Si durante la implementación detectas cualquier problema que requiera modificar módulos distintos a los autorizados:
+
+DETENTE.
+
+No implementes esa modificación.
+
+Explícala y espera aprobación antes de continuar.
+
+--------------------------------------------
+
+## CHECKLIST FINAL
+
+Antes de cerrar la tarea confirma:
+
+[ ] No existen duplicados.
+[ ] No se modificó el schema.
+[ ] No se modificaron migraciones.
+[ ] El backend inicia correctamente.
+[ ] El cambio afecta únicamente a la inicialización de `sports`.
