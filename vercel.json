@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install",
+  "packageManager": "pnpm@9",
+  "rootDirectory": "scripts"
+}
