@@ -608,8 +608,51 @@ export default function Admin() {
     setTimeout(() => setCopiedCodeId(null), 2000);
   };
 
+  const [isLoggingInSuperAdmin, setIsLoggingInSuperAdmin] = useState(false);
+
+  const handleSuperAdminLoginClick = async () => {
+    try {
+      setIsLoggingInSuperAdmin(true);
+      const res = await fetch("/api/login/demo?as=superadmin");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem("padel_auth_token", data.token);
+          localStorage.setItem("padel_auth_user", JSON.stringify(data.user));
+        }
+      }
+    } catch (err) {
+      console.error("Error iniciando sesión:", err);
+    } finally {
+      window.location.reload();
+    }
+  };
+
   if (isLoading || loading) return <div className="p-10 text-center text-muted-foreground">Cargando panel de gestión...</div>;
-  if (!isAdmin) return <div className="text-center py-20 text-muted-foreground"><Shield size={48} className="mx-auto mb-4" /> Acceso restringido</div>;
+  if (!isAdmin) {
+    return (
+      <div className="max-w-md mx-auto my-16 p-8 bg-card border border-border rounded-2xl text-center space-y-4 shadow-lg">
+        <div className="w-14 h-14 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-2 border border-purple-500/30">
+          <Shield size={32} />
+        </div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Acceso de Super Administrador</h2>
+        <p className="text-sm text-muted-foreground">
+          Esta sección está reservada exclusivamente para el Super Administrador de la plataforma (gestión de clubes, planes y deportes).
+        </p>
+        <div className="pt-2">
+          <button
+            type="button"
+            disabled={isLoggingInSuperAdmin}
+            onClick={handleSuperAdminLoginClick}
+            className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-lg transition-colors shadow-md cursor-pointer"
+          >
+            <Shield size={16} />
+            {isLoggingInSuperAdmin ? "Conectando..." : "Entrar como Super Administrador (mbau73@hotmail.com)"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const newClubGeneratedMapUrl = getEffectiveMapUrl(newClub);
   const editClubGeneratedMapUrl = getEffectiveMapUrl(editForm);

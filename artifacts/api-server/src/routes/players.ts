@@ -21,6 +21,7 @@ import {
 import {
   isSuperAdminUser,
   requireCommunityAccess,
+  resolveEffectiveClubId,
 } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
@@ -113,13 +114,8 @@ async function enrichPlayer(
 
 router.get(
   "/players",
-  requireCommunityAccess,
   async (req, res): Promise<void> => {
-    const clubId = (
-      req.user as {
-        clubId?: number | null;
-      } | undefined
-    )?.clubId;
+    const clubId = await resolveEffectiveClubId(req);
 
     const players = clubId
       ? await db

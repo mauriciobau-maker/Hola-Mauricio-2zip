@@ -6,11 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, CalendarDays } from "lucide-react";
+import { ArrowLeft, CalendarDays, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { format, isValid } from "date-fns";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { triggerParryn } from "@/components/ParrynWidget";
 
 const TRANSLATIONS = {
   es: {
@@ -161,6 +162,38 @@ export function NuevoEncuentro() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-bold">{t.title}</h1>
+      </div>
+
+      {/* Tarjeta de Asistencia de Parryn */}
+      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-sm flex-shrink-0 mt-0.5">
+            P
+          </div>
+          <div>
+            <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <span>¿Prefieres que Parryn organice todo por ti?</span>
+              <Sparkles size={13} className="text-yellow-400" />
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Dile en lenguaje natural: <em>"Parryn, crea un encuentro este viernes a las 19:00 en Cancha 2 con 8 cupos"</em>.
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            triggerParryn(
+              "Parryn, crea un nuevo encuentro de pádel para este viernes a las 19:00 con 8 cupos en Cancha Central"
+            )
+          }
+          className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs shrink-0 cursor-pointer self-start sm:self-auto"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-yellow-400 mr-1" />
+          Pedir a Parryn
+        </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

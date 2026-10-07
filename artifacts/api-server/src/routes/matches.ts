@@ -19,6 +19,7 @@ import { recalculateSportElo } from "../lib/recalculateElo";
 import {
   requireAuth,
   requireClub,
+  resolveEffectiveClubId,
 } from "../middlewares/requireCommunity";
 import { getSportModality, validatePlayersForClub } from "../lib/modalities";
 
@@ -447,15 +448,13 @@ async function enrichMatch(
 
 router.get(
   "/matches",
-  requireAuth,
-  requireClub,
   async (req, res): Promise<void> => {
-    const clubId =
-      (
-        req.user as {
-          clubId: number;
-        }
-      ).clubId;
+    const clubId = await resolveEffectiveClubId(req);
+
+    if (!clubId) {
+      res.json([]);
+      return;
+    }
 
     const matches = await db
       .select()

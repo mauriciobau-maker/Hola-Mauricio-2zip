@@ -1,4 +1,52 @@
 import type { Request, Response, NextFunction } from "express";
+import { db, clubsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+
+export async function resolveEffectiveClubId(req: Request): Promise<number | null> {
+  // 1. Authenticated user clubId
+  const userClubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  if (userClubId) return userClubId;
+
+  // 2. Query param ?clubId=
+  if (req.query.clubId) {
+    const parsed = Number(req.query.clubId);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Query param ?club= (slug)
+  if (typeof req.query.club === "string" && req.query.club.trim()) {
+    try {
+      const [found] = await db
+        .select({ id: clubsTable.id })
+        .from(clubsTable)
+        .where(eq(clubsTable.slug, req.query.club.trim()))
+        .limit(1);
+      if (found?.id) return found.id;
+    } catch {}
+  }
+
+  // 4. Default: first active club in DB
+  try {
+    const [firstActive] = await db
+      .select({ id: clubsTable.id })
+      .from(clubsTable)
+      .where(eq(clubsTable.active, true))
+      .orderBy(clubsTable.id)
+      .limit(1);
+
+    if (firstActive?.id) return firstActive.id;
+
+    const [firstClub] = await db
+      .select({ id: clubsTable.id })
+      .from(clubsTable)
+      .orderBy(clubsTable.id)
+      .limit(1);
+
+    return firstClub?.id ?? null;
+  } catch {
+    return 1;
+  }
+}
 
 export function isSuperAdminUser(
   user: { isAdmin?: number | boolean | null; role?: string | null } | undefined,

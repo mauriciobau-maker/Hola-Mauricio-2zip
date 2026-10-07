@@ -8,12 +8,14 @@ import {
   Users,
   Plus,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { format, isPast, isValid } from "date-fns";
 import type { Locale } from "date-fns";
 import { es, enUS, ptBR } from "date-fns/locale";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { triggerParryn } from "@/components/ParrynWidget";
 
 const LOCALES = {
   es,
@@ -175,29 +177,46 @@ export function Encuentros() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">{t.title}</h1>
 
-        {user ? (
-          <Button
-            size="sm"
-            onClick={() => navigate("/encuentros/nuevo")}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {t.new}
-          </Button>
-        ) : (
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={login}
-            className="gap-2 border-white/20 text-white hover:bg-white/10"
+            onClick={() =>
+              triggerParryn(
+                "Parryn, crea un nuevo encuentro de pádel para este viernes a las 19:00 con 8 cupos en Cancha Central"
+              )
+            }
+            className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 cursor-pointer shadow-sm"
+            title="Pedir a Parryn que cree y agende el encuentro con lenguaje natural"
           >
-            <Plus className="h-4 w-4" />
-            {t.create}
+            <Sparkles className="h-4 w-4 text-yellow-400" />
+            <span>Crear con Parryn IA</span>
           </Button>
-        )}
+
+          {user ? (
+            <Button
+              size="sm"
+              onClick={() => navigate("/encuentros/nuevo")}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              {t.new}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={login}
+              className="gap-2 border-white/20 text-white hover:bg-white/10"
+            >
+              <Plus className="h-4 w-4" />
+              {t.create}
+            </Button>
+          )}
+        </div>
       </div>
 
       {upcoming.length === 0 && past.length === 0 && (

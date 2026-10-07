@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
+import { hexToHslChannels } from "@/lib/utils";
 import type { CSSProperties } from "react";
 
 interface PublicClubData {
@@ -24,29 +24,6 @@ interface PublicClubData {
   adminEmail?: string | null;
   adminPhone?: string | null;
   adminWhatsappAlias?: string | null;
-}
-
-function hexToHsl(hex: string) {
-  const value = hex.replace("#", "");
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      default: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 
 export default function PublicClub() {
@@ -95,8 +72,8 @@ export default function PublicClub() {
   const publicMapUrl = club.mapUrl || (locationParts.length ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationParts.join(", "))}` : null);
   const activeSports = club.sports.filter((sport) => sport.active !== false);
   const cssVars = {
-    ...(club.primaryColor ? { "--primary": hexToHsl(club.primaryColor) } : {}),
-    ...(club.secondaryColor ? { "--secondary": hexToHsl(club.secondaryColor) } : {}),
+    ...(club.primaryColor ? { "--primary": hexToHslChannels(club.primaryColor) } : {}),
+    ...(club.secondaryColor ? { "--secondary": hexToHslChannels(club.secondaryColor) } : {}),
   } as CSSProperties;
 
   const copyInviteCode = async () => {
@@ -108,10 +85,6 @@ export default function PublicClub() {
 
   return (
     <div className="space-y-6" style={cssVars}>
-      <div className="flex items-center justify-end">
-        <AuthButton />
-      </div>
-
       <section className="relative overflow-hidden rounded-3xl border bg-card p-8 md:p-12 shadow-sm">
         <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
         <div className="relative flex flex-col items-center text-center">

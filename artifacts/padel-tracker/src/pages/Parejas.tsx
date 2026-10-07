@@ -4,6 +4,7 @@ import type { ParejaStats } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Handshake, Search, Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
 function initials(name: string) {
   return name
@@ -164,6 +165,7 @@ const MIN_MATCHES_FOR_RANKING = 1;
 export default function Parejas() {
   const { data: parejas, isLoading } = useListParejas();
   const [search, setSearch] = useState("");
+  const { t, language } = useLanguage();
 
   const filtered = useMemo(() => {
     if (!parejas) return [];
@@ -200,15 +202,17 @@ export default function Parejas() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Parejas</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("pairsTitle")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Estadísticas de todas las combinaciones de jugadores
+            {t("pairsSubtitle")}
           </p>
         </div>
         {parejas && (
           <div className="text-right">
             <span className="text-2xl font-bold text-primary">{parejas.length}</span>
-            <p className="text-xs text-muted-foreground">parejas activas</p>
+            <p className="text-xs text-muted-foreground">
+              {language === "en" ? "active pairs" : language === "pt" ? "duplas ativas" : "parejas activas"}
+            </p>
           </div>
         )}
       </div>
@@ -227,7 +231,7 @@ export default function Parejas() {
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Buscar por nombre de jugador..."
+          placeholder={language === "en" ? "Search by player name..." : language === "pt" ? "Buscar por nome do jogador..." : "Buscar por nombre de jugador..."}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50"

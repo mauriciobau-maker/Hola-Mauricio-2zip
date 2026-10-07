@@ -16,13 +16,18 @@ export interface SessionData {
   expires_at?: number;
 }
 
+const inMemorySessions = new Map<string, SessionData & { expire: Date }>();
+
 let oidcConfig: client.Configuration | null = null;
 
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
+    if (!process.env.REPL_ID) {
+      throw new Error("REPL_ID not set");
+    }
     oidcConfig = await client.discovery(
       new URL(ISSUER_URL),
-      process.env.REPL_ID!,
+      process.env.REPL_ID,
     );
   }
   return oidcConfig;
@@ -30,43 +35,76 @@ export async function getOidcConfig(): Promise<client.Configuration> {
 
 export async function createSession(data: SessionData): Promise<string> {
   const sid = crypto.randomBytes(32).toString("hex");
-  await db.insert(sessionsTable).values({
-    sid,
-    sess: data as unknown as Record<string, unknown>,
-    expire: new Date(Date.now() + SESSION_TTL),
-  });
+  const expire = new Date(Date.now() + SESSION_TTL);
+  inMemorySessions.set(sid, { ...data, expire });
+
+  try {
+    await db.insert(sessionsTable).values({
+      sid,
+      sess: data as unknown as Record<string, unknown>,
+      expire,
+    });
+  } catch {
+    // If DB is offline, in-memory session is retained
+  }
   return sid;
 }
 
 export async function getSession(sid: string): Promise<SessionData | null> {
-  const [row] = await db
-    .select()
-    .from(sessionsTable)
-    .where(eq(sessionsTable.sid, sid));
-
-  if (!row || row.expire < new Date()) {
-    if (row) await deleteSession(sid);
-    return null;
+  const inMem = inMemorySessions.get(sid);
+  if (inMem) {
+    if (inMem.expire < new Date()) {
+      inMemorySessions.delete(sid);
+      return null;
+    }
+    return inMem;
   }
 
-  return row.sess as unknown as SessionData;
+  try {
+    const [row] = await db
+      .select()
+      .from(sessionsTable)
+      .where(eq(sessionsTable.sid, sid));
+
+    if (!row || row.expire < new Date()) {
+      if (row) await deleteSession(sid);
+      return null;
+    }
+
+    const sess = row.sess as unknown as SessionData;
+    inMemorySessions.set(sid, { ...sess, expire: row.expire });
+    return sess;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateSession(
   sid: string,
   data: SessionData,
 ): Promise<void> {
-  await db
-    .update(sessionsTable)
-    .set({
-      sess: data as unknown as Record<string, unknown>,
-      expire: new Date(Date.now() + SESSION_TTL),
-    })
-    .where(eq(sessionsTable.sid, sid));
+  const expire = new Date(Date.now() + SESSION_TTL);
+  inMemorySessions.set(sid, { ...data, expire });
+  try {
+    await db
+      .update(sessionsTable)
+      .set({
+        sess: data as unknown as Record<string, unknown>,
+        expire,
+      })
+      .where(eq(sessionsTable.sid, sid));
+  } catch {
+    // Graceful fallback
+  }
 }
 
 export async function deleteSession(sid: string): Promise<void> {
-  await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
+  inMemorySessions.delete(sid);
+  try {
+    await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
+  } catch {
+    // Graceful fallback
+  }
 }
 
 export async function clearSession(

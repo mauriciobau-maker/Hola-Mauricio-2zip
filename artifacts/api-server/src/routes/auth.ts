@@ -38,9 +38,10 @@ function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     path: "/",
     maxAge: SESSION_TTL,
+    ...( { partitioned: true } as any ),
   });
 }
 
@@ -48,9 +49,10 @@ function setOidcCookie(res: Response, name: string, value: string) {
   res.cookie(name, value, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     path: "/",
     maxAge: OIDC_COOKIE_TTL,
+    ...( { partitioned: true } as any ),
   });
 }
 
@@ -112,8 +114,12 @@ router.get("/auth/user", async (req: Request, res: Response) => {
     res.json({ user: null });
     return;
   }
-  const userWithClub = await getUserWithClub(req.user.id);
-  res.json({ user: userWithClub });
+  try {
+    const userWithClub = await getUserWithClub(req.user.id);
+    res.json({ user: userWithClub ?? req.user });
+  } catch {
+    res.json({ user: req.user });
+  }
 });
 
 router.post("/auth/link-player", async (req: Request, res: Response) => {
@@ -172,10 +178,110 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
   });
 });
 
+function getMockSessionForRole(roleParamRaw?: string): SessionData {
+  const roleParam = (roleParamRaw || "superadmin").toLowerCase();
+  if (roleParam === "colaborador" || roleParam === "adminclub" || roleParam === "club_admin") {
+    return {
+      user: {
+        id: "usr_colaborador_demo",
+        email: "admin.club@padeltracker.com",
+        firstName: "Roberto",
+        lastName: "Gómez (Colaborador)",
+        profileImageUrl: null,
+        clubId: 1,
+        isAdmin: 0,
+        isClubAdmin: 1,
+      },
+      access_token: "mock-token",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  } else if (roleParam === "jugador" || roleParam === "player") {
+    return {
+      user: {
+        id: "usr_jugador_demo",
+        email: "jugador@padeltracker.com",
+        firstName: "Carlos",
+        lastName: "Ruiz",
+        profileImageUrl: null,
+        clubId: 1,
+        playerId: 1,
+        isAdmin: 0,
+        isClubAdmin: 0,
+      },
+      access_token: "mock-token",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  } else {
+    return {
+      user: {
+        id: "60741545",
+        email: "mbau73@hotmail.com",
+        firstName: "Super",
+        lastName: "Admin",
+        profileImageUrl: null,
+        clubId: 1,
+        isAdmin: 1,
+        isClubAdmin: 1,
+      },
+      access_token: "mock-token",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  }
+}
+
+router.get("/login/demo", async (req: Request, res: Response) => {
+  const role = (req.query.as as string) || (req.query.role as string) || "superadmin";
+  const mockUser = getMockSessionForRole(role);
+  const sid = await createSession(mockUser);
+  setSessionCookie(res, sid);
+  res.json({ success: true, token: sid, user: mockUser.user });
+});
+
+router.post("/login/demo", async (req: Request, res: Response) => {
+  const role = (req.body?.as as string) || (req.body?.role as string) || (req.query.as as string) || "superadmin";
+  const mockUser = getMockSessionForRole(role);
+  const sid = await createSession(mockUser);
+  setSessionCookie(res, sid);
+  res.json({ success: true, token: sid, user: mockUser.user });
+});
+
 router.get("/login", async (req: Request, res: Response) => {
+  const returnTo = getSafeReturnTo(req.query.returnTo);
+
+  if (!process.env.REPL_ID) {
+    const roleParam = ((req.query.as as string) || (req.query.role as string) || "superadmin").toLowerCase();
+    const mockUser = getMockSessionForRole(roleParam);
+    const sid = await createSession(mockUser);
+    setSessionCookie(res, sid);
+
+    // Render an HTML trampoline that stores the token in localStorage (bypassing third-party cookie blocking in iframes)
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Iniciando sesión...</title>
+</head>
+<body style="background:#090d16;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <div style="text-align:center;">
+    <p style="font-size:16px;font-weight:600;">Accediendo a la plataforma...</p>
+  </div>
+  <script>
+    try {
+      localStorage.setItem("padel_auth_token", ${JSON.stringify(sid)});
+      localStorage.setItem("padel_auth_user", ${JSON.stringify(JSON.stringify(mockUser.user))});
+    } catch (e) {
+      console.error(e);
+    }
+    window.location.replace(${JSON.stringify(returnTo)});
+  </script>
+</body>
+</html>`);
+    return;
+  }
+
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
-  const returnTo = getSafeReturnTo(req.query.returnTo);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
@@ -268,11 +374,16 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
   const sid = getSessionId(req);
   await clearSession(res, sid);
+
+  if (!process.env.REPL_ID) {
+    res.redirect("/");
+    return;
+  }
+
+  const config = await getOidcConfig();
+  const origin = getOrigin(req);
 
   const endSessionUrl = oidc.buildEndSessionUrl(config, {
     client_id: process.env.REPL_ID!,

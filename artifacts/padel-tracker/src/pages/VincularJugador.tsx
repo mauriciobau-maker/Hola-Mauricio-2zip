@@ -1,4 +1,4 @@
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, updateStoredUser } from "@workspace/replit-auth-web";
 import { useListPlayers } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +69,8 @@ export function VincularJugador() {
         body: JSON.stringify({ playerId }),
       });
       if (res.ok) {
+        const resData = await res.json();
+        updateStoredUser(resData.user || { playerId });
         await queryClient.invalidateQueries();
         navigate("/encuentros");
       }

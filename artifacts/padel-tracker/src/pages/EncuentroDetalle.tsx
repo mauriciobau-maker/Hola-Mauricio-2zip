@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   CalendarDays, MapPin, Users, Check, X, Clock,
-  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle
+  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle, Sparkles
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import { es, enUS, ptBR } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { triggerParryn } from "@/components/ParrynWidget";
 
 const LOCALES = {
   es: es,
@@ -750,14 +751,40 @@ export function EncuentroDetalle() {
           </div>
           {encuentro.notes && <p className="mt-2 text-sm text-muted-foreground italic">{encuentro.notes}</p>}
 
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm"
               onClick={handleShareGroupWhatsapp}
             >
               <MessageCircle className="h-4 w-4" />
               {t.shareGroupWhatsapp}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 gap-1.5 shadow-sm"
+              onClick={() =>
+                triggerParryn(
+                  `Redacta una convocatoria oficial y motivadora para WhatsApp del encuentro "${encuentro.title}" en ${encuentro.location} para ${encuentro.maxSpots || 8} jugadores`
+                )
+              }
+            >
+              <Sparkles className="h-4 w-4 text-yellow-400" />
+              Parryn IA Convocatoria
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-border text-foreground hover:bg-muted/50 gap-1.5 shadow-sm"
+              onClick={() =>
+                triggerParryn(
+                  `Redacta el resumen oficial deportivo para WhatsApp de la jornada "${encuentro.title}" con felicitaciones y resultados`
+                )
+              }
+            >
+              <Sparkles className="h-4 w-4 text-emerald-400" />
+              Parryn Resumen de Jornada
             </Button>
           </div>
         </div>

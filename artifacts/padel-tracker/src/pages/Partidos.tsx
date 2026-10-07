@@ -9,9 +9,15 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
+function formatDate(iso: string, locale: string = "es") {
+  const localeMap: Record<string, string> = {
+    es: "es-ES",
+    en: "en-US",
+    pt: "pt-BR",
+  };
+  return new Date(iso).toLocaleDateString(localeMap[locale] || "es-ES", {
     weekday: "short", day: "numeric", month: "short", year: "numeric",
   });
 }
@@ -22,6 +28,8 @@ type TeamPlayer = { id: number; name: string };
 export default function Partidos() {
   const { data: matches, isLoading } = useListMatches();
   const queryClient = useQueryClient();
+  const { t, language } = useLanguage();
+
   const deleteMutation = useDeleteMatch({
     mutation: {
       onSuccess: () => {
@@ -33,7 +41,14 @@ export default function Partidos() {
   });
 
   const handleDelete = (id: number) => {
-    if (confirm("¿Eliminar este partido? Esta acción no se puede deshacer.")) {
+    const confirmMsg =
+      language === "en"
+        ? "Delete this match? This action cannot be undone."
+        : language === "pt"
+        ? "Excluir esta partida? Esta ação não pode ser desfeita."
+        : "¿Eliminar este partido? Esta acción no se puede deshacer.";
+
+    if (confirm(confirmMsg)) {
       deleteMutation.mutate({ id });
     }
   };
@@ -42,16 +57,16 @@ export default function Partidos() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Partidos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("matchesTitle")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {matches?.length ?? 0} partido{(matches?.length ?? 0) !== 1 ? "s" : ""} registrado{(matches?.length ?? 0) !== 1 ? "s" : ""}
+            {matches?.length ?? 0} {language === "en" ? "matches recorded" : language === "pt" ? "partidas registradas" : "partidos registrados"}
           </p>
         </div>
         <Link
           href="/partidos/nuevo"
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
-          <Plus size={15} /> Registrar
+          <Plus size={15} /> {t("newMatchButton")}
         </Link>
       </div>
 
@@ -67,14 +82,16 @@ export default function Partidos() {
             <Calendar size={28} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="font-semibold">Sin partidos aún</p>
-            <p className="text-sm text-muted-foreground">Registra el primer partido para empezar</p>
+            <p className="font-semibold">{t("noMatchesFound")}</p>
+            <p className="text-sm text-muted-foreground">
+              {language === "en" ? "Record the first match to get started" : language === "pt" ? "Registre a primeira partida para começar" : "Registra el primer partido para empezar"}
+            </p>
           </div>
           <Link
             href="/partidos/nuevo"
             className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Registrar partido
+            {t("newMatchButton")}
           </Link>
         </div>
       ) : (
@@ -102,98 +119,89 @@ export default function Partidos() {
                   </div>
                 )}
 
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
                     {/* Team 1 */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                        team1Won ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {team1Won ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
-                      </span>
-                      <p className="text-sm font-medium truncate">
-                        {team1Players.map((p) => p.name).join(" / ") || "—"}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-sm font-semibold", team1Won ? "text-primary" : "text-foreground")}>
+                          {team1Players.map((p) => p.name).join(" / ") || "—"}
+                        </span>
+                        {team1Won && (
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                            {language === "en" ? "Winner" : language === "pt" ? "Vencedor" : "Ganador"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-lg font-bold tabular-nums", team1Won ? "text-primary" : "text-muted-foreground")}>
+                          {m.team1Score ?? 0}
+                        </span>
+                        {team1EloChanges.length > 0 && (
+                          <EloBadge changes={team1EloChanges} />
+                        )}
+                      </div>
                     </div>
+
                     {/* Team 2 */}
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                        !team1Won && !isDraw ? "bg-primary/20 text-primary" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {!team1Won && !isDraw ? "GANADOR" : isDraw ? "EMPATE" : "PERDEDOR"}
-                      </span>
-                      <p className="text-sm font-medium truncate">
-                        {team2Players.map((p) => p.name).join(" / ") || "—"}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-sm font-semibold", !team1Won && !isDraw ? "text-primary" : "text-foreground")}>
+                          {team2Players.map((p) => p.name).join(" / ") || "—"}
+                        </span>
+                        {!team1Won && !isDraw && (
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                            {language === "en" ? "Winner" : language === "pt" ? "Vencedor" : "Ganador"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-lg font-bold tabular-nums", !team1Won && !isDraw ? "text-primary" : "text-muted-foreground")}>
+                          {m.team2Score ?? 0}
+                        </span>
+                        {team2EloChanges.length > 0 && (
+                          <EloBadge changes={team2EloChanges} />
+                        )}
+                      </div>
                     </div>
+
+                    {/* Sets detail */}
+                    {sets && sets.length > 0 && (
+                      <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                        <span className="text-xs text-muted-foreground">{t("sets")}:</span>
+                        <div className="flex gap-2">
+                          {sets.map((s, idx) => (
+                            <span key={idx} className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                              {s.team1Games}-{s.team2Games}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Score + actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold tabular-nums">
-                        <span className={team1Won ? "text-primary" : "text-muted-foreground"}>
-                          {m.team1Score}
-                        </span>
-                        <span className="text-muted-foreground mx-1 text-lg">-</span>
-                        <span className={!team1Won && !isDraw ? "text-primary" : "text-muted-foreground"}>
-                          {m.team2Score}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {sets && sets.length > 0 ? "sets" : "goles"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Link
-                        href={`/partidos/${m.id}/editar`}
-                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <Pencil size={14} />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(m.id)}
-                        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <Link
+                      href={`/partidos/${m.id}/editar`}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      title={t("edit")}
+                    >
+                      <Pencil size={15} />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title={t("delete")}
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
 
-                {/* Sets detail */}
-                {sets && sets.length > 0 && (
-                  <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
-                    {sets.map((s) => (
-                      <div key={s.setNumber} className="text-xs text-muted-foreground">
-                        <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
-                          {s.team1Games}-{s.team2Games}
-                        </span>
-                      </div>
-                    ))}
-                    <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt)}</span>
-                  </div>
-                )}
-
-                {!sets && (
-                  <div className="mt-2.5 pt-2.5 border-t border-border">
-                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt)}</span>
-                  </div>
-                )}
-
-                {/* Elo changes */}
-                {eloChanges.length > 0 && (
-                  <div className="mt-2.5 pt-2.5 border-t border-border">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {[...team1EloChanges, ...team2EloChanges].map((c) => (
-                        <EloChangePill key={c.playerId} change={c} />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{formatDate(m.playedAt, language)}</span>
+                </div>
               </div>
             );
           })}
@@ -203,26 +211,21 @@ export default function Partidos() {
   );
 }
 
-function EloChangePill({ change }: { change: EloChange }) {
-  const positive = change.eloChange > 0;
-  const neutral = change.eloChange === 0;
+function EloBadge({ changes }: { changes: EloChange[] }) {
+  const totalChange = changes.reduce((acc, c) => acc + c.eloChange, 0) / changes.length;
+  const rounded = Math.round(totalChange);
+  if (rounded === 0) return null;
+
+  const isPositive = rounded > 0;
   return (
-    <div className="flex items-center gap-1 text-xs">
-      {positive ? (
-        <TrendingUp size={10} className="text-green-400" />
-      ) : neutral ? null : (
-        <TrendingDown size={10} className="text-red-400" />
+    <span
+      className={cn(
+        "flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded font-mono",
+        isPositive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400",
       )}
-      <span className="text-muted-foreground truncate max-w-[80px]">
-        {change.playerName.split(" ")[0]}
-      </span>
-      <span className={cn(
-        "font-bold tabular-nums",
-        positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
-      )}>
-        {positive ? "+" : ""}{change.eloChange}
-      </span>
-      <span className="text-muted-foreground/60 tabular-nums">({change.eloAfter})</span>
-    </div>
+    >
+      {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+      {isPositive ? `+${rounded}` : rounded}
+    </span>
   );
 }

@@ -37,6 +37,10 @@ const INITIAL_SPORTS = [
  *   - If partially seeded → onConflictDoNothing on slug prevents duplicates.
  */
 export async function seedSports(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+
   const existing = await db.select({ id: sportsTable.id }).from(sportsTable).limit(1);
 
   if (existing.length > 0) {

@@ -7,12 +7,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@workspace/api-client-react": "workspace:*"
+    "@workspace/api-client-react": "*"
   },
   "peerDependencies": {
     "react": ">=18"
   },
   "devDependencies": {
-    "@types/react": "catalog:"
+    "@types/react": "^19.2.0"
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, updateStoredUser } from "@workspace/replit-auth-web";
 import { Building2, ArrowRight, UserPlus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +71,9 @@ export function Onboarding() {
         setError(data.error ?? "Código inválido");
         return;
       }
+      if (data.user) {
+        updateStoredUser(data.user);
+      }
       setClub(data.club);
       // Cargar jugadores del club
       const playersRes = await fetch("/api/players", { credentials: "include" });
@@ -95,12 +98,18 @@ export function Onboarding() {
         credentials: "include",
         body: JSON.stringify({ playerId }),
       });
+      const data = await res.json();
       if (res.ok) {
+        if (data.user) {
+          updateStoredUser(data.user);
+        } else {
+          updateStoredUser({ playerId });
+        }
         setStep("done");
         // Forzar recarga completa para que useAuth() lea el nuevo clubId/playerId
         setTimeout(() => {
           window.location.href = "/";
-        }, 1500);
+        }, 1200);
       }
     } finally {
       setLoading(false);

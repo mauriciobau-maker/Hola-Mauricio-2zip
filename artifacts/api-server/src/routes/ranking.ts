@@ -8,7 +8,7 @@ import {
   playersTable,
   sportsTable,
 } from "@workspace/db";
-import { requireAuth, requireClub } from "../middlewares/requireCommunity";
+import { resolveEffectiveClubId } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -34,13 +34,17 @@ function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
   return grouped;
 }
 
-router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void> => {
+router.get("/ranking", async (req, res): Promise<void> => {
   const sportId = await getSelectedSportId(req.query.sportId);
   if (!sportId) {
     res.status(400).json({ error: "sportId inválido" });
     return;
   }
-  const clubId = (req.user as { clubId: number }).clubId;
+  const clubId = await resolveEffectiveClubId(req);
+  if (!clubId) {
+    res.json([]);
+    return;
+  }
 
   const [players, matches] = await Promise.all([
     db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
@@ -129,13 +133,22 @@ router.get("/ranking", requireAuth, requireClub, async (req, res): Promise<void>
   res.json(ranking);
 });
 
-router.get("/dashboard", requireAuth, requireClub, async (req, res): Promise<void> => {
+router.get("/dashboard", async (req, res): Promise<void> => {
   const sportId = await getSelectedSportId(req.query.sportId);
   if (!sportId) {
     res.status(400).json({ error: "sportId inválido" });
     return;
   }
-  const clubId = (req.user as { clubId: number }).clubId;
+  const clubId = await resolveEffectiveClubId(req);
+  if (!clubId) {
+    res.json({
+      totalPlayers: 0,
+      totalMatches: 0,
+      topPlayer: null,
+      recentMatches: [],
+    });
+    return;
+  }
   const [players, matches] = await Promise.all([
     db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
     db

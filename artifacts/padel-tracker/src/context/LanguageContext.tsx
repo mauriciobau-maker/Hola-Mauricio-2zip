@@ -1,62 +1,74 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { translations, Language, TranslationKey } from "../lib/translations";
-import { useAuth } from "@workspace/replit-auth-web"; // 👈 1. Importamos la autenticación
+import { useAuth } from "@workspace/replit-auth-web";
 
-// 👈 Solución: Re-exportamos el tipo Language para que otros archivos puedan importarlo desde aquí
-export type { Language };
+export type { Language, TranslationKey };
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (lang: Language, userInitiated?: boolean) => void;
+  setLanguage: (lang: Language) => void;
   setClubDefaultLanguage: (lang: string) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey | string, fallback?: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth(); // 👈 2. Obtenemos el usuario activo
+  const { user } = useAuth();
 
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem("app_language") as Language;
-    return saved || "es";
-  });
-
-  const [hasUserPreference, setHasUserPreference] = useState<boolean>(() => {
-    return !!localStorage.getItem("app_language");
-  });
-
-  // 👈 3. NUEVO: Si el usuario inició sesión/se inscribió y tiene un idioma en su perfil, se aplica globalmente
-  useEffect(() => {
-    const playerLang = (user as any)?.playerLanguage || (user as any)?.language;
-    if (playerLang && (playerLang === "es" || playerLang === "en" || playerLang === "pt")) {
-      setLanguageState(playerLang as Language);
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("app_language") as Language;
+      if (saved === "es" || saved === "en" || saved === "pt") {
+        return saved;
+      }
     }
-  }, [user]);
+    return "es";
+  });
 
-  const setLanguage = (lang: Language, userInitiated: boolean = false) => {
+  const [hasManualPreference, setHasManualPreference] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("app_language");
+    }
+    return false;
+  });
+
+  // Si el usuario no ha escogido un idioma manualmente, usar el de su perfil de usuario o club
+  useEffect(() => {
+    if (!hasManualPreference && user) {
+      const playerLang = (user as any)?.playerLanguage || (user as any)?.language;
+      if (playerLang && (playerLang === "es" || playerLang === "en" || playerLang === "pt")) {
+        setLanguageState(playerLang as Language);
+      }
+    }
+  }, [user, hasManualPreference]);
+
+  const setLanguage = (lang: Language) => {
+    if (lang !== "es" && lang !== "en" && lang !== "pt") return;
     setLanguageState(lang);
-    if (userInitiated) {
+    setHasManualPreference(true);
+    if (typeof window !== "undefined") {
       localStorage.setItem("app_language", lang);
-      setHasUserPreference(true);
     }
   };
 
   const setClubDefaultLanguage = (clubLang: string) => {
-    if (!hasUserPreference && (clubLang === "es" || clubLang === "en" || clubLang === "pt")) {
+    if (!hasManualPreference && (clubLang === "es" || clubLang === "en" || clubLang === "pt")) {
       setLanguageState(clubLang as Language);
     }
   };
 
-  const t = (key: TranslationKey): string => {
-    if (translations[language] && translations[language][key]) {
-      return translations[language][key];
+  const t = (key: TranslationKey | string, fallback?: string): string => {
+    const langDict = translations[language];
+    if (langDict && langDict[key]) {
+      return langDict[key];
     }
-    // Fallback a español si no existe en el idioma actual
+    // Fallback al diccionario en español
     if (translations.es && translations.es[key]) {
       return translations.es[key];
     }
-    return key;
+    // Fallback explícito o la clave
+    return fallback !== undefined ? fallback : key;
   };
 
   return (
