@@ -34,10 +34,33 @@ Migrations/snapshots are in `./drizzle/`.
 
 ## Environment variables
 
-- `DATABASE_URL` — PostgreSQL connection string (already configured in Replit)
-- `SESSION_SECRET` — Session signing secret (already configured as a Replit secret)
+- `DATABASE_URL` — PostgreSQL connection string (configured in Neon: `postgresql://neondb_owner:***@ep-long-mud-b6ect6dp-pooler.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require`)
+- `SESSION_SECRET` — Session signing secret (configured as a secret)
 - `PORT` / `BASE_PATH` — Set automatically per artifact by Replit
+
+## GitHub Repository & Sync
+
+- **Repo URL**: `https://github.com/mauriciobau-maker/Hola-Mauricio-2zip.git`
+- **Owner**: `mauriciobau-maker`
+- **Branch**: `main`
+- **Auth Token (PAT)**: Stored securely in `/.github_pat` (`ghp_9toS0k...`, classic PAT with `repo` scope)
+- **Sync Command**:
+  ```bash
+  git push origin main
+  ```
+
+## Internationalization & Features (Oct 2026)
+
+- **Languages Supported**: Español (`es`, default), English (`en`), Português (`pt`).
+- **Dynamic Translation**:
+  - `Partidos`: Winner/Loser badges (`WINNER`, `LOSER`, `DRAW`), sports (`Padel`, `Tennis`, `Football`), fair play confirmation.
+  - `Nuevo Partido`: Player slot indicators (`Player 1`, `Player 2`), select options (`Select...`).
+  - `Parejas`: Rankings (`Top 20 pairs`), podium cards (`W`, `L`, `M`).
+  - `Perfil del Jugador`: Full profile localization, dates in user locale, Elo history and sparklines.
+  - `Encuentros`: Parryn AI Assistant banner in natural language.
+  - `Cobros`: Dynamic expense split concepts (`(Split share)`, `Applied discount`, `Tournament split`).
+  - `Nuevo Jugador`: Synchronized application language, court positions (`Drive`, `Backhand`, `Both Sides`), dominant hand (`Right-handed`, `Left-handed`).
 
 ## User preferences
 
-- Language: Spanish (the app UI is in Spanish)
+- Language: Multi-language selector (`es`, `en`, `pt`) located in the header. Default: Spanish (`es`).

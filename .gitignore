@@ -52,6 +52,7 @@ Thumbs.db
 .env.local
 .env.*.local
 artifacts/padel-tracker/.env
+.github_pat
 zipFile.zip
 
 # Backups locales — no publicar
