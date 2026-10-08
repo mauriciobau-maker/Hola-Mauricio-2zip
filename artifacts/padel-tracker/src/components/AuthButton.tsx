@@ -40,21 +40,59 @@ export function AuthButton() {
   }
 
   const handleLoginAs = async (role: "superadmin" | "colaborador" | "jugador") => {
+    let demoUser: any = null;
+    if (role === "jugador") {
+      demoUser = {
+        id: "demo-jugador-1",
+        email: "jugador@padeltracker.com",
+        firstName: "Carlos",
+        lastName: "Ruiz",
+        role: "player",
+        isAdmin: 0,
+        isClubAdmin: 0,
+        clubId: 1
+      };
+    } else if (role === "colaborador") {
+      demoUser = {
+        id: "demo-admin-1",
+        email: "admin.club@padeltracker.com",
+        firstName: "Admin",
+        lastName: "Club",
+        role: "club_admin",
+        isAdmin: 1,
+        isClubAdmin: 1,
+        clubId: 1
+      };
+    } else {
+      demoUser = {
+        id: "demo-superadmin-1",
+        email: "mauricio.bau@gmail.com",
+        firstName: "Mauricio",
+        lastName: "Bau",
+        role: "superadmin",
+        isAdmin: 2,
+        isClubAdmin: 1,
+        clubId: 1
+      };
+    }
+
     try {
       const res = await fetch(`/api/login/demo?as=${role}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.token) {
+        if (data.token && data.user) {
+          demoUser = data.user;
           localStorage.setItem("padel_auth_token", data.token);
-          localStorage.setItem("padel_auth_user", JSON.stringify(data.user));
-          window.location.reload();
-          return;
         }
       }
     } catch (e) {
-      console.error(e);
+      // Offline or static Vercel fallback
     }
-    window.location.href = `/api/login?as=${role}&returnTo=${encodeURIComponent(window.location.pathname)}`;
+
+    localStorage.setItem("padel_auth_token", `demo-token-${role}`);
+    localStorage.setItem("padel_auth_user", JSON.stringify(demoUser));
+    window.dispatchEvent(new CustomEvent("padel_auth_update", { detail: demoUser }));
+    window.location.reload();
   };
 
   if (!user) {
