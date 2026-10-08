@@ -100,21 +100,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background flex flex-col" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2.5 font-bold text-base md:text-lg tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-400 via-emerald-500 to-teal-600 flex items-center justify-center text-zinc-950 font-black text-sm shadow-md shrink-0">
-              P
-            </div>
-            <div className="flex flex-col leading-tight">
-              <div className="flex items-center gap-1.5">
-                <span className="text-foreground font-extrabold tracking-tight">Parryn</span>
-                <span className="text-primary font-bold">Sport Hub</span>
-                <span className="text-[10px] font-black bg-primary/20 text-primary px-1.5 py-0.2 rounded-full border border-primary/30">IA</span>
+          <Link href="/" className="flex items-center gap-2.5 tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
+            {club?.logoUrl ? (
+              <img
+                src={club.logoUrl}
+                alt={club.name}
+                className="w-9 h-9 rounded-xl object-contain bg-background/80 border border-border/60 p-0.5 shadow-sm shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/40 flex items-center justify-center text-primary font-black text-sm shadow-sm shrink-0">
+                {(club?.name ? club.name.trim().slice(0, 2).toUpperCase() : "CP")}
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-medium">
-                {club?.logoUrl ? (
-                  <img src={club.logoUrl} alt={club.name} className="h-3.5 w-auto object-contain rounded shrink-0" />
-                ) : null}
-                <span className="truncate max-w-[150px]">{club?.name || "Club Padel"}</span>
+            )}
+            <div className="flex flex-col leading-tight">
+              <span className="text-foreground font-black text-sm md:text-base tracking-tight truncate max-w-[200px] md:max-w-[280px]">
+                {club?.name || "Club Pádel"}
+              </span>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                <span className="opacity-75">powered by</span>
+                <span className="font-semibold text-foreground/80">Parryn Sport Hub</span>
+                <span className="text-[9px] font-bold bg-primary/20 text-primary px-1 py-0.2 rounded border border-primary/30">IA</span>
               </div>
             </div>
           </Link>
@@ -165,7 +170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} Parryn Sport Hub IA • {club?.name || "Club Pádel"}.</p>
+          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Powered by Parryn Sport Hub IA.</p>
           {club?.address && <span className="flex items-center gap-1 font-medium bg-background border border-border px-2 py-1 rounded-md shadow-sm"><MapPin size={12} className="text-primary" /> {club.address}</span>}
         </div>
       </footer>
