@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "bun install",
-  "buildCommand": "bun run --filter @workspace/padel-tracker build && mkdir -p public && cp -r artifacts/padel-tracker/dist/public/* public/",
+  "buildCommand": "bun run --filter @workspace/padel-tracker build && mkdir -p public && (cp -r artifacts/padel-tracker/dist/public/. public/ 2>/dev/null || cp -r dist/public/. public/ 2>/dev/null || true)",
   "outputDirectory": "public",
   "rewrites": [
     {
