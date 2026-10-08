@@ -8,6 +8,7 @@ import {
   Users,
   Plus,
   ChevronRight,
+  Bot,
   Sparkles,
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -15,7 +16,6 @@ import { format, isPast, isValid } from "date-fns";
 import type { Locale } from "date-fns";
 import { es, enUS, ptBR } from "date-fns/locale";
 import { useLanguage, Language } from "@/context/LanguageContext";
-import { triggerParryn } from "@/components/ParrynWidget";
 
 const LOCALES = {
   es,
@@ -33,6 +33,13 @@ const TRANSLATIONS = {
     upcoming: "Próximos",
     past: "Pasados",
     maxSpots: (num: number) => `Máx. ${num}`,
+    parrynBadge: "Parryn IA",
+    parrynSubtitle: "Asistente de Convocatorias",
+    parrynTitle: "¿Quieres armar un encuentro en segundos por lenguaje natural?",
+    parrynPromptPrefix: "Dile a Parryn: ",
+    parrynPromptExample: '"Hazme una convocatoria para mañana a las 19:00 para 12 jugadores en 3 canchas en Star Padel"',
+    parrynPromptSuffix: " y lo programará automáticamente con el mensaje para WhatsApp listo.",
+    parrynButton: "Organizar con Parryn IA",
   },
   en: {
     title: "Matches & Events",
@@ -43,6 +50,13 @@ const TRANSLATIONS = {
     upcoming: "Upcoming",
     past: "Past",
     maxSpots: (num: number) => `Max ${num}`,
+    parrynBadge: "Parryn AI",
+    parrynSubtitle: "Match & Event Assistant",
+    parrynTitle: "Want to organize an event in seconds using natural language?",
+    parrynPromptPrefix: "Tell Parryn: ",
+    parrynPromptExample: '"Create a match for tomorrow at 19:00 for 12 players across 3 courts at Star Padel"',
+    parrynPromptSuffix: " and it will automatically schedule it with the WhatsApp message ready.",
+    parrynButton: "Organize with Parryn AI",
   },
   pt: {
     title: "Encontros",
@@ -53,6 +67,13 @@ const TRANSLATIONS = {
     upcoming: "Próximos",
     past: "Passados",
     maxSpots: (num: number) => `Máx. ${num}`,
+    parrynBadge: "Parryn IA",
+    parrynSubtitle: "Assistente de Convocatórias",
+    parrynTitle: "Quer organizar um encontro em segundos por linguagem natural?",
+    parrynPromptPrefix: "Diga ao Parryn: ",
+    parrynPromptExample: '"Crie uma convocatória para amanhã às 19:00 para 12 jogadores em 3 quadras no Star Padel"',
+    parrynPromptSuffix: " e ele programará automaticamente com a mensagem para WhatsApp pronta.",
+    parrynButton: "Organizar com Parryn IA",
   },
 };
 
@@ -177,45 +198,56 @@ export function Encuentros() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t.title}</h1>
 
-        <div className="flex items-center gap-2">
+        {user ? (
+          <Button
+            size="sm"
+            onClick={() => navigate("/encuentros/nuevo")}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            {t.new}
+          </Button>
+        ) : (
           <Button
             size="sm"
             variant="outline"
-            onClick={() =>
-              triggerParryn(
-                "Parryn, crea un nuevo encuentro de pádel para este viernes a las 19:00 con 8 cupos en Cancha Central"
-              )
-            }
-            className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 cursor-pointer shadow-sm"
-            title="Pedir a Parryn que cree y agende el encuentro con lenguaje natural"
+            onClick={login}
+            className="gap-2 border-white/20 text-white hover:bg-white/10"
           >
-            <Sparkles className="h-4 w-4 text-yellow-400" />
-            <span>Crear con Parryn IA</span>
+            <Plus className="h-4 w-4" />
+            {t.create}
           </Button>
+        )}
+      </div>
 
-          {user ? (
-            <Button
-              size="sm"
-              onClick={() => navigate("/encuentros/nuevo")}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              {t.new}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={login}
-              className="gap-2 border-white/20 text-white hover:bg-white/10"
-            >
-              <Plus className="h-4 w-4" />
-              {t.create}
-            </Button>
-          )}
+      {/* Banner Parryn IA para armar convocatorias por lenguaje natural */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/30 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" /> {t.parrynBadge}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">{t.parrynSubtitle}</span>
+            </div>
+            <h3 className="font-semibold text-sm sm:text-base text-white">
+              {t.parrynTitle}
+            </h3>
+            <p className="text-xs text-emerald-200/80 max-w-xl">
+              {t.parrynPromptPrefix}<em>{t.parrynPromptExample}</em>{t.parrynPromptSuffix}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => navigate("/secretario")}
+            className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs gap-1.5 shadow"
+          >
+            <Bot className="w-4 h-4" />
+            {t.parrynButton}
+          </Button>
         </div>
       </div>
 

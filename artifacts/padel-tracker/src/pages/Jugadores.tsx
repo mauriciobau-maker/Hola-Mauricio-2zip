@@ -20,9 +20,9 @@ const avatarColors = [
 ];
 
 export default function Jugadores() {
+  const { t } = useLanguage();
   const { data: players, isLoading } = useListPlayers();
   const [search, setSearch] = useState("");
-  const { t, language } = useLanguage();
 
   const queryClient = useQueryClient();
   const deleteMutation = useDeletePlayer({
@@ -39,19 +39,13 @@ export default function Jugadores() {
   );
 
   const handleDelete = (id: number, name: string) => {
-    const confirmMsg =
-      language === "en"
-        ? `Delete ${name}? This action cannot be undone.`
-        : language === "pt"
-        ? `Excluir ${name}? Esta ação não pode ser desfeita.`
-        : `¿Eliminar a ${name}? Esta acción no se puede deshacer.`;
-
-    if (confirm(confirmMsg)) {
+    if (confirm(t("jugadores.deleteConfirm", { name }))) {
       deleteMutation.mutate({ id });
     }
   };
 
   const openWhatsApp = (phone: string) => {
+    // Limpia el número quitando caracteres no numéricos
     const cleanPhone = phone.replace(/\D/g, "");
     window.open(`https://wa.me/${cleanPhone}`, "_blank");
   };
@@ -60,9 +54,9 @@ export default function Jugadores() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("playersTitle")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("jugadores.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {players?.length ?? 0} {language === "en" ? "registered" : language === "pt" ? "registrados" : "registrados"}
+            {t("jugadores.count", { count: players?.length ?? 0 })}
           </p>
         </div>
         <Link
@@ -70,7 +64,7 @@ export default function Jugadores() {
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
           <Plus size={15} />
-          {t("newPlayer")}
+          {t("jugadores.new")}
         </Link>
       </div>
 
@@ -78,7 +72,7 @@ export default function Jugadores() {
         <Search className="absolute left-3 top-3 text-muted-foreground" size={16} />
         <input
           type="text"
-          placeholder={t("searchPlaceholder")}
+          placeholder={t("jugadores.search")}
           className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -92,7 +86,7 @@ export default function Jugadores() {
           ))}
         </div>
       ) : !players?.length ? (
-        <div className="text-center py-20 text-muted-foreground">{t("noPlayersFound")}</div>
+        <div className="text-center py-20 text-muted-foreground">{t("jugadores.noPlayers")}</div>
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
           {filteredPlayers?.map((player: any, idx) => {
@@ -119,16 +113,16 @@ export default function Jugadores() {
                   {player.phone && (
                     <button
                       onClick={() => openWhatsApp(player.phone)}
-                      title="WhatsApp"
+                      title={t("jugadores.chatWhatsApp")}
                       className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-500 transition-colors"
                     >
                       <MessageCircle size={15} />
                     </button>
                   )}
-                  <Link href={`/jugadores/${player.id}/editar`} className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors" title={t("edit")}>
+                  <Link href={`/jugadores/${player.id}/editar`} className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors">
                     <Pencil size={14} />
                   </Link>
-                  <button onClick={() => handleDelete(player.id, player.name)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title={t("delete")}>
+                  <button onClick={() => handleDelete(player.id, player.name)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -136,7 +130,7 @@ export default function Jugadores() {
             );
           })}
           {filteredPlayers?.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">{t("noPlayersFound")}</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("jugadores.noPlayers")}</div>
           )}
         </div>
       )}

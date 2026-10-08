@@ -6,12 +6,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowLeft, CalendarDays, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { format, isValid } from "date-fns";
 import { useLanguage, Language } from "@/context/LanguageContext";
-import { triggerParryn } from "@/components/ParrynWidget";
 
 const TRANSLATIONS = {
   es: {
@@ -89,8 +88,11 @@ export function NuevoEncuentro() {
   );
   const [location, setLocation] = useState("");
   const [maxSpots, setMaxSpots] = useState<string>("");
+  const [durationMinutes, setDurationMinutes] = useState<string>("90");
+  const [courtsAvailable, setCourtsAvailable] = useState<string>("1");
   const [notes, setNotes] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!user) {
     return (
@@ -134,9 +136,11 @@ export function NuevoEncuentro() {
           dateTime: isoDateTime,
           location: location.trim(),
           maxSpots: maxSpots ? parseInt(maxSpots, 10) : undefined,
+          durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
+          courtsAvailable: courtsAvailable ? parseInt(courtsAvailable, 10) : 1,
           notes: notes.trim() || undefined,
           playerIds: selectedPlayers.size > 0 ? Array.from(selectedPlayers).map(Number) : undefined,
-        },
+        } as any,
       });
 
       const encuentroId =
@@ -149,9 +153,9 @@ export function NuevoEncuentro() {
       } else {
         navigate("/encuentros");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al crear encuentro:", error);
-      alert(t.errorCreating);
+      setFormError(error?.message || t.errorCreating);
     }
   }
 
@@ -164,37 +168,12 @@ export function NuevoEncuentro() {
         <h1 className="text-xl font-bold">{t.title}</h1>
       </div>
 
-      {/* Tarjeta de Asistencia de Parryn */}
-      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-sm flex-shrink-0 mt-0.5">
-            P
-          </div>
-          <div>
-            <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <span>¿Prefieres que Parryn organice todo por ti?</span>
-              <Sparkles size={13} className="text-yellow-400" />
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Dile en lenguaje natural: <em>"Parryn, crea un encuentro este viernes a las 19:00 en Cancha 2 con 8 cupos"</em>.
-            </p>
-          </div>
+      {formError && (
+        <div className="bg-destructive/15 border border-destructive/30 text-destructive text-sm p-3 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{formError}</span>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            triggerParryn(
-              "Parryn, crea un nuevo encuentro de pádel para este viernes a las 19:00 con 8 cupos en Cancha Central"
-            )
-          }
-          className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs shrink-0 cursor-pointer self-start sm:self-auto"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-yellow-400 mr-1" />
-          Pedir a Parryn
-        </Button>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -230,15 +209,41 @@ export function NuevoEncuentro() {
           />
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="maxSpots">{t.fieldMaxSpots}</Label>
+            <Input
+              id="maxSpots"
+              type="number"
+              min={1}
+              value={maxSpots}
+              onChange={(e) => setMaxSpots(e.target.value)}
+              placeholder="4"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="durationMinutes">Duración (minutos)</Label>
+            <Input
+              id="durationMinutes"
+              type="number"
+              min={30}
+              step={15}
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(e.target.value)}
+              placeholder="90"
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="maxSpots">{t.fieldMaxSpots}</Label>
+          <Label htmlFor="courtsAvailable">Pistas / Canchas Asignadas</Label>
           <Input
-            id="maxSpots"
+            id="courtsAvailable"
             type="number"
             min={1}
-            value={maxSpots}
-            onChange={(e) => setMaxSpots(e.target.value)}
-            placeholder="4"
+            value={courtsAvailable}
+            onChange={(e) => setCourtsAvailable(e.target.value)}
+            placeholder="1"
           />
         </div>
 

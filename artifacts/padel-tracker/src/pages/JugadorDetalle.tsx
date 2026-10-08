@@ -9,9 +9,11 @@ import {
 } from "@workspace/api-client-react";
 import { ArrowLeft, TrendingUp, TrendingDown, Award, Target, Flame, Pencil, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+function formatDate(iso: string, language: string) {
+  const loc = language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-ES";
+  return new Date(iso).toLocaleDateString(loc, { day: "numeric", month: "short" });
 }
 
 function initials(name: string) {
@@ -19,6 +21,7 @@ function initials(name: string) {
 }
 
 export default function JugadorDetalle() {
+  const { t, language } = useLanguage();
   const params = useParams();
   const id = parseInt(params.id ?? "0", 10);
 
@@ -49,9 +52,9 @@ export default function JugadorDetalle() {
   if (!player) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Jugador no encontrado</p>
+        <p className="text-muted-foreground">{t("jugadores.playerNotFound")}</p>
         <Link href="/jugadores" className="text-primary hover:underline text-sm mt-2 block">
-          Volver a jugadores
+          {t("jugadores.backToPlayers")}
         </Link>
       </div>
     );
@@ -69,13 +72,13 @@ export default function JugadorDetalle() {
         >
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-xl font-bold flex-1">Perfil del jugador</h1>
+        <h1 className="text-xl font-bold flex-1">{t("jugadores.profile")}</h1>
         <Link
           href={`/jugadores/${id}/editar`}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted/50 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           <Pencil size={13} />
-          Editar
+          {t("jugadores.edit")}
         </Link>
       </div>
 
@@ -91,10 +94,11 @@ export default function JugadorDetalle() {
               <p className="text-muted-foreground text-sm">&quot;{player.nickname}&quot;</p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
-              Miembro desde{" "}
-              {new Date(player.createdAt).toLocaleDateString("es-ES", {
-                month: "long",
-                year: "numeric",
+              {t("jugadores.memberSince", {
+                date: new Date(player.createdAt).toLocaleDateString(
+                  language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-ES",
+                  { month: "long", year: "numeric" }
+                ),
               })}
             </p>
           </div>
@@ -122,7 +126,7 @@ export default function JugadorDetalle() {
         {stats && stats.totalMatches > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-muted-foreground">Porcentaje de victorias</span>
+              <span className="text-xs text-muted-foreground">{t("jugadores.winRate")}</span>
               <span className="text-xs font-semibold text-primary">{winRate}%</span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -140,24 +144,24 @@ export default function JugadorDetalle() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatTile
             icon={<Award size={16} className="text-yellow-400" />}
-            label="Puntos"
+            label={t("jugadores.points")}
             value={stats.points}
             accent
           />
           <StatTile
             icon={<TrendingUp size={16} className="text-primary" />}
-            label="Victorias"
+            label={t("jugadores.wins")}
             value={stats.wins}
           />
           <StatTile
             icon={<Target size={16} className="text-muted-foreground" />}
-            label="Derrotas"
+            label={t("jugadores.losses")}
             value={stats.losses}
           />
           <StatTile
             icon={<Flame size={16} className="text-orange-400" />}
-            label="Racha actual"
-            value={`${stats.currentStreak}V`}
+            label={t("jugadores.currentStreak")}
+            value={`${stats.currentStreak}${t("parejas.winsShort") || "V"}`}
           />
         </div>
       )}
@@ -165,19 +169,19 @@ export default function JugadorDetalle() {
       {/* Sets stats */}
       {stats && (
         <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="font-semibold text-sm mb-3">Estadisticas de sets</h3>
+          <h3 className="font-semibold text-sm mb-3">{t("jugadores.setStats")}</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold text-primary">{stats.setsWon}</p>
-              <p className="text-xs text-muted-foreground">Sets ganados</p>
+              <p className="text-xs text-muted-foreground">{t("jugadores.setsWon")}</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-muted-foreground">{stats.setsLost}</p>
-              <p className="text-xs text-muted-foreground">Sets perdidos</p>
+              <p className="text-xs text-muted-foreground">{t("jugadores.setsLost")}</p>
             </div>
             <div>
               <p className="text-2xl font-bold">{stats.totalMatches}</p>
-              <p className="text-xs text-muted-foreground">Partidos totales</p>
+              <p className="text-xs text-muted-foreground">{t("jugadores.totalMatches")}</p>
             </div>
           </div>
         </div>
@@ -188,11 +192,13 @@ export default function JugadorDetalle() {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
             <Zap size={13} className="text-primary" />
-            <h3 className="font-semibold text-sm">Historial Elo</h3>
-            <span className="text-xs text-muted-foreground ml-auto">{eloHistory.length} partidos</span>
+            <h3 className="font-semibold text-sm">{t("jugadores.eloHistory")}</h3>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {t("jugadores.eloMatchesCount", { count: eloHistory.length })}
+            </span>
           </div>
           {/* Mini sparkline */}
-          <EloSparkline history={eloHistory as any} />
+          <EloSparkline history={eloHistory as any} t={t} />
           {/* List — last 8 entries reversed (most recent first) */}
           <div className="divide-y divide-border">
             {[...eloHistory].reverse().slice(0, 8).map((entry) => {
@@ -212,7 +218,7 @@ export default function JugadorDetalle() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">{formatDate(entry.matchPlayedAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(entry.matchPlayedAt, language)}</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-muted-foreground tabular-nums">{entry.eloBefore}</span>
@@ -238,7 +244,7 @@ export default function JugadorDetalle() {
       {stats && (stats.recentMatches ?? []).length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="font-semibold text-sm">Ultimos partidos</h3>
+            <h3 className="font-semibold text-sm">{t("jugadores.recentMatches")}</h3>
           </div>
           <div className="divide-y divide-border">
             {(stats.recentMatches ?? []).map((m) => {
@@ -263,7 +269,7 @@ export default function JugadorDetalle() {
                       won ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive",
                     )}
                   >
-                    {won ? "V" : "D"}
+                    {won ? (t("parejas.winsShort") || "V") : (t("parejas.lossesShort") || "D")}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium truncate">{myTeam}</p>
@@ -275,7 +281,7 @@ export default function JugadorDetalle() {
                     <span className={!won ? "text-primary" : "text-muted-foreground"}>{rivalScore}</span>
                   </div>
                   <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {formatDate(m.playedAt)}
+                    {formatDate(m.playedAt, language)}
                   </span>
                 </div>
               );
@@ -288,7 +294,7 @@ export default function JugadorDetalle() {
 }
 
 /** Inline SVG sparkline for Elo progression */
-function EloSparkline({ history }: { history: Array<{ eloAfter: number }> }) {
+function EloSparkline({ history, t }: { history: Array<{ eloAfter: number }>; t: (key: string) => string }) {
   const values = history.map((h) => h.eloAfter);
   if (values.length < 2) return null;
 
@@ -343,9 +349,9 @@ function EloSparkline({ history }: { history: Array<{ eloAfter: number }> }) {
         )}
       </svg>
       <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-        <span>Inicio</span>
-        <span className="text-muted-foreground/50">— 1500 base —</span>
-        <span>Ahora</span>
+        <span>{t("jugadores.start")}</span>
+        <span className="text-muted-foreground/50">{t("jugadores.baseElo")}</span>
+        <span>{t("jugadores.now")}</span>
       </div>
     </div>
   );

@@ -203,3 +203,17 @@
     inset: -1px;
   }
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, nav, aside, footer, .no-print, [data-no-print] {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 10mm 10mm;
+  }
+}

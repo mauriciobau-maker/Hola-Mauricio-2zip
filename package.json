@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "license": "MIT",
   "workspaces": [
-    "artifacts/*",
+    "artifacts/api-server",
+    "artifacts/padel-tracker",
     "lib/*",
     "scripts"
   ],
@@ -27,6 +28,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "0.45.2",
     "express": "^5.2.1",
+    "pg": "^8.23.1",
     "tsx": "^4.23.1",
     "vite": "^7.3.2"
   }

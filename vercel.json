@@ -1,10 +1,13 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=@workspace/padel-tracker",
   "outputDirectory": "artifacts/padel-tracker/dist/public",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "https://padel-tracker-api.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

@@ -15,6 +15,8 @@ export const encuentrosTable = pgTable("encuentros", {
   sportId: integer("sport_id").references(() => sportsTable.id),
   formato: text("formato"),
   estado: text("estado").notNull().default("abierto"),
+  durationMinutes: integer("duration_minutes").default(90),
+  courtsAvailable: integer("courts_available").default(1),
   notificationEmail: boolean("notification_email").notNull().default(false),
   notificationWhatsapp: boolean("notification_whatsapp").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

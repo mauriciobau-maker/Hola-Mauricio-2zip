@@ -15,6 +15,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Link } from "wouter";
+import { useLanguage } from "@/context/LanguageContext";
 
 // Diccionario de traducciones para el formulario dinámico
 const labels: Record<string, Record<string, string>> = {
@@ -35,6 +36,16 @@ const labels: Record<string, Record<string, string>> = {
     creating: "Creando...",
     errorMsg: "Error al crear el jugador. Intenta de nuevo.",
     errorNameRequired: "El nombre es obligatorio.",
+    courtPosition: "Posición en Cancha",
+    drive: "Drive (Derecha)",
+    backhand: "Revés (Izquierda)",
+    bothSides: "Ambos Lados",
+    dominantHand: "Mano Hábil",
+    rightHanded: "Diestro",
+    leftHanded: "Zurdo",
+    clubCodeLabel: "Código de Club",
+    placeholderName: "Ej: Carlos López",
+    placeholderNickname: "Ej: El Rayo",
   },
   en: {
     title: "New Player",
@@ -53,6 +64,16 @@ const labels: Record<string, Record<string, string>> = {
     creating: "Creating...",
     errorMsg: "Error creating player. Please try again.",
     errorNameRequired: "Name is required.",
+    courtPosition: "Court Position",
+    drive: "Drive (Right)",
+    backhand: "Backhand (Left)",
+    bothSides: "Both Sides",
+    dominantHand: "Dominant Hand",
+    rightHanded: "Right-handed",
+    leftHanded: "Left-handed",
+    clubCodeLabel: "Club Code",
+    placeholderName: "e.g. Charlie Smith",
+    placeholderNickname: "e.g. Lightning",
   },
   pt: {
     title: "Novo Jogador",
@@ -71,6 +92,16 @@ const labels: Record<string, Record<string, string>> = {
     creating: "Criando...",
     errorMsg: "Erro ao criar jogador. Tente novamente.",
     errorNameRequired: "O nome é obrigatório.",
+    courtPosition: "Posição em Quadra",
+    drive: "Drive (Direita)",
+    backhand: "Revés (Esquerda)",
+    bothSides: "Ambos os Lados",
+    dominantHand: "Mão Hábil",
+    rightHanded: "Destro",
+    leftHanded: "Canhoto",
+    clubCodeLabel: "Código do Clube",
+    placeholderName: "Ex: Carlos Silva",
+    placeholderNickname: "Ex: O Raio",
   },
 };
 
@@ -86,10 +117,20 @@ export default function NuevoJugador() {
   // Datos básicos del jugador
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [courtSide, setCourtSide] = useState<string>("ambos");
+  const [dominantHand, setDominantHand] = useState<string>("diestro");
   const [error, setError] = useState("");
 
-  // Idioma de la aplicación/usuario (por defecto Español)
-  const [language, setLanguage] = useState("es");
+  const { language: activeAppLanguage } = useLanguage();
+
+  // Idioma de la aplicación/usuario sincronizado con el contexto activo
+  const [playerLanguage, setPlayerLanguage] = useState(activeAppLanguage || "es");
+
+  useEffect(() => {
+    if (activeAppLanguage) {
+      setPlayerLanguage(activeAppLanguage);
+    }
+  }, [activeAppLanguage]);
 
   // Contacto y WhatsApp
   const [phone, setPhone] = useState("");
@@ -104,8 +145,8 @@ export default function NuevoJugador() {
   const [clubCode, setClubCode] = useState("");
   const isSuperAdmin = true; // Control de rol para mostrar el campo de club
 
-  // Textos traducidos dinámicamente según la opción elegida
-  const t = labels[language] || labels.es;
+  // Textos traducidos dinámicamente según la app activa
+  const t = labels[activeAppLanguage] || labels.es;
 
   // Cargar categorías disponibles al montar el componente
   useEffect(() => {
@@ -151,7 +192,9 @@ export default function NuevoJugador() {
       data: {
         name: name.trim(),
         ...(nickname.trim() ? { nickname: nickname.trim() } : {}),
-        language,
+        courtSide,
+        dominantHand,
+        language: playerLanguage,
         ...(phone.trim() ? { phone: phone.trim() } : {}),
         ...(waId.trim() ? { waId: waId.trim() } : {}),
         wspConsent,
@@ -195,7 +238,7 @@ export default function NuevoJugador() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Carlos Lopez"
+              placeholder={t.placeholderName || "Ej: Carlos López"}
               className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
               autoFocus
             />
@@ -213,9 +256,40 @@ export default function NuevoJugador() {
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="Ej: El Rayo"
+              placeholder={t.placeholderNickname || "Ej: El Rayo"}
               className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
             />
+          </div>
+
+          {/* Posición en Pista y Mano Hábil */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                {t.courtPosition}
+              </label>
+              <select
+                value={courtSide}
+                onChange={(e) => setCourtSide(e.target.value)}
+                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="drive">{t.drive}</option>
+                <option value="reves">{t.backhand}</option>
+                <option value="ambos">{t.bothSides}</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                {t.dominantHand}
+              </label>
+              <select
+                value={dominantHand}
+                onChange={(e) => setDominantHand(e.target.value)}
+                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="diestro">{t.rightHanded}</option>
+                <option value="zurdo">{t.leftHanded}</option>
+              </select>
+            </div>
           </div>
 
           {/* Selector de Categorías / Deportes */}
@@ -252,7 +326,7 @@ export default function NuevoJugador() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 <Building2 size={14} className="text-muted-foreground" />
-                Código de Club{" "}
+                {t.clubCodeLabel}{" "}
                 <span className="text-muted-foreground text-xs">
                   {t.optional}
                 </span>
@@ -274,8 +348,8 @@ export default function NuevoJugador() {
               {t.appLanguage}
             </label>
             <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              value={playerLanguage}
+              onChange={(e) => setPlayerLanguage(e.target.value)}
               className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
             >
               <option value="es">Español (ES)</option>

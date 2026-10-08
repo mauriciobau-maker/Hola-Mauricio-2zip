@@ -83,6 +83,9 @@ const TRANSLATIONS = {
     errorTeamSize: "Selecciona los jugadores requeridos por equipo.",
     errorDuplicatePlayer: "Un jugador no puede estar en ambos equipos.",
     errorSave: "Error al registrar el partido. Inténtalo de nuevo.",
+    player: "Jugador",
+    playerIdx: (n: number) => `Jugador ${n}`,
+    selectOption: "Seleccionar...",
   },
   en: {
     title: "Register Match",
@@ -109,6 +112,9 @@ const TRANSLATIONS = {
     errorTeamSize: "Select all required players for each team.",
     errorDuplicatePlayer: "A player cannot be on both teams.",
     errorSave: "Error registering match. Please try again.",
+    player: "Player",
+    playerIdx: (n: number) => `Player ${n}`,
+    selectOption: "Select...",
   },
   pt: {
     title: "Registrar Partida",
@@ -135,6 +141,9 @@ const TRANSLATIONS = {
     errorTeamSize: "Selecione os jogadores necessários por equipe.",
     errorDuplicatePlayer: "Um jogador não pode estar em ambas as equipes.",
     errorSave: "Erro ao registrar a partida. Tente novamente.",
+    player: "Jogador",
+    playerIdx: (n: number) => `Jogador ${n}`,
+    selectOption: "Selecionar...",
   },
 };
 
@@ -382,7 +391,8 @@ export default function NuevoPartido() {
                 <h3 className="text-sm font-semibold text-center text-primary">{t.team1}</h3>
                 {team1Players.map((val, idx) => (
                   <PlayerSelect key={idx}
-                    label={teamSize === 1 ? "Jugador" : `Jugador ${idx + 1}`}
+                    label={teamSize === 1 ? t.player : t.playerIdx(idx + 1)}
+                    placeholder={t.selectOption}
                     value={val}
                     onChange={(id) => setTeam1Players((prev) => prev.map((v, i) => i === idx ? id : v))}
                     options={availableFor([...team1Players.filter((_, i) => i !== idx), ...team2Players])}
@@ -393,7 +403,8 @@ export default function NuevoPartido() {
                 <h3 className="text-sm font-semibold text-center text-accent">{t.team2}</h3>
                 {team2Players.map((val, idx) => (
                   <PlayerSelect key={idx}
-                    label={teamSize === 1 ? "Jugador" : `Jugador ${idx + 1}`}
+                    label={teamSize === 1 ? t.player : t.playerIdx(idx + 1)}
+                    placeholder={t.selectOption}
                     value={val}
                     onChange={(id) => setTeam2Players((prev) => prev.map((v, i) => i === idx ? id : v))}
                     options={availableFor([...team1Players, ...team2Players.filter((_, i) => i !== idx)])}
@@ -566,8 +577,9 @@ export default function NuevoPartido() {
   );
 }
 
-function PlayerSelect({ label, value, onChange, options }: {
+function PlayerSelect({ label, placeholder = "Seleccionar...", value, onChange, options }: {
   label: string;
+  placeholder?: string;
   value: number | null;
   onChange: (id: number | null) => void;
   options: Array<{ id: number; name: string; nickname?: string | null }>;
@@ -577,7 +589,7 @@ function PlayerSelect({ label, value, onChange, options }: {
       <label className="text-xs text-muted-foreground">{label}</label>
       <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : null)}
         className="w-full bg-background border border-input rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        <option value="">Seleccionar...</option>
+        <option value="">{placeholder}</option>
         {options.map((p) => (
           <option key={p.id} value={p.id}>{p.name}{p.nickname ? ` (${p.nickname})` : ""}</option>
         ))}

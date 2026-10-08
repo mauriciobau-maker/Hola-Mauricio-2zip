@@ -11,9 +11,10 @@ import {
   getGetPlayerStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Minus, X, Save } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, ShieldAlert, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { useAuth } from "@workspace/replit-auth-web";
 
 interface SetData {
   setNumber: number;
@@ -81,6 +82,7 @@ const TRANSLATIONS = {
 export default function EditarPartido() {
   const params = useParams();
   const id = parseInt(params.id ?? "0", 10);
+  const { user } = useAuth();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { language } = useLanguage();
@@ -159,23 +161,30 @@ export default function EditarPartido() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!team1P1 || !team1P2 || !team2P1 || !team2P2) {
-      setError(t.errorSelect4);
-      return;
+    if (isStaff) {
+      if (!team1P1 || !team1P2 || !team2P1 || !team2P2) {
+        setError(t.errorSelect4);
+        return;
+      }
+      if (new Set([team1P1, team1P2, team2P1, team2P2]).size !== 4) {
+        setError(t.errorUnique4);
+        return;
+      }
     }
-    if (new Set([team1P1, team1P2, team2P1, team2P2]).size !== 4) {
-      setError(t.errorUnique4);
-      return;
+
+    const payload: any = {
+      sets,
+      playedAt: new Date(playedAt).toISOString(),
+    };
+
+    if (isStaff) {
+      payload.team1PlayerIds = [team1P1, team1P2];
+      payload.team2PlayerIds = [team2P1, team2P2];
     }
 
     updateMutation.mutate({
       id,
-      data: {
-        team1PlayerIds: [team1P1, team1P2],
-        team2PlayerIds: [team2P1, team2P2],
-        sets,
-        playedAt: new Date(playedAt).toISOString(),
-      } as any,
+      data: payload,
     });
   };
 
@@ -194,6 +203,35 @@ export default function EditarPartido() {
       <div className="text-center py-20">
         <p className="text-muted-foreground">{t.notFound}</p>
         <Link href="/partidos" className="text-primary hover:underline text-sm mt-2 block">
+          {t.backToMatches}
+        </Link>
+      </div>
+    );
+  }
+
+  const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+  const userPlayerId = (user as any)?.playerId;
+  const matchAny = match as any;
+  const t1 = matchAny.team1Players || [];
+  const t2 = matchAny.team2Players || [];
+  const matchPlayerIds = [...t1, ...t2].map((p: any) => p.id);
+  const isParticipant = Boolean(userPlayerId && matchPlayerIds.includes(userPlayerId));
+  const canEdit = isStaff || isParticipant;
+
+  if (!canEdit) {
+    return (
+      <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-destructive/15 text-destructive flex items-center justify-center mx-auto">
+          <ShieldAlert size={24} />
+        </div>
+        <h2 className="text-lg font-bold">Acceso Restringido</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          No puedes modificar este partido porque no participaste en él. Solo los jugadores que disputaron el partido pueden corregir el marcador (sujeto a validación rival Fair Play), o bien los administradores del club.
+        </p>
+        <Link
+          href="/partidos"
+          className="inline-block bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
           {t.backToMatches}
         </Link>
       </div>
@@ -221,37 +259,72 @@ export default function EditarPartido() {
         </div>
       </div>
 
+      {!isStaff && isParticipant && (
+        <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex items-start gap-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <Info size={16} className="shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <span className="font-semibold">Modo Jugador (Fair Play):</span> Estás editando el resultado como participante. Al guardar los cambios, el nuevo marcador quedará pendiente de aprobación por el equipo contrincante antes de actualizar los puntos de Elo.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <h3 className="text-sm font-semibold text-center text-primary">{t.team1}</h3>
-            <PlayerSelect
-              label="Jugador 1"
-              value={team1P1}
-              onChange={setTeam1P1}
-              options={playerOptions([team1P2, team2P1, team2P2].filter(Boolean) as number[])}
-            />
-            <PlayerSelect
-              label="Jugador 2"
-              value={team1P2}
-              onChange={setTeam1P2}
-              options={playerOptions([team1P1, team2P1, team2P2].filter(Boolean) as number[])}
-            />
+            {isStaff ? (
+              <>
+                <PlayerSelect
+                  label="Jugador 1"
+                  value={team1P1}
+                  onChange={setTeam1P1}
+                  options={playerOptions([team1P2, team2P1, team2P2].filter(Boolean) as number[])}
+                />
+                <PlayerSelect
+                  label="Jugador 2"
+                  value={team1P2}
+                  onChange={setTeam1P2}
+                  options={playerOptions([team1P1, team2P1, team2P2].filter(Boolean) as number[])}
+                />
+              </>
+            ) : (
+              <div className="space-y-2 py-1">
+                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                  {players?.find((p) => p.id === team1P1)?.name || "Jugador 1"}
+                </div>
+                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                  {players?.find((p) => p.id === team1P2)?.name || "Jugador 2"}
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <h3 className="text-sm font-semibold text-center text-accent">{t.team2}</h3>
-            <PlayerSelect
-              label="Jugador 1"
-              value={team2P1}
-              onChange={setTeam2P1}
-              options={playerOptions([team1P1, team1P2, team2P2].filter(Boolean) as number[])}
-            />
-            <PlayerSelect
-              label="Jugador 2"
-              value={team2P2}
-              onChange={setTeam2P2}
-              options={playerOptions([team1P1, team1P2, team2P1].filter(Boolean) as number[])}
-            />
+            {isStaff ? (
+              <>
+                <PlayerSelect
+                  label="Jugador 1"
+                  value={team2P1}
+                  onChange={setTeam2P1}
+                  options={playerOptions([team1P1, team1P2, team2P2].filter(Boolean) as number[])}
+                />
+                <PlayerSelect
+                  label="Jugador 2"
+                  value={team2P2}
+                  onChange={setTeam2P2}
+                  options={playerOptions([team1P1, team1P2, team2P1].filter(Boolean) as number[])}
+                />
+              </>
+            ) : (
+              <div className="space-y-2 py-1">
+                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                  {players?.find((p) => p.id === team2P1)?.name || "Jugador 1"}
+                </div>
+                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                  {players?.find((p) => p.id === team2P2)?.name || "Jugador 2"}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

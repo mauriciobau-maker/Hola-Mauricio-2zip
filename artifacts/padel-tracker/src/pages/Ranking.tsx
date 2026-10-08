@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useGetRanking } from "@workspace/api-client-react";
-import { Trophy, Medal, Zap, TrendingUp, TrendingDown } from "lucide-react";
+import { Trophy, Medal, TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -9,15 +9,15 @@ function initials(name: string) {
 }
 
 export default function Ranking() {
+  const { t } = useLanguage();
   const { data: ranking, isLoading } = useGetRanking();
-  const { t, language } = useLanguage();
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("playerRanking")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("ranking.title")}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {t("rankingSubtitle")}
+          {t("ranking.subtitle")}
         </p>
       </div>
 
@@ -33,7 +33,8 @@ export default function Ranking() {
             <Trophy size={28} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="font-semibold">{t("noRankingsFound")}</p>
+            <p className="font-semibold">{t("ranking.noData")}</p>
+            <p className="text-sm text-muted-foreground">{t("ranking.noDataDesc")}</p>
           </div>
         </div>
       ) : (
@@ -50,12 +51,12 @@ export default function Ranking() {
           {/* Full table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <div className="col-span-1">#</div>
-              <div className="col-span-4">{t("player")}</div>
-              <div className="col-span-3 text-center">{t("elo")}</div>
-              <div className="col-span-1 text-center">{t("wins")}</div>
-              <div className="col-span-1 text-center">{t("losses")}</div>
-              <div className="col-span-2 text-center">{t("winRate")}</div>
+              <div className="col-span-1">{t("ranking.pos")}</div>
+              <div className="col-span-4">{t("ranking.player")}</div>
+              <div className="col-span-3 text-center">Elo</div>
+              <div className="col-span-1 text-center">{t("ranking.wins")}</div>
+              <div className="col-span-1 text-center">{t("ranking.losses")}</div>
+              <div className="col-span-2 text-center">{t("ranking.winRate")}</div>
             </div>
             <div className="divide-y divide-border">
               {ranking.map((entry) => (
@@ -95,30 +96,20 @@ export default function Ranking() {
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Zap size={14} className="text-primary" />
-              <h3 className="text-sm font-semibold">
-                {language === "en" ? "How ELO works" : language === "pt" ? "Como funciona o ELO" : "Cómo funciona el Elo"}
-              </h3>
+              <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
             </div>
             <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
               <div className="flex items-start gap-2">
                 <TrendingUp size={12} className="text-green-400 mt-0.5 flex-shrink-0" />
-                <span>
-                  {language === "en"
-                    ? "Winning against higher-rated opponents awards more points than winning against weaker rivals."
-                    : language === "pt"
-                    ? "Vencer adversários com maior ELO concede mais pontos do que vencer rivais mais fracos."
-                    : "Ganar contra rivales de mayor Elo otorga más puntos que ganar contra rivales débiles."}
-                </span>
+                <span>{t("ranking.eloWinLossRule")}</span>
               </div>
               <div className="flex items-start gap-2">
                 <TrendingDown size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-                <span>
-                  {language === "en"
-                    ? "Losing against lower-rated opponents deducts more points. Every match matters."
-                    : language === "pt"
-                    ? "Perder contra adversários de menor ELO desconta mais pontos. Cada partida importa."
-                    : "Perder contra rivales de menor Elo resta más puntos. Cada partido importa."}
-                </span>
+                <span>{t("ranking.eloDrawRule")}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-3 h-3 rounded-full bg-primary/50 flex-shrink-0 mt-0.5" />
+                <span>{t("ranking.eloBaseRule")}</span>
               </div>
             </div>
           </div>

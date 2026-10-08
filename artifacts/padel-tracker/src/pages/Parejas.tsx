@@ -40,6 +40,7 @@ function StatCell({ label, value, sub }: { label: string; value: string | number
 }
 
 function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
+  const { t } = useLanguage();
   const isTop = rank <= 3;
   const medalColors: Record<number, string> = {
     1: "text-yellow-400",
@@ -102,7 +103,7 @@ function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
             </div>
 
             <div className="ml-auto flex items-center gap-1 bg-muted/50 rounded-md px-2 py-0.5">
-              <span className="text-xs text-muted-foreground">Elo avg</span>
+              <span className="text-xs text-muted-foreground">{t("parejas.avgElo")}</span>
               <span className="text-xs font-bold text-primary">{pareja.avgElo}</span>
             </div>
           </div>
@@ -128,22 +129,22 @@ function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
           <WinRateBar rate={pareja.winRate} />
         </div>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {pareja.wins}V · {pareja.losses}D
+          {pareja.wins}{t("parejas.winsShort") || "V"} · {pareja.losses}{t("parejas.lossesShort") || "D"}
         </span>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-5 gap-2 pt-1 border-t border-border/50">
-        <StatCell label="Partidos" value={pareja.totalMatches} />
-        <StatCell label="Sets G/P" value={`${pareja.setsWon}/${pareja.setsLost}`} />
-        <StatCell label="Games G" value={pareja.gamesWon} />
-        <StatCell label="Games P" value={pareja.gamesLost} />
+        <StatCell label={t("parejas.matches")} value={pareja.totalMatches} />
+        <StatCell label={t("parejas.setsRatio")} value={`${pareja.setsWon}/${pareja.setsLost}`} />
+        <StatCell label={t("parejas.gamesWon")} value={pareja.gamesWon} />
+        <StatCell label={t("parejas.gamesLost")} value={pareja.gamesLost} />
         <div className="flex flex-col items-center gap-0.5">
           <span className={cn("text-sm font-semibold tabular-nums flex items-center gap-0.5", gameDiffColor)}>
             <GameDiffIcon size={12} />
             {pareja.gameDiff > 0 ? `+${pareja.gameDiff}` : pareja.gameDiff}
           </span>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Dif G</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("parejas.gameDiff")}</span>
         </div>
       </div>
 
@@ -153,7 +154,7 @@ function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
           href={`/parejas/${pareja.player1Id}/${pareja.player2Id}`}
           className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors"
         >
-          Ver historial completo →
+          {t("parejas.viewHistory")}
         </Link>
       </div>
     </div>
@@ -163,9 +164,9 @@ function ParejaCard({ pareja, rank }: { pareja: ParejaStats; rank: number }) {
 const MIN_MATCHES_FOR_RANKING = 1;
 
 export default function Parejas() {
+  const { t } = useLanguage();
   const { data: parejas, isLoading } = useListParejas();
   const [search, setSearch] = useState("");
-  const { t, language } = useLanguage();
 
   const filtered = useMemo(() => {
     if (!parejas) return [];
@@ -202,17 +203,15 @@ export default function Parejas() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("pairsTitle")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("parejas.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {t("pairsSubtitle")}
+            {t("parejas.subtitle")}
           </p>
         </div>
         {parejas && (
           <div className="text-right">
             <span className="text-2xl font-bold text-primary">{parejas.length}</span>
-            <p className="text-xs text-muted-foreground">
-              {language === "en" ? "active pairs" : language === "pt" ? "duplas ativas" : "parejas activas"}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("parejas.activeCount", { count: parejas.length })}</p>
           </div>
         )}
       </div>
@@ -231,7 +230,7 @@ export default function Parejas() {
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
-          placeholder={language === "en" ? "Search by player name..." : language === "pt" ? "Buscar por nome do jogador..." : "Buscar por nombre de jugador..."}
+          placeholder={t("parejas.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50"
@@ -252,10 +251,7 @@ export default function Parejas() {
           </div>
           <div>
             <p className="font-semibold">
-              {search ? "No se encontraron parejas" : "Sin partidos registrados"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {search ? "Prueba con otro nombre" : "Registra partidos para ver estadísticas de parejas"}
+              {t("parejas.noData")}
             </p>
           </div>
           {search && (
@@ -263,7 +259,7 @@ export default function Parejas() {
               onClick={() => setSearch("")}
               className="text-sm text-primary underline underline-offset-2"
             >
-              Limpiar búsqueda
+              {t("parejas.clearSearch") || "Limpiar búsqueda"}
             </button>
           )}
         </div>
@@ -276,7 +272,7 @@ export default function Parejas() {
                 <div className="flex items-center gap-2 mb-3">
                   <Trophy size={14} className="text-primary" />
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    Ranking — Top {Math.min(ranked.length, 20)} parejas
+                    {t("parejas.topRanking", { count: Math.min(ranked.length, 20) })}
                   </h2>
                 </div>
               )}
@@ -300,7 +296,7 @@ export default function Parejas() {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  Sin partidos suficientes
+                  {t("parejas.insufficientMatches") || "Sin partidos suficientes"}
                 </h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -325,6 +321,7 @@ function TopPodiumCard({
   rank: number;
   isFirst?: boolean;
 }) {
+  const { t } = useLanguage();
   const medalColors: Record<number, string> = {
     1: "text-yellow-400 border-yellow-400/30 bg-yellow-400/5",
     2: "text-slate-300 border-slate-300/30 bg-slate-300/5",
@@ -362,7 +359,7 @@ function TopPodiumCard({
         {pareja.winRate}%
       </div>
       <div className="text-[10px] text-muted-foreground">
-        {pareja.wins}V · {pareja.losses}D · {pareja.totalMatches}P
+        {pareja.wins}{t("parejas.winsShort") || "V"} · {pareja.losses}{t("parejas.lossesShort") || "D"} · {pareja.totalMatches}{t("parejas.matchesShort") || "P"}
       </div>
     </div>
   );

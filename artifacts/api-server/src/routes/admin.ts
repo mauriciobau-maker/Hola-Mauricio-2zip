@@ -7,6 +7,8 @@ import {
   sportsTable,
   usersTable,
   gastosTable,
+  clubSportCategoriesTable,
+  playersTable,
 } from "@workspace/db";
 import type { Request, Response, NextFunction } from "express";
 
@@ -269,15 +271,45 @@ router.post(
               : Number(sportItem);
           if (!isNaN(sportId) && sportId > 0) {
             try {
-              await db.insert(clubSportsTable).values({
+              const [insertedClubSport] = await db.insert(clubSportsTable).values({
                 clubId: club.id,
                 sportId: sportId,
                 active: true,
-              });
+              }).returning();
+
+              // Precarga automática de categorías estándar para el deporte
+              const defaultCategories: Record<number, string[]> = {
+                1: ["1ª Categoría", "2ª Categoría", "3ª Categoría", "4ª Categoría", "5ª Categoría", "Iniciación"],
+                2: ["División de Honor", "Primera División", "Senior"],
+                3: ["Escalafón A", "Escalafón B", "Escalafón C"],
+              };
+              const toInsert = defaultCategories[sportId] || ["General", "Iniciación"];
+              for (const catName of toInsert) {
+                await db.insert(clubSportCategoriesTable).values({
+                  clubSportId: insertedClubSport.id,
+                  name: catName,
+                });
+              }
             } catch (e: any) {
               console.error(`⚠️ No se pudo asociar el deporte ${sportId}:`, e?.message);
             }
           }
+        }
+      }
+
+      let linkedPlayerId: number | null = null;
+      if (req.body.createAdminPlayer && adminName) {
+        try {
+          const [createdPlayer] = await db.insert(playersTable).values({
+            name: adminName,
+            nickname: adminNickname || null,
+            phone: adminPhone || null,
+            clubId: club.id,
+            elo: 1500,
+          }).returning();
+          linkedPlayerId = createdPlayer.id;
+        } catch (e: any) {
+          console.error("⚠️ Error creando ficha de jugador para admin:", e?.message);
         }
       }
 
@@ -296,6 +328,7 @@ router.post(
               .set({
                 clubId: club.id,
                 isClubAdmin: 1,
+                playerId: linkedPlayerId || (existingUser as any).playerId || undefined,
                 name: adminName || (existingUser as any).name || undefined,
                 nickname: adminNickname || (existingUser as any).nickname || undefined,
                 phone: adminPhone || (existingUser as any).phone || undefined,
@@ -307,6 +340,7 @@ router.post(
               name: adminName || null,
               nickname: adminNickname || null,
               phone: adminPhone || null,
+              playerId: linkedPlayerId || null,
               clubId: club.id,
               isAdmin: 0,
               isClubAdmin: 1,

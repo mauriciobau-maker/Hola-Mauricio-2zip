@@ -23,7 +23,9 @@ export function Onboarding() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [step, setStep] = useState<Step>("club");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(() => {
+    return new URLSearchParams(window.location.search).get("code") || "";
+  });
   const [club, setClub] = useState<Club | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +33,16 @@ export function Onboarding() {
   const [creatingNew, setCreatingNew] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState("");
   const [newPlayerNickname, setNewPlayerNickname] = useState("");
+  const [courtSide, setCourtSide] = useState<string>("ambos");
+  const [dominantHand, setDominantHand] = useState<string>("diestro");
+
+  // Si viene con ?code= en la URL y el usuario no tiene clubId, auto-unir
+  useEffect(() => {
+    const codeParam = new URLSearchParams(window.location.search).get("code");
+    if (codeParam && !user?.clubId && step === "club") {
+      setInviteCode(codeParam);
+    }
+  }, [user, step]);
 
   // 🚀 SI EL USUARIO YA TIENE clubId (ej. Admin de club creado por Super Admin)
   // Saltamos automáticamente el Paso 1 de ingresar código
@@ -128,6 +140,8 @@ export function Onboarding() {
         body: JSON.stringify({
           name: newPlayerName.trim(),
           nickname: newPlayerNickname.trim() || undefined,
+          courtSide,
+          dominantHand,
         }),
       });
       const player = await res.json();
@@ -261,6 +275,25 @@ export function Onboarding() {
                   placeholder="Rafael Nadal"
                   className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+                {newPlayerName.trim().length >= 3 && (() => {
+                  const match = players.find((p) => p.name.toLowerCase().includes(newPlayerName.toLowerCase().trim()));
+                  if (!match) return null;
+                  return (
+                    <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs flex items-center justify-between gap-2 mt-2">
+                      <div>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">¿Ya juegas en el club?</span>
+                        <p className="text-muted-foreground">Existe "{match.name}" (Elo {match.elo})</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleLinkPlayer(match.id)}
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded text-xs font-semibold shrink-0"
+                      >
+                        Vincularme
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Apodo (opcional)</label>
@@ -270,6 +303,32 @@ export function Onboarding() {
                   placeholder="Rafa"
                   className="w-full bg-background border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Lado en Cancha</label>
+                  <select
+                    value={courtSide}
+                    onChange={(e) => setCourtSide(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg px-2.5 py-2 text-xs focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="drive">Drive (Derecha)</option>
+                    <option value="reves">Revés (Izquierda)</option>
+                    <option value="ambos">Ambos Lados</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Mano Hábil</label>
+                  <select
+                    value={dominantHand}
+                    onChange={(e) => setDominantHand(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg px-2.5 py-2 text-xs focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="diestro">Diestro</option>
+                    <option value="zurdo">Zurdo</option>
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button

@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Phone, MessageSquare, Globe, Lock, Trophy } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -89,6 +90,7 @@ export default function EditarJugador() {
   const id = parseInt(params.id ?? "0", 10);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { language: activeAppLanguage } = useLanguage();
 
   // Simulación del rol activo (por defecto "admin" para pruebas; integrable con Auth Context)
   const [currentUserRole] = useState<"admin" | "superadmin" | "player">("admin");
@@ -145,7 +147,7 @@ export default function EditarJugador() {
     }
   }, [player]);
 
-  const t = labels[language] || labels.es;
+  const t = labels[activeAppLanguage] || labels.es;
 
   const updateMutation = useUpdatePlayer({
     mutation: {

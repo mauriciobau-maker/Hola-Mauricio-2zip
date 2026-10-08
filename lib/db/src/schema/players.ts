@@ -13,6 +13,8 @@ export const playersTable = pgTable("players", {
   waId: text("wa_id"),            // ID persistente de WhatsApp
   wspConsent: boolean("wsp_consent").default(false), // Cumplimiento legal
   language: text("language").default("es"), // Configuración de idioma
+  dominantHand: text("dominant_hand"),       // 'diestro' | 'zurdo'
+  courtSide: text("court_side"),             // 'drive' | 'reves' | 'ambos'
   // ---------------------
   clubId: integer("club_id").references(() => clubsTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

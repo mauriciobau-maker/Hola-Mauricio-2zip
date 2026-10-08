@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { db, pool, cobrosTable, playersTable, torneoCalculosTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { db, pool, cobrosTable, playersTable, torneoCalculosTable, usersTable, clubsTable } from "@workspace/db";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth, requireClub } from "../middlewares/requireCommunity";
 
 const router = Router();
@@ -86,12 +86,63 @@ router.get("/stats", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    // Buscar teléfono y nombre de contacto del administrador del club
+    let adminPhone: string | null = null;
+    let adminName: string | null = null;
+
+    try {
+      const adminUsers = await db
+        .select({
+          name: usersTable.name,
+          phone: usersTable.phone,
+          playerId: usersTable.playerId,
+        })
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.clubId, clubId),
+            sql`(${usersTable.isClubAdmin} = 1 OR ${usersTable.isAdmin} = 1)`
+          )
+        );
+
+      for (const u of adminUsers) {
+        if (u.phone) {
+          adminPhone = u.phone;
+          adminName = u.name;
+          break;
+        }
+        if (u.playerId) {
+          const [p] = await db
+            .select({ name: playersTable.name, phone: playersTable.phone })
+            .from(playersTable)
+            .where(eq(playersTable.id, u.playerId));
+          if (p?.phone) {
+            adminPhone = p.phone;
+            adminName = p.name;
+            break;
+          }
+        }
+      }
+
+      if (!adminPhone) {
+        const [c] = await db.select().from(clubsTable).where(eq(clubsTable.id, clubId));
+        if (c) {
+          adminPhone = (c as any).adminWhatsappAlias || (c as any).phone || null;
+          adminName = c.name;
+        }
+      }
+    } catch (e) {
+      console.warn("Error buscando contacto del admin:", e);
+    }
+
     res.json({
       totalRecaudado,
       totalPendiente,
       totalCobros: rows.length,
       deudoresCount: deudoresSet.size,
       isStaff,
+      adminPhone,
+      adminName,
     });
   } catch (error) {
     console.error("Error obteniendo estadísticas de cobros:", error);
@@ -229,40 +280,71 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Calcular el total de costos compartidos
-    const validItems: { concepto: string; monto: number }[] = [];
+    // Mapear qué ítems aplican a cada jugador
+    const allSelectedPlayerIds = jugadores.map((j: any) => Number(j.playerId));
+    const playerItemsMap = new Map<number, { concepto: string; monto: number }[]>();
+    for (const pid of allSelectedPlayerIds) {
+      playerItemsMap.set(pid, []);
+    }
+
     let totalCostos = 0;
+    const validItems: { concepto: string; monto: number; playerIds?: number[] }[] = [];
 
     for (const it of items) {
       const c = (it.concepto || "").trim();
       const m = Number(it.monto) || 0;
-      if (c && m > 0) {
-        validItems.push({ concepto: c, monto: m });
-        totalCostos += m;
+      if (!c || m <= 0) continue;
+
+      validItems.push({ concepto: c, monto: m, playerIds: it.playerIds });
+      totalCostos += m;
+
+      // Jugadores asignados a este ítem en particular
+      let itemTargetPlayers =
+        Array.isArray(it.playerIds) && it.playerIds.length > 0
+          ? it.playerIds.map(Number).filter((pid: number) => allSelectedPlayerIds.includes(pid))
+          : allSelectedPlayerIds;
+
+      if (itemTargetPlayers.length === 0) {
+        itemTargetPlayers = allSelectedPlayerIds;
+      }
+
+      const costPerAssignedPlayer = Math.round(m / itemTargetPlayers.length);
+      for (const pid of itemTargetPlayers) {
+        const list = playerItemsMap.get(pid);
+        if (list) {
+          list.push({
+            concepto: c,
+            monto: costPerAssignedPlayer,
+          });
+        }
       }
     }
 
     if (totalCostos <= 0 || validItems.length === 0) {
-      res.status(400).json({ error: "La suma de los costos compartidos debe ser mayor a 0" });
+      res.status(400).json({ error: "La suma de los costos debe ser mayor a 0" });
       return;
     }
-
-    const numJugadores = jugadores.length;
-    const basePerPlayer = Math.round(totalCostos / numJugadores);
 
     const createdCobros: any[] = [];
 
     for (const j of jugadores) {
       const playerId = Number(j.playerId);
       const ajuste = Number(j.ajuste) || 0;
-      const montoFinal = Math.max(0, basePerPlayer + ajuste);
+      const baseItems = playerItemsMap.get(playerId) || [];
+
+      let totalBase = 0;
+      for (const bi of baseItems) {
+        totalBase += bi.monto;
+      }
 
       const playerItems = [
-        { concepto: `${nombre.trim()} (Cuota parte)`, monto: basePerPlayer },
+        ...baseItems,
         ...(ajuste !== 0
           ? [{ concepto: ajuste < 0 ? "Descuento aplicado" : "Saldo / Ajuste adicional", monto: ajuste }]
           : []),
       ];
+
+      const montoFinal = Math.max(0, totalBase + ajuste);
 
       const [cobro] = await db
         .insert(cobrosTable)
@@ -271,7 +353,7 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
           clubId,
           monto: montoFinal,
           items: playerItems,
-          notas: `Reparto torneo "${nombre.trim()}" ($${totalCostos.toLocaleString()} entre ${numJugadores} jugadores)`,
+          notas: `Reparto evento "${nombre.trim()}" (Total: $${totalCostos.toLocaleString("es-CL")})`,
           estado: "pendiente",
         })
         .returning();

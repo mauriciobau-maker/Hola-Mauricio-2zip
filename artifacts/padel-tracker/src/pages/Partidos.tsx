@@ -7,17 +7,15 @@ import {
   getGetDashboardQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Calendar, Pencil, TrendingUp, TrendingDown, Check, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "@/context/LanguageContext";
+import { formatSportName } from "@/lib/translations";
 
-function formatDate(iso: string, locale: string = "es") {
-  const localeMap: Record<string, string> = {
-    es: "es-ES",
-    en: "en-US",
-    pt: "pt-BR",
-  };
-  return new Date(iso).toLocaleDateString(localeMap[locale] || "es-ES", {
+function formatDate(iso: string, language: string) {
+  const loc = language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-ES";
+  return new Date(iso).toLocaleDateString(loc, {
     weekday: "short", day: "numeric", month: "short", year: "numeric",
   });
 }
@@ -26,10 +24,10 @@ type EloChange = { playerId: number; playerName: string; eloBefore: number; eloA
 type TeamPlayer = { id: number; name: string };
 
 export default function Partidos() {
-  const { data: matches, isLoading } = useListMatches();
-  const queryClient = useQueryClient();
   const { t, language } = useLanguage();
-
+  const { data: matches, isLoading } = useListMatches();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const deleteMutation = useDeleteMatch({
     mutation: {
       onSuccess: () => {
@@ -40,15 +38,27 @@ export default function Partidos() {
     },
   });
 
-  const handleDelete = (id: number) => {
-    const confirmMsg =
-      language === "en"
-        ? "Delete this match? This action cannot be undone."
-        : language === "pt"
-        ? "Excluir esta partida? Esta ação não pode ser desfeita."
-        : "¿Eliminar este partido? Esta acción no se puede deshacer.";
+  const handleConfirmMatch = async (matchId: number) => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/confirm`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      } else {
+        alert(data.error || "No se pudo confirmar el partido");
+      }
+    } catch {
+      alert("Error de conexión al confirmar el partido.");
+    }
+  };
 
-    if (confirm(confirmMsg)) {
+  const handleDelete = (id: number) => {
+    if (confirm(t("partidos.deleteConfirm"))) {
       deleteMutation.mutate({ id });
     }
   };
@@ -57,16 +67,16 @@ export default function Partidos() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("matchesTitle")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("partidos.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {matches?.length ?? 0} {language === "en" ? "matches recorded" : language === "pt" ? "partidas registradas" : "partidos registrados"}
+            {t("partidos.count", { count: matches?.length ?? 0 })}
           </p>
         </div>
         <Link
           href="/partidos/nuevo"
           className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
         >
-          <Plus size={15} /> {t("newMatchButton")}
+          <Plus size={15} /> {t("partidos.new")}
         </Link>
       </div>
 
@@ -82,16 +92,14 @@ export default function Partidos() {
             <Calendar size={28} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="font-semibold">{t("noMatchesFound")}</p>
-            <p className="text-sm text-muted-foreground">
-              {language === "en" ? "Record the first match to get started" : language === "pt" ? "Registre a primeira partida para começar" : "Registra el primer partido para empezar"}
-            </p>
+            <p className="font-semibold">{t("partidos.noMatches")}</p>
+            <p className="text-sm text-muted-foreground">{t("partidos.noMatchesDesc")}</p>
           </div>
           <Link
             href="/partidos/nuevo"
             className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            {t("newMatchButton")}
+            {t("partidos.new")}
           </Link>
         </div>
       ) : (
@@ -99,8 +107,11 @@ export default function Partidos() {
           {matches.map((m: any) => {
             const team1Players: TeamPlayer[] = m.team1Players ?? [];
             const team2Players: TeamPlayer[] = m.team2Players ?? [];
-            const team1Won = m.result === "team1";
-            const isDraw = m.result === "draw";
+            const t1ScoreNum = Number(m.team1Score ?? 0);
+            const t2ScoreNum = Number(m.team2Score ?? 0);
+            const team1Won = m.result === "team1" || (m.result !== "team2" && t1ScoreNum > t2ScoreNum);
+            const team2Won = m.result === "team2" || (m.result !== "team1" && t2ScoreNum > t1ScoreNum);
+            const isDraw = m.result === "draw" || (!team1Won && !team2Won && t1ScoreNum === t2ScoreNum);
             const eloChanges: EloChange[] = m.eloChanges ?? [];
             const team1Ids = team1Players.map((p) => p.id);
             const team2Ids = team2Players.map((p) => p.id);
@@ -108,100 +119,181 @@ export default function Partidos() {
             const team2EloChanges = eloChanges.filter((c) => team2Ids.includes(c.playerId));
             const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | null;
 
+            const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+            const userPlayerId = (user as any)?.playerId;
+            const isParticipant = userPlayerId && (team1Ids.includes(userPlayerId) || team2Ids.includes(userPlayerId));
+            const canEdit = isStaff || isParticipant;
+            const canDelete = isStaff;
+
             return (
               <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
                 {/* Sport badge */}
                 {m.sportName && (
                   <div className="mb-2">
                     <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
-                      {m.sportName}
+                      {formatSportName(m.sportName, language)}
                     </span>
                   </div>
                 )}
 
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
                     {/* Team 1 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-sm font-semibold", team1Won ? "text-primary" : "text-foreground")}>
-                          {team1Players.map((p) => p.name).join(" / ") || "—"}
-                        </span>
-                        {team1Won && (
-                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
-                            {language === "en" ? "Winner" : language === "pt" ? "Vencedor" : "Ganador"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-lg font-bold tabular-nums", team1Won ? "text-primary" : "text-muted-foreground")}>
-                          {m.team1Score ?? 0}
-                        </span>
-                        {team1EloChanges.length > 0 && (
-                          <EloBadge changes={team1EloChanges} />
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        team1Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {team1Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
+                      </span>
+                      <p className="text-sm font-medium truncate">
+                        {team1Players.map((p) => p.name).join(" / ") || "—"}
+                      </p>
                     </div>
-
                     {/* Team 2 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-sm font-semibold", !team1Won && !isDraw ? "text-primary" : "text-foreground")}>
-                          {team2Players.map((p) => p.name).join(" / ") || "—"}
-                        </span>
-                        {!team1Won && !isDraw && (
-                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
-                            {language === "en" ? "Winner" : language === "pt" ? "Vencedor" : "Ganador"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-lg font-bold tabular-nums", !team1Won && !isDraw ? "text-primary" : "text-muted-foreground")}>
-                          {m.team2Score ?? 0}
-                        </span>
-                        {team2EloChanges.length > 0 && (
-                          <EloBadge changes={team2EloChanges} />
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                        team2Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {team2Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
+                      </span>
+                      <p className="text-sm font-medium truncate">
+                        {team2Players.map((p) => p.name).join(" / ") || "—"}
+                      </p>
                     </div>
+                  </div>
 
-                    {/* Sets detail */}
-                    {sets && sets.length > 0 && (
-                      <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                        <span className="text-xs text-muted-foreground">{t("sets")}:</span>
-                        <div className="flex gap-2">
-                          {sets.map((s, idx) => (
-                            <span key={idx} className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                              {s.team1Games}-{s.team2Games}
-                            </span>
-                          ))}
-                        </div>
+                  {/* Score + actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold tabular-nums">
+                        <span className={team1Won ? "text-primary" : "text-muted-foreground"}>
+                          {m.team1Score}
+                        </span>
+                        <span className="text-muted-foreground mx-1 text-lg">-</span>
+                        <span className={team2Won ? "text-primary" : "text-muted-foreground"}>
+                          {m.team2Score}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sets && sets.length > 0 ? "sets" : "goles"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {canEdit && (
+                        <Link
+                          href={`/partidos/${m.id}/editar`}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                          title="Editar marcador del partido"
+                        >
+                          <Pencil size={14} />
+                        </Link>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          disabled={deleteMutation.isPending}
+                          title="Eliminar partido (Solo Administrador)"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sets detail */}
+                {sets && sets.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
+                    {sets.map((s) => (
+                      <div key={s.setNumber} className="text-xs text-muted-foreground">
+                        <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
+                          {s.team1Games}-{s.team2Games}
+                        </span>
                       </div>
-                    )}
+                    ))}
+                    <span className="text-xs text-muted-foreground ml-auto">{formatDate(m.playedAt, language)}</span>
                   </div>
+                )}
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <Link
-                      href={`/partidos/${m.id}/editar`}
-                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      title={t("edit")}
-                    >
-                      <Pencil size={15} />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(m.id)}
-                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title={t("delete")}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                {!sets && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <span className="text-xs text-muted-foreground">{formatDate(m.playedAt, language)}</span>
                   </div>
-                </div>
+                )}
 
-                <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{formatDate(m.playedAt, language)}</span>
-                </div>
+                {/* Elo changes */}
+                {eloChanges.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-border">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {[...team1EloChanges, ...team2EloChanges].map((c) => (
+                        <EloChangePill key={c.playerId} change={c} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fair Play Validation Bar */}
+                {m.status === "pending_confirmation" && (
+                  <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        ⚖️ Fair Play:
+                      </span>
+                      <span className="text-muted-foreground ml-1">
+                        {m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para afectar el Elo.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(() => {
+                        const userPlayerId = (user as any)?.playerId;
+                        const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+                        const userInT1 = team1Ids.includes(userPlayerId);
+                        const userInT2 = team2Ids.includes(userPlayerId);
+                        const isRival = m.submittedByPlayerId
+                          ? (userInT1 && !team1Ids.includes(m.submittedByPlayerId)) ||
+                            (userInT2 && !team2Ids.includes(m.submittedByPlayerId))
+                          : userInT1 || userInT2;
+
+                        if (isStaff) {
+                          return (
+                            <button
+                              onClick={() => handleConfirmMatch(m.id)}
+                              className="px-2.5 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium flex items-center gap-1"
+                            >
+                              <ShieldCheck size={13} />
+                              {t("adminApprove") || "Aprobar como Admin"}
+                            </button>
+                          );
+                        }
+
+                        if (isRival) {
+                          return (
+                            <button
+                              onClick={() => handleConfirmMatch(m.id)}
+                              className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium flex items-center gap-1"
+                            >
+                              <Check size={13} />
+                              {t("approveResult") || "Aprobar como Rival"}
+                            </button>
+                          );
+                        }
+
+                        if (userInT1 || userInT2) {
+                          return (
+                            <span className="text-[11px] text-amber-500">
+                              {t("partidos.waitingRival")}
+                            </span>
+                          );
+                        }
+
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -211,21 +303,26 @@ export default function Partidos() {
   );
 }
 
-function EloBadge({ changes }: { changes: EloChange[] }) {
-  const totalChange = changes.reduce((acc, c) => acc + c.eloChange, 0) / changes.length;
-  const rounded = Math.round(totalChange);
-  if (rounded === 0) return null;
-
-  const isPositive = rounded > 0;
+function EloChangePill({ change }: { change: EloChange }) {
+  const positive = change.eloChange > 0;
+  const neutral = change.eloChange === 0;
   return (
-    <span
-      className={cn(
-        "flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded font-mono",
-        isPositive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400",
+    <div className="flex items-center gap-1 text-xs">
+      {positive ? (
+        <TrendingUp size={10} className="text-green-400" />
+      ) : neutral ? null : (
+        <TrendingDown size={10} className="text-red-400" />
       )}
-    >
-      {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-      {isPositive ? `+${rounded}` : rounded}
-    </span>
+      <span className="text-muted-foreground truncate max-w-[80px]">
+        {change.playerName.split(" ")[0]}
+      </span>
+      <span className={cn(
+        "font-bold tabular-nums",
+        positive ? "text-green-400" : neutral ? "text-muted-foreground" : "text-red-400",
+      )}>
+        {positive ? "+" : ""}{change.eloChange}
+      </span>
+      <span className="text-muted-foreground/60 tabular-nums">({change.eloAfter})</span>
+    </div>
   );
 }

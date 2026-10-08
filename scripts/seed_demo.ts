@@ -234,7 +234,7 @@ export async function runSeed() {
           { setNumber: 1, team1Games: 6, team2Games: 3 },
           { setNumber: 2, team1Games: 6, team2Games: 4 },
         ],
-        result: "6-3, 6-4",
+        result: "team1",
         status: "confirmed",
         playedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // Hace 3 días
       })
@@ -261,7 +261,7 @@ export async function runSeed() {
           { setNumber: 2, team1Games: 4, team2Games: 6 },
           { setNumber: 3, team1Games: 6, team2Games: 2 },
         ],
-        result: "7-5, 4-6, 6-2",
+        result: "team1",
         status: "confirmed",
         playedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Ayer
       })

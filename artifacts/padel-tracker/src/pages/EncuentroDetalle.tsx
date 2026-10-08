@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   CalendarDays, MapPin, Users, Check, X, Clock,
-  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle, Sparkles
+  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle, Crown, RotateCcw, Info, Printer
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { format } from "date-fns";
@@ -14,7 +14,9 @@ import { es, enUS, ptBR } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useLanguage, Language } from "@/context/LanguageContext";
-import { triggerParryn } from "@/components/ParrynWidget";
+import { ParrynAssistant } from "@/components/ParrynAssistant";
+import { Bot, Sparkles, ShieldCheck } from "lucide-react";
+import { PrintFixtureModal } from "@/components/PrintFixtureModal";
 
 const LOCALES = {
   es: es,
@@ -85,6 +87,17 @@ const TRANSLATIONS = {
       location: "Lugar",
       cta: "Por favor confirma tu asistencia aquí:",
     },
+    printFixture: "Imprimir Fixture",
+    regenerateFixture: "Re-generar Fixture",
+    cleanFixture: "Limpiar",
+    restNotice: (start: string, end: string) => `⏳ Descanso de 2 minutos: ${start} a ${end} (Rotación de pistas y calentamiento corto)`,
+    restingNames: (names: string) => `☕ Descansan en esta ronda: ${names}`,
+    generatePayments: "Generar Cobros del Encuentro",
+    finalizeEncuentro: "Finalizar Encuentro",
+    finalizeConfirm: "¿Deseas dar por finalizado oficialmente este encuentro deportivo?",
+    finalizeSuccessMsg: "¡Encuentro finalizado con éxito! Todos los resultados y rankings están computados.",
+    askGoToCobros: "¿Deseas ir ahora a Cobros para prorratear el arriendo y gastos entre los jugadores participantes?",
+    finalizeError: "Error al finalizar el encuentro",
   },
   en: {
     notFound: "Match not found.",
@@ -148,6 +161,17 @@ const TRANSLATIONS = {
       location: "Location",
       cta: "Please confirm your attendance here:",
     },
+    printFixture: "Print Fixture",
+    regenerateFixture: "Regenerate Fixture",
+    cleanFixture: "Clear",
+    restNotice: (start: string, end: string) => `⏳ 2-minute break: ${start} to ${end} (Court rotation and short warm-up)`,
+    restingNames: (names: string) => `☕ Resting in this round: ${names}`,
+    generatePayments: "Generate Event Charges",
+    finalizeEncuentro: "Finish Match Event",
+    finalizeConfirm: "Do you want to officially finish this sports event?",
+    finalizeSuccessMsg: "Event finished successfully! All scores and rankings are calculated.",
+    askGoToCobros: "Would you like to go to Billing now to split court fees and expenses among participants?",
+    finalizeError: "Error finishing event",
   },
   pt: {
     notFound: "Encontro não encontrado.",
@@ -211,6 +235,17 @@ const TRANSLATIONS = {
       location: "Local",
       cta: "Por favor confirme sua presença aqui:",
     },
+    printFixture: "Imprimir Fixture",
+    regenerateFixture: "Regenerar Fixture",
+    cleanFixture: "Limpar",
+    restNotice: (start: string, end: string) => `⏳ Descanso de 2 minutos: ${start} às ${end} (Rotação de quadras e aquecimento rápido)`,
+    restingNames: (names: string) => `☕ Descansam nesta rodada: ${names}`,
+    generatePayments: "Gerar Cobranças do Encontro",
+    finalizeEncuentro: "Finalizar Encontro",
+    finalizeConfirm: "Deseja dar como finalizado oficialmente este encontro esportivo?",
+    finalizeSuccessMsg: "Encontro finalizado com sucesso! Todos os resultados e rankings foram calculados.",
+    askGoToCobros: "Deseja ir agora para Cobranças para ratear os custos entre os jogadores participantes?",
+    finalizeError: "Erro ao finalizar o encontro",
   },
 };
 
@@ -244,12 +279,16 @@ interface SetScore {
 
 interface MatchData {
   id: number;
+  encuentroId?: number;
+  round?: number;
+  court?: number;
   team1Players: Array<{ id: number; name: string }>;
   team2Players: Array<{ id: number; name: string }>;
   team1Score: number;
   team2Score: number;
   result: string;
   sets: SetScore[] | Record<string, any>;
+  status?: string;
   pendingResult: boolean;
   playedAt: string;
 }
@@ -325,9 +364,17 @@ export function EncuentroDetalle() {
   const [matchesLoaded, setMatchesLoaded] = useState(false);
   const [sports, setSports] = useState<Sport[]>([]);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
-  const [formato, setFormato] = useState<"americana" | "parejas_fijas">("americana");
+  const [formato, setFormato] = useState<"americana" | "parejas_fijas" | "desafio">("americana");
+  const [canchas, setCanchas] = useState<number>(1);
+  const [rondas, setRondas] = useState<number>(3);
   const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [deletingMatches, setDeletingMatches] = useState(false);
+  const [previewCruces, setPreviewCruces] = useState<any[] | null>(null);
+  const [previewSummary, setPreviewSummary] = useState<any | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Estado para la edición de resultados por sets
   const [editingMatchId, setEditingMatchId] = useState<number | null>(null);
@@ -349,6 +396,32 @@ export function EncuentroDetalle() {
     }
     return Array.from(map.values());
   }, [rawAsistencia]);
+
+  const confirmedList = useMemo(() => asistencia.filter((a) => a.status === "confirmed"), [asistencia]);
+  const confirmedCount = confirmedList.length;
+  const declinedCount = useMemo(() => asistencia.filter((a) => a.status === "declined").length, [asistencia]);
+  const pendingCount = useMemo(() => asistencia.filter((a) => a.status === "pending").length, [asistencia]);
+  const waitlistCount = useMemo(() => asistencia.filter((a) => a.status === "waitlist" || a.status === "reserva").length, [asistencia]);
+
+  const matchesByRound = useMemo(() => {
+    const map = new Map<number, MatchData[]>();
+    for (const m of matches) {
+      const r = m.round ?? 1;
+      if (!map.has(r)) map.set(r, []);
+      map.get(r)!.push(m);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }, [matches]);
+
+  useEffect(() => {
+    if (confirmedCount >= 4) {
+      const recCanchas = Math.max(1, Math.floor(confirmedCount / 4));
+      setCanchas((prev) => (prev <= 1 && recCanchas > 1 ? recCanchas : prev));
+      if (confirmedCount === 4) setRondas((prev) => (prev === 1 ? 3 : prev));
+      else if (confirmedCount === 5) setRondas(5);
+      else if (confirmedCount >= 8) setRondas((prev) => (prev === 1 ? 3 : prev));
+    }
+  }, [confirmedCount]);
 
   useEffect(() => {
     if (!id) return;
@@ -401,13 +474,14 @@ export function EncuentroDetalle() {
 
   const { encuentro } = data;
   const date = new Date(encuentro.dateTime);
-  const isOrganizer = user?.id === encuentro.organizerId || user?.isAdmin;
+  const isOrganizer = Boolean(
+    user && (
+      String(user.id) === String(encuentro.organizerId) ||
+      user.isAdmin ||
+      (user.playerId && String(user.playerId) === String(encuentro.organizerId))
+    )
+  );
   const myEntry = asistencia.find((a) => a.playerId === user?.playerId);
-
-  const confirmedCount = asistencia.filter((a) => a.status === "confirmed").length;
-  const declinedCount = asistencia.filter((a) => a.status === "declined").length;
-  const pendingCount = asistencia.filter((a) => a.status === "pending").length;
-  const waitlistCount = asistencia.filter((a) => a.status === "waitlist" || a.status === "reserva").length;
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     encuentro.location
@@ -531,14 +605,19 @@ export function EncuentroDetalle() {
     setRsvpError(null);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       const res = await fetch(`/api/encuentros/${id}/generar-partidos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ formato, sportId: selectedSportId }),
+        body: JSON.stringify({
+          formato,
+          sportId: selectedSportId,
+          courts: canchas,
+          rounds: rondas,
+        }),
         signal: controller.signal,
       });
 
@@ -561,6 +640,106 @@ export function EncuentroDetalle() {
       }
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handlePreviewMatches() {
+    if (!selectedSportId) return;
+    setPreviewLoading(true);
+    setRsvpError(null);
+    try {
+      const res = await fetch(`/api/encuentros/${id}/generar-partidos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          formato,
+          sportId: selectedSportId,
+          courts: canchas,
+          rounds: rondas,
+          previewOnly: true,
+        }),
+      });
+      const resData = await res.json();
+      if (res.ok && resData.cruces) {
+        setPreviewCruces(resData.cruces);
+        setPreviewSummary(resData.summary || null);
+        setShowPreviewModal(true);
+      } else {
+        setRsvpError(resData.message || "Error al calcular cruces");
+      }
+    } catch {
+      setRsvpError("Error de conexión al simular emparejamiento.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function handleDeleteMatches() {
+    if (!confirm("¿Deseas eliminar todos los partidos generados para este encuentro? Podrás reconfigurar y volver a generar los cruces libremente.")) return;
+    setDeletingMatches(true);
+    setRsvpError(null);
+    try {
+      const res = await fetch(`/api/encuentros/${id}/partidos`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        reloadMatches();
+        setShowGenerateForm(true);
+      } else {
+        const d = await res.json();
+        setRsvpError(d.message || "Error al eliminar partidos");
+      }
+    } catch {
+      setRsvpError("Error de conexión al eliminar los partidos.");
+    } finally {
+      setDeletingMatches(false);
+    }
+  }
+
+  async function handleConfirmMatchOfficial(matchId: number) {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/confirm`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        reloadMatches();
+      } else {
+        alert(data.error || "No se pudo confirmar el partido");
+      }
+    } catch {
+      alert("Error al confirmar resultado oficial");
+    }
+  }
+
+  async function handleFinalizarEncuentro() {
+    if (!confirm(t.finalizeConfirm || "¿Deseas dar por finalizado oficialmente este encuentro deportivo?")) return;
+    try {
+      const res = await fetch(`/api/encuentros/${id}/finalizar`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await refreshEncuentroData();
+        const baseMsg = data.pendingCount > 0
+          ? `Encuentro finalizado. Quedaron ${data.pendingCount} partidos sin resultado oficial.`
+          : (t.finalizeSuccessMsg || "¡Encuentro finalizado con éxito! Todos los resultados y rankings están computados.");
+        
+        const shouldGoToCobros = confirm(
+          baseMsg + "\n\n" + (t.askGoToCobros || "¿Deseas ir ahora a Cobros para prorratear el arriendo y gastos entre los jugadores participantes?")
+        );
+
+        if (shouldGoToCobros && encuentro) {
+          const playerIds = confirmedList.map((c) => c.playerId).join(",");
+          navigate(`/cobros?encuentroId=${encuentro.id}&players=${playerIds}&title=${encodeURIComponent(encuentro.title)}`);
+        }
+      }
+    } catch {
+      alert(t.finalizeError || "Error al finalizar el encuentro");
     }
   }
 
@@ -754,38 +933,65 @@ export function EncuentroDetalle() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
               onClick={handleShareGroupWhatsapp}
             >
               <MessageCircle className="h-4 w-4" />
               {t.shareGroupWhatsapp}
             </Button>
+
+            <ParrynAssistant
+              mode="convocatoria"
+              payload={{
+                title: encuentro.title,
+                dateTime: formattedDateStr,
+                location: encuentro.location,
+                maxSpots: encuentro.maxSpots,
+                confirmedCount,
+                missingCount: Math.max(0, (encuentro.maxSpots || 4) - confirmedCount),
+                confirmedNames: confirmedList.map((a) => a.playerName),
+              }}
+            />
+
+            {matches.length > 0 && (
+              <ParrynAssistant
+                mode="cierre"
+                payload={{
+                  title: encuentro.title,
+                  date: formattedDateStr,
+                  matches: matches.map((m, idx) => ({
+                    matchNumber: idx + 1,
+                    team1Names: m.team1Players.map((p) => p.name).join(" / "),
+                    team2Names: m.team2Players.map((p) => p.name).join(" / "),
+                    score: `${m.team1Score} - ${m.team2Score}`,
+                    status: (m as any).status,
+                  })),
+                }}
+              />
+            )}
+
             <Button
               size="sm"
               variant="outline"
-              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 gap-1.5 shadow-sm"
-              onClick={() =>
-                triggerParryn(
-                  `Redacta una convocatoria oficial y motivadora para WhatsApp del encuentro "${encuentro.title}" en ${encuentro.location} para ${encuentro.maxSpots || 8} jugadores`
-                )
-              }
+              className="border-primary/40 text-primary hover:bg-primary/10 gap-1.5"
+              onClick={() => {
+                const playerIds = confirmedList.map((c) => c.playerId).join(",");
+                navigate(`/cobros?encuentroId=${encuentro.id}&players=${playerIds}&title=${encodeURIComponent(encuentro.title)}`);
+              }}
             >
-              <Sparkles className="h-4 w-4 text-yellow-400" />
-              Parryn IA Convocatoria
+              💳 {t.generatePayments || "Generar Cobros del Encuentro"}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-border text-foreground hover:bg-muted/50 gap-1.5 shadow-sm"
-              onClick={() =>
-                triggerParryn(
-                  `Redacta el resumen oficial deportivo para WhatsApp de la jornada "${encuentro.title}" con felicitaciones y resultados`
-                )
-              }
-            >
-              <Sparkles className="h-4 w-4 text-emerald-400" />
-              Parryn Resumen de Jornada
-            </Button>
+
+            {encuentro.estado !== "finalizado" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-border hover:bg-muted gap-1.5"
+                onClick={handleFinalizarEncuentro}
+              >
+                🏁 {t.finalizeEncuentro || "Finalizar Encuentro"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -865,6 +1071,23 @@ export function EncuentroDetalle() {
           </Card>
         ))}
       </div>
+
+      {isOrganizer && (
+        <div className="bg-primary/10 border border-primary/25 rounded-xl p-3.5 flex items-start gap-3">
+          <div className="p-1.5 rounded-lg bg-primary/20 text-primary shrink-0 mt-0.5">
+            <Crown size={18} />
+          </div>
+          <div className="text-xs space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              👑 Modo Organizador del Encuentro
+              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">Tú eres el creador</span>
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Como creador de este evento, tienes la facultad de gestionar la asistencia de todos los jugadores (confirmar o dar de baja si te avisan por WhatsApp) y generar los cruces de partidos. Los jugadores invitados solo pueden responder por su propia cuenta.
+            </p>
+          </div>
+        </div>
+      )}
 
       {asistencia.length > 0 && (
         <Card>
@@ -1041,6 +1264,11 @@ export function EncuentroDetalle() {
           <h2 className="font-bold flex items-center gap-2">
             <Swords size={16} className="text-primary" />
             {t.eventMatches}
+            {matches.length > 0 && (
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                {matches.length} partidos
+              </span>
+            )}
           </h2>
           {isOrganizer && matches.length === 0 && !showGenerateForm && (
             <button
@@ -1050,233 +1278,675 @@ export function EncuentroDetalle() {
               <Shuffle size={14} /> {t.generateMatches}
             </button>
           )}
+          {matches.length > 0 && !showGenerateForm && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPrintModal(true)}
+                className="h-7 text-xs border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1.5 font-medium"
+                title={t.printFixture}
+              >
+                <Printer size={13} /> {t.printFixture}
+              </Button>
+              {isOrganizer && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowGenerateForm(true)}
+                    className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/10 gap-1.5"
+                  >
+                    <Shuffle size={12} /> {t.regenerateFixture}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeleteMatches}
+                    disabled={deletingMatches}
+                    className="h-7 text-xs text-destructive hover:bg-destructive/10 gap-1"
+                  >
+                    <Trash2 size={12} /> {t.cleanFixture}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {isOrganizer && showGenerateForm && (
-          <Card>
+          <Card className="border-primary/30">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Shuffle className="w-4 h-4 text-primary" />
+                    Configurar Fixture y Generar Partidos
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Define la modalidad, pistas disponibles y cantidad de rondas a disputar.
+                  </p>
+                </div>
+                {matches.length > 0 && (
+                  <span className="text-[11px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+                    ⚠️ Reemplazará los partidos existentes
+                  </span>
+                )}
+              </div>
+            </CardHeader>
             <CardContent className="p-4 space-y-4">
+              {/* Formato */}
               <div className="space-y-2">
-                <p className="text-sm font-medium">{t.formatLabel}</p>
-                <div className="grid grid-cols-2 gap-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  1. Formato de Juego
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setFormato("americana")}
                     className={cn(
-                      "px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors",
+                      "p-3 rounded-xl text-left border transition-all",
                       formato === "americana"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted text-muted-foreground border-border"
+                        ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
                     )}
                   >
-                    🎾 Americana
+                    <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                      🎾 Americana (Rotación)
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Individual: rotas de compañero y rivales en cada ronda sumando puntos.
+                    </p>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setFormato("parejas_fijas")}
                     className={cn(
-                      "px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors",
+                      "p-3 rounded-xl text-left border transition-all",
                       formato === "parejas_fijas"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted text-muted-foreground border-border"
+                        ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
                     )}
                   >
-                    👥 {t.fixedPairs}
+                    <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                      👥 Parejas Fijas (Liguilla)
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Parejas estables balanceadas por Elo jugando todos contra todos.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormato("desafio");
+                      setRondas(1);
+                    }}
+                    className={cn(
+                      "p-3 rounded-xl text-left border transition-all",
+                      formato === "desafio"
+                        ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                      ⚡ Desafío (1 Partido)
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      1 solo partido competitivo por cada pista disponible.
+                    </p>
                   </button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">{t.sportLabel}</p>
-                <div className="flex gap-2 flex-wrap">
-                  {sports.map((sport) => (
-                    <button
-                      key={sport.id}
+
+              {/* Canchas y Rondas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                {/* Canchas */}
+                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">2. Pistas / Canchas Disponibles</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Máx. {Math.max(1, Math.floor(confirmedCount / 4))}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
                       type="button"
-                      onClick={() => setSelectedSportId(sport.id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors",
-                        selectedSportId === sport.id
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-muted text-muted-foreground border-border"
-                      )}
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={canchas <= 1}
+                      onClick={() => setCanchas((c) => Math.max(1, c - 1))}
                     >
-                      {sport.name}
-                    </button>
-                  ))}
+                      <Minus size={14} />
+                    </Button>
+                    <span className="font-bold text-sm min-w-16 text-center tabular-nums">
+                      {canchas} {canchas === 1 ? "Pista" : "Pistas"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={canchas >= Math.max(1, Math.floor(confirmedCount / 4))}
+                      onClick={() =>
+                        setCanchas((c) =>
+                          Math.min(Math.max(1, Math.floor(confirmedCount / 4)), c + 1)
+                        )
+                      }
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {canchas * 4} jugadores en simultáneo •{" "}
+                    {Math.max(0, confirmedCount - canchas * 4) === 0 ? (
+                      <span className="text-emerald-500 font-medium">0 descansan</span>
+                    ) : (
+                      <span className="text-amber-500 font-medium">
+                        {confirmedCount - canchas * 4} descansan por ronda (rotación)
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Rondas */}
+                <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">3. Rondas a Disputar</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {canchas * rondas} partidos tot.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={rondas <= 1}
+                      onClick={() => setRondas((r) => Math.max(1, r - 1))}
+                    >
+                      <Minus size={14} />
+                    </Button>
+                    <span className="font-bold text-sm min-w-16 text-center tabular-nums">
+                      {rondas} {rondas === 1 ? "Ronda" : "Rondas"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={rondas >= 15}
+                      onClick={() => setRondas((r) => Math.min(15, r + 1))}
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </div>
+                  {/* Presets rápidos */}
+                  <div className="flex gap-1.5 flex-wrap pt-1">
+                    {[
+                      { r: 3, label: "3 rondas (Recomendado)" },
+                      ...(confirmedCount >= 8 ? [{ r: 4, label: "4 rondas" }, { r: 7, label: "7 rondas (Completa)" }] : []),
+                      ...(confirmedCount === 5 ? [{ r: 5, label: "5 rondas (1 descanso c/u)" }] : []),
+                    ].map((preset) => (
+                      <button
+                        key={preset.r}
+                        type="button"
+                        onClick={() => setRondas(preset.r)}
+                        className={cn(
+                          "text-[10px] px-2 py-0.5 rounded-md border transition-colors",
+                          rondas === preset.r
+                            ? "bg-primary text-primary-foreground border-primary font-bold"
+                            : "bg-background/60 hover:bg-muted text-muted-foreground border-border"
+                        )}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t.confirmedPlayersMsg(confirmedCount)}{" "}
-                {confirmedCount < 4 && <span className="text-destructive">{t.needAtLeast4}</span>}
-              </p>
-              <div className="flex gap-2">
-                <button
+
+              {/* Deporte */}
+              {sports.length > 1 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Deporte
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {sports.map((sport) => (
+                      <button
+                        key={sport.id}
+                        type="button"
+                        onClick={() => setSelectedSportId(sport.id)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                          selectedSportId === sport.id
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-border"
+                        )}
+                      >
+                        {sport.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tarjeta de Desglose en Vivo (Cálculo visible antes de generar) */}
+              <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-primary">
+                  <span className="flex items-center gap-1.5">
+                    <Info size={14} /> Planificación y División del Encuentro
+                  </span>
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    {confirmedCount < 4 ? "Mínimo 4 jugadores" : "Paridad deportiva con Elo"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="bg-background/90 p-2 rounded-lg border">
+                    <span className="text-muted-foreground block text-[10px]">Jugadores</span>
+                    <span className="font-bold text-sm text-foreground">{confirmedCount} confirmados</span>
+                  </div>
+                  <div className="bg-background/90 p-2 rounded-lg border">
+                    <span className="text-muted-foreground block text-[10px]">Pistas simultáneas</span>
+                    <span className="font-bold text-sm text-foreground">{canchas} pista{canchas > 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="bg-background/90 p-2 rounded-lg border">
+                    <span className="text-muted-foreground block text-[10px]">Rondas de juego</span>
+                    <span className="font-bold text-sm text-foreground">{rondas} ronda{rondas > 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="bg-background/90 p-2 rounded-lg border">
+                    <span className="text-muted-foreground block text-[10px]">Total Partidos</span>
+                    <span className="font-bold text-sm text-primary">{canchas * rondas} partidos</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                  <span>⏱️ Tiempo estimado: ~{rondas * 30} minutos</span>
+                  <span>
+                    {confirmedCount - canchas * 4 > 0
+                      ? `☕ ${confirmedCount - canchas * 4} jugador(es) descansan por ronda en rotación`
+                      : "✓ Todos los jugadores juegan simultáneamente"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <Button
+                  onClick={handlePreviewMatches}
+                  disabled={previewLoading || generating || confirmedCount < 4}
+                  variant="outline"
+                  className="flex-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 text-xs font-semibold gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  {previewLoading ? "Calculando equilibrio..." : "🤖 Simular Cruces (Vista Previa Parryn)"}
+                </Button>
+                <Button
                   onClick={handleGenerateMatches}
                   disabled={generating || confirmedCount < 4}
-                  className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 bg-primary text-primary-foreground text-xs font-semibold gap-1.5 hover:opacity-90"
                 >
-                  {generating ? t.generating : t.generateMatches}
-                </button>
-                <button
+                  <Swords size={13} />
+                  {generating ? "Generando..." : `⚔️ Generar ${canchas * rondas} Partidos Oficiales`}
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => setShowGenerateForm(false)}
-                  className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm hover:bg-muted/80"
+                  className="px-4 text-xs"
                 >
                   {t.cancel}
-                </button>
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
         {matchesLoaded && matches.length > 0 && (
-          <div className="space-y-2">
-            {matches.map((match, idx) => {
-              const setsList = Array.isArray(match.sets)
-                ? match.sets
-                : match.sets && typeof match.sets === "object"
-                ? Object.values(match.sets)
-                : [];
+          <div className="space-y-6">
+            {matchesByRound.map(([roundNum, roundMatches]) => (
+              <div key={`round-block-${roundNum}`} className="space-y-2.5">
+                <div className="flex items-center justify-between bg-muted/40 px-3.5 py-2 rounded-xl border border-border/50">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center">
+                      R{roundNum}
+                    </span>
+                    <span className="text-xs font-bold text-foreground">
+                      Ronda {roundNum} {matchesByRound.length > 1 ? `de ${matchesByRound.length}` : ""}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    {roundMatches.length} partido{roundMatches.length > 1 ? "s" : ""} en simultáneo
+                  </span>
+                </div>
 
-              return (
-                <Card key={match.id} className={cn(match.pendingResult ? "border-border" : "border-primary/20")}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {t.matchIndex(idx + 1)}
-                      </span>
-                      {match.pendingResult ? (
-                        <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                          {t.pendingResult}
-                        </span>
-                      ) : (
-                        <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full">
-                          ✓ {t.completed}
-                        </span>
-                      )}
-                    </div>
+                <div className="space-y-2">
+                  {roundMatches.map((match, idx) => {
+                    const setsList = Array.isArray(match.sets)
+                      ? match.sets
+                      : match.sets && typeof match.sets === "object"
+                      ? Object.values(match.sets)
+                      : [];
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 text-sm font-medium">
-                        {match.team1Players.map((p) => p.name).join(" / ")}
-                      </div>
-
-                      {/* Visualización del Marcador Global y de los Sets */}
-                      <div className="text-center">
-                        <div className="font-bold text-lg tabular-nums">
-                          <span
-                            className={
-                              match.result === "team1" && !match.pendingResult
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }
-                          >
-                            {match.team1Score}
-                          </span>
-                          <span className="text-muted-foreground mx-1">-</span>
-                          <span
-                            className={
-                              match.result === "team2" && !match.pendingResult
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }
-                          >
-                            {match.team2Score}
-                          </span>
-                        </div>
-                        {setsList.length > 0 && (
-                          <div className="flex gap-1.5 justify-center mt-1">
-                            {setsList.map((s: any, sIdx: number) => (
-                              <span
-                                key={sIdx}
-                                className="text-[11px] bg-muted/60 px-1.5 py-0.5 rounded font-mono text-muted-foreground"
-                              >
-                                {s.team1 ?? s.team1Score ?? 0}-{s.team2 ?? s.team2Score ?? 0}
+                    return (
+                      <Card key={match.id} className={cn(match.pendingResult ? "border-border" : "border-primary/20")}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-md">
+                                🏟️ Pista {match.court || (idx + 1)}
                               </span>
-                            ))}
+                              <span className="text-xs text-muted-foreground font-medium">
+                                Partido #{match.id}
+                              </span>
+                            </div>
+                            {match.pendingResult ? (
+                              <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                {t.pendingResult}
+                              </span>
+                            ) : (match as any).status === "pending_confirmation" ? (
+                              <span className="text-xs bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded-full font-medium">
+                                ⏳ Pendiente aprobación rival
+                              </span>
+                            ) : (
+                              <span className="text-xs bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                ✓ {t.completed} (Oficial)
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
 
-                      <div className="flex-1 text-sm font-medium text-right">
-                        {match.team2Players.map((p) => p.name).join(" / ")}
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 text-sm font-medium">
+                              {match.team1Players.map((p) => p.name).join(" / ")}
+                            </div>
+
+                            {/* Visualización del Marcador Global y de los Sets */}
+                            <div className="text-center">
+                              <div className="font-bold text-lg tabular-nums">
+                                <span
+                                  className={
+                                    (match.result === "team1" || match.team1Score > match.team2Score) && !match.pendingResult
+                                      ? "text-primary font-bold"
+                                      : "text-muted-foreground"
+                                  }
+                                >
+                                  {match.team1Score}
+                                </span>
+                                <span className="text-muted-foreground mx-1">-</span>
+                                <span
+                                  className={
+                                    (match.result === "team2" || match.team2Score > match.team1Score) && !match.pendingResult
+                                      ? "text-primary font-bold"
+                                      : "text-muted-foreground"
+                                  }
+                                >
+                                  {match.team2Score}
+                                </span>
+                              </div>
+                              {setsList.length > 0 && (
+                                <div className="flex gap-1.5 justify-center mt-1">
+                                  {setsList.map((s: any, sIdx: number) => (
+                                    <span
+                                      key={sIdx}
+                                      className="text-[11px] bg-muted/60 px-1.5 py-0.5 rounded font-mono text-muted-foreground"
+                                    >
+                                      {s.team1 ?? s.team1Score ?? 0}-{s.team2 ?? s.team2Score ?? 0}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 text-sm font-medium text-right">
+                              {match.team2Players.map((p) => p.name).join(" / ")}
+                            </div>
+                          </div>
+
+                          {/* Formulario de Edición con Sets Dinámicos */}
+                          {isOrganizer && (
+                            <>
+                              {editingMatchId === match.id ? (
+                                <div className="mt-4 p-3 bg-muted/30 border border-white/5 rounded-lg space-y-3">
+                                  <div className="space-y-2">
+                                    {editSets.map((s, sIdx) => (
+                                      <div key={sIdx} className="flex items-center justify-between gap-2 bg-background/50 p-2 rounded">
+                                        <span className="text-xs font-semibold text-muted-foreground w-12">
+                                          {t.setLabel(sIdx + 1)}
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                          <ScoreInput
+                                            value={s.team1}
+                                            onChange={(v) => handleSetChange(sIdx, "team1", v)}
+                                          />
+                                          <span className="text-xs text-muted-foreground font-bold">-</span>
+                                          <ScoreInput
+                                            value={s.team2}
+                                            onChange={(v) => handleSetChange(sIdx, "team2", v)}
+                                          />
+                                        </div>
+                                        {editSets.length > 1 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveSet(sIdx)}
+                                            className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                                            title={t.removeSet}
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        ) : (
+                                          <div className="w-5" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={handleAddSet}
+                                    className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-1 font-medium"
+                                  >
+                                    <Plus size={12} /> {t.addSet}
+                                  </button>
+
+                                  <div className="flex gap-2 pt-2">
+                                    <button
+                                      onClick={() => handleSaveScore(match.id)}
+                                      disabled={savingScore}
+                                      className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+                                    >
+                                      {savingScore ? t.saving : t.saveScore}
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingMatchId(null)}
+                                      className="px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs hover:bg-muted/80"
+                                    >
+                                      {t.cancel}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleStartEditMatch(match)}
+                                  className="w-full mt-3 text-xs text-primary hover:underline font-medium"
+                                >
+                                  {match.pendingResult ? t.enterScore : t.editScore}
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                          {/* Banner de Validación Cruzada Fair Play */}
+                          {((match as any).status === "pending_confirmation" || (!match.pendingResult && (match as any).status !== "confirmed")) && (
+                            <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                              <div>
+                                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                  ⚖️ Fair Play:
+                                </span>
+                                <span className="text-muted-foreground ml-1">
+                                  {(match as any).submittedByPlayerName
+                                    ? `Marcador registrado por ${(match as any).submittedByPlayerName}.`
+                                    : "Marcador registrado."}{" "}
+                                  Requiere aprobación del rival o del administrador para validar el Elo.
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {(() => {
+                                  const userPlayerId = user?.playerId;
+                                  const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
+                                  const userInT1 = match.team1Players.some((p) => p.id === userPlayerId);
+                                  const userInT2 = match.team2Players.some((p) => p.id === userPlayerId);
+                                  const submitterId = (match as any).submittedByPlayerId;
+                                  const isRival = submitterId
+                                    ? (userInT1 && !match.team1Players.some((p) => p.id === submitterId)) ||
+                                      (userInT2 && !match.team2Players.some((p) => p.id === submitterId))
+                                    : userInT1 || userInT2;
+
+                                  if (isStaff) {
+                                    return (
+                                      <Button
+                                        size="sm"
+                                        className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold gap-1"
+                                        onClick={() => handleConfirmMatchOfficial(match.id)}
+                                      >
+                                        🛡️ Aprobar como Admin
+                                      </Button>
+                                    );
+                                  }
+
+                                  if (isRival) {
+                                    return (
+                                      <Button
+                                        size="sm"
+                                        className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1"
+                                        onClick={() => handleConfirmMatchOfficial(match.id)}
+                                      >
+                                        <Check className="w-3 h-3" />
+                                        ✓ Aprobar resultado rival
+                                      </Button>
+                                    );
+                                  }
+
+                                  if (userInT1 || userInT2) {
+                                    return (
+                                      <span className="text-[11px] text-amber-500 font-medium">
+                                        Esperando que tu rival confirme...
+                                      </span>
+                                    );
+                                  }
+
+                                  return null;
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Modal de Vista Previa de Cruces con Parryn */}
+        {showPreviewModal && previewCruces && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-500" />
+                  <div>
+                    <h3 className="font-bold text-base">Vista Previa del Fixture (Parryn IA)</h3>
+                    <p className="text-[11px] text-muted-foreground">Cruces calculados y balanceados por nivel Elo</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="text-muted-foreground hover:text-foreground text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {previewSummary && (
+                <div className="grid grid-cols-4 gap-1.5 p-2.5 bg-primary/5 rounded-xl border border-primary/20 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Jugadores</span>
+                    <span className="font-bold">{previewSummary.totalConfirmed}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Pistas</span>
+                    <span className="font-bold">{previewSummary.courts}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Rondas</span>
+                    <span className="font-bold">{previewSummary.rounds}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Partidos</span>
+                    <span className="font-bold text-primary">{previewSummary.totalMatches}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+                {previewCruces.map((cruce: any) => (
+                  <div
+                    key={`preview-${cruce.round}-${cruce.court}-${cruce.matchIndex}`}
+                    className="p-3 bg-muted/40 rounded-xl border border-border/40 text-xs space-y-1.5"
+                  >
+                    <div className="flex justify-between items-center font-semibold text-foreground">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-bold">
+                          Ronda {cruce.round || 1} • Pista {cruce.court || 1}
+                        </span>
+                        <span className="text-muted-foreground font-normal">Partido #{cruce.matchIndex}</span>
+                      </div>
+                      <span className="text-emerald-500 font-medium">Δ Elo: {cruce.diffElo} pts</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                      <div className="bg-background/80 p-2 rounded-lg border">
+                        <p className="font-medium text-foreground">{cruce.team1Names}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Elo promedio: {cruce.team1AvgElo}</p>
+                      </div>
+                      <div className="bg-background/80 p-2 rounded-lg border">
+                        <p className="font-medium text-foreground">{cruce.team2Names}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Elo promedio: {cruce.team2AvgElo}</p>
                       </div>
                     </div>
 
-                    {/* Formulario de Edición con Sets Dinámicos */}
-                    {isOrganizer && (
-                      <>
-                        {editingMatchId === match.id ? (
-                          <div className="mt-4 p-3 bg-muted/30 border border-white/5 rounded-lg space-y-3">
-                            <div className="space-y-2">
-                              {editSets.map((s, sIdx) => (
-                                <div key={sIdx} className="flex items-center justify-between gap-2 bg-background/50 p-2 rounded">
-                                  <span className="text-xs font-semibold text-muted-foreground w-12">
-                                    {t.setLabel(sIdx + 1)}
-                                  </span>
-                                  <div className="flex items-center gap-3">
-                                    <ScoreInput
-                                      value={s.team1}
-                                      onChange={(v) => handleSetChange(sIdx, "team1", v)}
-                                    />
-                                    <span className="text-xs text-muted-foreground font-bold">-</span>
-                                    <ScoreInput
-                                      value={s.team2}
-                                      onChange={(v) => handleSetChange(sIdx, "team2", v)}
-                                    />
-                                  </div>
-                                  {editSets.length > 1 ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveSet(sIdx)}
-                                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                                      title={t.removeSet}
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  ) : (
-                                    <div className="w-5" />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={handleAddSet}
-                              className="w-full py-1.5 text-xs text-primary border border-primary/30 border-dashed rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-1 font-medium"
-                            >
-                              <Plus size={12} /> {t.addSet}
-                            </button>
-
-                            <div className="flex gap-2 pt-2">
-                              <button
-                                onClick={() => handleSaveScore(match.id)}
-                                disabled={savingScore}
-                                className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 disabled:opacity-50"
-                              >
-                                {savingScore ? t.saving : t.saveScore}
-                              </button>
-                              <button
-                                onClick={() => setEditingMatchId(null)}
-                                className="px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs hover:bg-muted/80"
-                              >
-                                {t.cancel}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleStartEditMatch(match)}
-                            className="w-full mt-3 text-xs text-primary hover:underline font-medium"
-                          >
-                            {match.pendingResult ? t.enterScore : t.editScore}
-                          </button>
-                        )}
-                      </>
+                    {cruce.restingNames && cruce.restingNames.length > 0 && (
+                      <p className="text-[10px] text-amber-500/90 pt-0.5">
+                        ☕ Descansan en esta ronda: {cruce.restingNames.join(", ")}
+                      </p>
                     )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="flex-1 text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    setShowPreviewModal(false);
+                    await handleGenerateMatches();
+                  }}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Confirmar y Crear Fixture
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1285,6 +1955,17 @@ export function EncuentroDetalle() {
             <Swords size={24} className="mx-auto mb-2 opacity-30" />
             <p>{t.noMatchesYet}</p>
           </div>
+        )}
+
+        {showPrintModal && (
+          <PrintFixtureModal
+            isOpen={showPrintModal}
+            onClose={() => setShowPrintModal(false)}
+            encuentro={encuentro}
+            matches={matches}
+            asistencia={asistencia}
+            clubName={encuentro.location || "Club de Pádel"}
+          />
         )}
       </div>
     </div>

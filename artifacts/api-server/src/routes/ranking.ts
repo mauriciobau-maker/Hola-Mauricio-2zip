@@ -75,15 +75,22 @@ router.get("/ranking", async (req, res): Promise<void> => {
   ]));
 
   for (const match of matches) {
-    if (
-      match.status !== "confirmed" ||
-      !["team1", "team2", "draw"].includes(match.result)
-    ) continue;
+    if (match.status !== "confirmed") continue;
+
+    let effectiveResult = match.result;
+    if (!["team1", "team2", "draw"].includes(effectiveResult)) {
+      const t1 = Number(match.team1Score ?? 0);
+      const t2 = Number(match.team2Score ?? 0);
+      if (t1 > t2) effectiveResult = "team1";
+      else if (t2 > t1) effectiveResult = "team2";
+      else effectiveResult = "draw";
+    }
+
     const rows = grouped[match.id] ?? [];
     const team1 = rows.filter((row) => row.team === "team1").map((row) => row.playerId);
     const team2 = rows.filter((row) => row.team === "team2").map((row) => row.playerId);
     if (!team1.length || !team2.length) continue;
-    if (match.result === "draw") {
+    if (effectiveResult === "draw") {
       for (const playerId of [...team1, ...team2]) {
         const playerStats = stats.get(playerId);
         if (playerStats) {
@@ -92,8 +99,8 @@ router.get("/ranking", async (req, res): Promise<void> => {
         }
       }
     } else {
-      const winners = match.result === "team1" ? team1 : team2;
-      const losers = match.result === "team1" ? team2 : team1;
+      const winners = effectiveResult === "team1" ? team1 : team2;
+      const losers = effectiveResult === "team1" ? team2 : team1;
       for (const playerId of winners) {
         const playerStats = stats.get(playerId);
         if (playerStats) {
@@ -111,7 +118,7 @@ router.get("/ranking", async (req, res): Promise<void> => {
   const ranking = players
     .map((player) => {
       const playerStats = stats.get(player.id)!;
-      const elo = ratingMap.get(player.id) ?? 1500;
+      const elo = ratingMap.get(player.id) ?? player.elo ?? 1500;
       const totalMatches = playerStats.wins + playerStats.losses + playerStats.draws;
       return {
         playerId: player.id,

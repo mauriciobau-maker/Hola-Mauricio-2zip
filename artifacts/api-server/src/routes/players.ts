@@ -23,6 +23,7 @@ import {
   requireCommunityAccess,
   resolveEffectiveClubId,
 } from "../middlewares/requireCommunity";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -115,34 +116,39 @@ async function enrichPlayer(
 router.get(
   "/players",
   async (req, res): Promise<void> => {
-    const clubId = await resolveEffectiveClubId(req);
+    try {
+      const clubId = await resolveEffectiveClubId(req);
 
-    const players = clubId
-      ? await db
-          .select()
-          .from(playersTable)
-          .where(
-            eq(
-              playersTable.clubId,
-              clubId
+      const players = clubId
+        ? await db
+            .select()
+            .from(playersTable)
+            .where(
+              eq(
+                playersTable.clubId,
+                clubId
+              )
             )
-          )
-          .orderBy(
-            playersTable.name
-          )
-      : await db
-          .select()
-          .from(playersTable)
-          .orderBy(
-            playersTable.name
-          );
+            .orderBy(
+              playersTable.name
+            )
+        : await db
+            .select()
+            .from(playersTable)
+            .orderBy(
+              playersTable.name
+            );
 
-    const enriched =
-      await Promise.all(
-        players.map(enrichPlayer)
-      );
+      const enriched =
+        await Promise.all(
+          players.map(enrichPlayer)
+        );
 
-    res.json(enriched);
+      res.json(enriched);
+    } catch (err: any) {
+      logger.warn({ err: err?.message }, "Failed to query players — database may be offline or unconfigured");
+      res.json([]);
+    }
   }
 );
 

@@ -1,164 +1,10 @@
 export type Language = "es" | "en" | "pt";
 
-export type TranslationKey =
-  // Navegación & General
-  | "dashboard"
-  | "ranking"
-  | "pairs"
-  | "matches"
-  | "players"
-  | "encuentros"
-  | "payments"
-  | "adminPanel"
-  | "adminTitle"
-  | "clubsRegistered"
-  | "newClub"
-  | "copyLink"
-  | "copyCode"
-  | "visit"
-  | "edit"
-  | "deactivate"
-  | "sportsEnabled"
-  | "adminContact"
-  | "noAdminAssigned"
-  | "demoLoad"
-  | "padel"
-  | "tenis"
-  | "futbol"
-  | "search"
-  | "filter"
-  | "all"
-  | "loading"
-  | "save"
-  | "saving"
-  | "cancel"
-  | "delete"
-  | "close"
-  | "back"
-  | "confirm"
-  | "actions"
-  | "status"
-  | "date"
-  | "location"
-  | "details"
-  | "total"
-  | "share"
-  | "copied"
-  // Dashboard
-  | "welcome"
-  | "clubOverview"
-  | "quickStats"
-  | "totalPlayers"
-  | "totalMatches"
-  | "activeEvents"
-  | "recentMatches"
-  | "topPlayers"
-  | "viewAll"
-  | "noRecentMatches"
-  | "noPlayersYet"
-  | "newMatch"
-  | "newEvent"
-  | "newPlayer"
-  | "matchesThisMonth"
-  | "winRate"
-  | "eloLeaderboard"
-  // Ranking
-  | "playerRanking"
-  | "rankingSubtitle"
-  | "rank"
-  | "player"
-  | "elo"
-  | "matchesPlayed"
-  | "wins"
-  | "losses"
-  | "position"
-  | "category"
-  | "allSports"
-  | "allCategories"
-  | "noRankingsFound"
-  // Partidos
-  | "matchesTitle"
-  | "matchesSubtitle"
-  | "filterAll"
-  | "filterConfirmed"
-  | "filterPending"
-  | "noMatchesFound"
-  | "newMatchButton"
-  | "matchDetails"
-  | "sets"
-  | "score"
-  | "pendingApproval"
-  | "confirmedStatus"
-  | "approveResult"
-  | "proposedBy"
-  | "vs"
-  | "completed"
-  | "inProgress"
-  | "editScore"
-  | "enterScore"
-  // Jugadores
-  | "playersTitle"
-  | "playersSubtitle"
-  | "searchPlaceholder"
-  | "dominantHand"
-  | "courtPosition"
-  | "rightSide"
-  | "leftSide"
-  | "bothSides"
-  | "goalkeeper"
-  | "defender"
-  | "midfielder"
-  | "forward"
-  | "viewProfile"
-  | "unlinked"
-  | "linked"
-  | "noPlayersFound"
-  // Cobros & Finanzas
-  | "paymentsTitle"
-  | "paymentsSubtitle"
-  | "courtRental"
-  | "costPerPlayer"
-  | "totalAmount"
-  | "courtCount"
-  | "shareWhatsappReport"
-  | "splitCalculator"
-  | "unpaid"
-  | "paid"
-  | "markAsPaid"
-  | "markAsUnpaid"
-  | "paymentSummary"
-  | "playersToCharge"
-  // Parejas
-  | "pairsTitle"
-  | "pairsSubtitle"
-  | "topPairs"
-  | "matchesTogether"
-  | "chemistry"
-  // Encuentros
-  | "encuentrosTitle"
-  | "encuentrosSubtitle"
-  | "spotsAvailable"
-  | "waitlist"
-  | "confirmedAttendance"
-  | "shareInvitation"
-  | "generateMatches"
-  | "endEvent"
-  | "spotsFull"
-  // Parryn IA
-  | "parryn"
-  | "parrynSecretary"
-  | "parrynHeroTitle"
-  | "parrynHeroSubtitle"
-  | "parrynAskWhoMissing"
-  | "parrynDraftWhatsapp"
-  | "parrynPaymentReminder"
-  | "parrynMatchSummary"
-  | "parrynOpenChat"
-  | "parrynStatusOnline";
+export type TranslationKey = string;
 
 export const translations: Record<Language, Record<string, string>> = {
   es: {
-    // Navegación
+    // Nav & Layout
     dashboard: "Dashboard",
     ranking: "Ranking",
     pairs: "Parejas",
@@ -166,6 +12,7 @@ export const translations: Record<Language, Record<string, string>> = {
     players: "Jugadores",
     encuentros: "Encuentros",
     payments: "Cobros",
+    parrynSecretary: "Secretario IA (Parryn)",
     adminPanel: "Panel Admin",
     adminTitle: "Panel de Admin",
     clubsRegistered: "clubes registrados",
@@ -182,148 +29,340 @@ export const translations: Record<Language, Record<string, string>> = {
     padel: "Pádel",
     tenis: "Tenis",
     futbol: "Fútbol",
-    search: "Buscar",
-    filter: "Filtrar",
-    all: "Todos",
-    loading: "Cargando...",
-    save: "Guardar",
-    saving: "Guardando...",
-    cancel: "Cancelar",
-    delete: "Eliminar",
-    close: "Cerrar",
-    back: "Volver",
-    confirm: "Confirmar",
-    actions: "Acciones",
-    status: "Estado",
-    date: "Fecha",
-    location: "Ubicación",
-    details: "Detalles",
-    total: "Total",
-    share: "Compartir",
-    copied: "Copiado",
+
+    // Common
+    "common.save": "Guardar",
+    "common.cancel": "Cancelar",
+    "common.close": "Cerrar",
+    "common.delete": "Eliminar",
+    "common.edit": "Editar",
+    "common.create": "Crear",
+    "common.back": "Volver",
+    "common.search": "Buscar...",
+    "common.filter": "Filtrar",
+    "common.all": "Todos",
+    "common.actions": "Acciones",
+    "common.loading": "Cargando...",
+    "common.success": "Éxito",
+    "common.error": "Error",
+    "common.confirm": "Confirmar",
+    "common.copy": "Copiar",
+    "common.copied": "¡Copiado!",
+    "common.yes": "Sí",
+    "common.no": "No",
+    "common.total": "Total",
+    "common.status": "Estado",
+    "common.details": "Detalles",
+    "common.print": "Imprimir",
+    "common.share": "Compartir",
+    "common.refresh": "Actualizar",
+    "common.apply": "Aplicar",
+    "common.clear": "Limpiar",
+    "common.selectAll": "Seleccionar todos",
+    "common.deselectAll": "Deseleccionar todos",
+    "common.backToHome": "Volver al Inicio",
+    "common.viewAll": "Ver todos",
 
     // Dashboard
-    welcome: "Bienvenido",
-    clubOverview: "Resumen de tu club deportivo",
-    quickStats: "Estadísticas Rápidas",
-    totalPlayers: "Total Jugadores",
-    totalMatches: "Partidos Jugados",
-    activeEvents: "Encuentros Activos",
-    recentMatches: "Partidos Recientes",
-    topPlayers: "Mejores Jugadores",
-    viewAll: "Ver todos",
-    noRecentMatches: "No hay partidos registrados aún.",
-    noPlayersYet: "No hay jugadores registrados aún.",
-    newMatch: "Nuevo Partido",
-    newEvent: "Nuevo Encuentro",
-    newPlayer: "Nuevo Jugador",
-    matchesThisMonth: "Partidos este mes",
-    winRate: "% Victorias",
-    eloLeaderboard: "Líderes de Ranking",
+    "dashboard.subtitle": "Resumen general del club",
+    "dashboard.leader": "Líder",
+    "dashboard.activeCount": "{count} activos",
+    "dashboard.recentMatches": "Últimos Partidos",
+    "dashboard.topRanking": "Top Ranking",
+    "dashboard.viewRanking": "Ver ranking",
+    "dashboard.noMatches": "No hay partidos registrados",
+    "dashboard.noPlayers": "No hay jugadores registrados",
 
     // Ranking
-    playerRanking: "Ranking de Jugadores",
-    rankingSubtitle: "Clasificación oficial por nivel deportivo y rendimiento",
-    rank: "Posición",
-    player: "Jugador",
-    elo: "Puntuación ELO",
-    matchesPlayed: "PJ",
-    wins: "PG",
-    losses: "PP",
-    position: "Posición",
-    category: "Categoría",
-    allSports: "Todos los deportes",
-    allCategories: "Todas las categorías",
-    noRankingsFound: "No se encontraron jugadores en el ranking.",
-
-    // Partidos
-    matchesTitle: "Partidos",
-    matchesSubtitle: "Historial y marcadores de partidos de la comunidad",
-    filterAll: "Todos",
-    filterConfirmed: "Confirmados",
-    filterPending: "Pendientes",
-    noMatchesFound: "No hay partidos que coincidan con el filtro.",
-    newMatchButton: "Registrar Partido",
-    matchDetails: "Detalle del Partido",
-    sets: "Sets",
-    score: "Marcador",
-    pendingApproval: "Pendiente de validación por rival",
-    confirmedStatus: "Confirmado",
-    approveResult: "Aprobar resultado",
-    proposedBy: "Propuesto por",
-    vs: "vs",
-    completed: "Completado",
-    inProgress: "En juego",
-    editScore: "Editar resultado",
-    enterScore: "Ingresar resultado",
-
-    // Jugadores
-    playersTitle: "Jugadores del Club",
-    playersSubtitle: "Fichas deportivas, estadísticas individuales y contacto",
-    searchPlaceholder: "Buscar por nombre o apodo...",
-    dominantHand: "Mano hábil",
-    courtPosition: "Lado de juego",
-    rightSide: "Drive (Derecha)",
-    leftSide: "Revés (Izquierda)",
-    bothSides: "Ambos lados",
-    goalkeeper: "Portero / Arquero",
-    defender: "Defensa",
-    midfielder: "Mediocampista",
-    forward: "Delantero",
-    viewProfile: "Ver Perfil",
-    unlinked: "Sin vincular",
-    linked: "Vinculado",
-    noPlayersFound: "No se encontraron jugadores.",
-
-    // Cobros
-    paymentsTitle: "Control de Cobros & Finanzas",
-    paymentsSubtitle: "Calculadora de pista, división de gastos y cobro por WhatsApp",
-    courtRental: "Alquiler de Canchas",
-    costPerPlayer: "Costo por Jugador",
-    totalAmount: "Monto Total",
-    courtCount: "Número de Pistas",
-    shareWhatsappReport: "Enviar Cobro por WhatsApp",
-    splitCalculator: "Calculadora de Prorrateo",
-    unpaid: "Pendiente",
-    paid: "Pagado",
-    markAsPaid: "Marcar como pagado",
-    markAsUnpaid: "Marcar como pendiente",
-    paymentSummary: "Resumen de Cobro",
-    playersToCharge: "Jugadores a Cobrar",
+    "ranking.title": "Ranking Elo",
+    "ranking.subtitle": "Sistema Elo profesional — puntuación basada en la fuerza de los rivales",
+    "ranking.noData": "Sin datos de ranking",
+    "ranking.noDataDesc": "Registra jugadores y partidos para ver el ranking",
+    "ranking.howEloWorks": "Cómo funciona el Elo",
+    "ranking.eloBaseRule": "Todos los jugadores comienzan con 1000 puntos base.",
+    "ranking.eloWinLossRule": "Ganar a rivales con mayor puntuación otorga más puntos que a rivales de menor nivel.",
+    "ranking.eloDrawRule": "La diferencia de sets y games influye en la variación final de puntos.",
+    "ranking.pos": "#",
+    "ranking.player": "Jugador",
+    "ranking.points": "Puntos Elo",
+    "ranking.matches": "Partidos",
+    "ranking.wins": "V",
+    "ranking.losses": "D",
+    "ranking.winRate": "%V",
+    "ranking.streak": "Racha",
 
     // Parejas
-    pairsTitle: "Parejas del Club",
-    pairsSubtitle: "Rendimiento y química de duplas en competencia",
-    topPairs: "Mejores Parejas",
-    matchesTogether: "Partidos juntos",
-    chemistry: "Efectividad",
+    "parejas.title": "Parejas",
+    "parejas.subtitle": "Estadísticas de todas las combinaciones de jugadores",
+    "parejas.activeCount": "{count} parejas activas",
+    "parejas.searchPlaceholder": "Buscar por nombre de jugador...",
+    "parejas.noData": "Sin parejas registradas",
+    "parejas.viewHistory": "Ver historial completo →",
+    "parejas.matches": "Partidos",
+    "parejas.setsRatio": "Sets G/P",
+    "parejas.gamesWon": "Games G",
+    "parejas.gamesLost": "Games P",
+    "parejas.gameDiff": "Dif G",
+    "parejas.avgElo": "Elo avg",
+    "parejas.topRanking": "Ranking — Top {count} parejas",
+    "parejas.clearSearch": "Limpiar búsqueda",
+    "parejas.insufficientMatches": "Sin partidos suficientes",
+    "parejas.winsShort": "V",
+    "parejas.lossesShort": "D",
+    "parejas.matchesShort": "P",
 
-    // Encuentros
-    encuentrosTitle: "Encuentros Deportivos",
-    encuentrosSubtitle: "Convocatorias, citaciones y rotaciones inteligentes",
-    spotsAvailable: "Cupos disponibles",
-    waitlist: "Lista de Reserva",
-    confirmedAttendance: "Asistencia Confirmada",
-    shareInvitation: "Compartir Convocatoria",
-    generateMatches: "Generar Partidos",
-    endEvent: "Finalizar Encuentro",
-    spotsFull: "Cupos agotados",
+    // Partidos & Fair Play
+    "partidos.title": "Partidos",
+    "partidos.count": "{count} partido(s) registrado(s)",
+    "partidos.new": "Registrar partido",
+    "partidos.noMatches": "Sin partidos aún",
+    "partidos.noMatchesDesc": "Registra el primer partido para empezar",
+    "partidos.deleteConfirm": "¿Eliminar este partido? Esta acción no se puede deshacer.",
+    "partidos.confirmFairPlay": "Aprobar resultado",
+    "partidos.waitingRival": "Esperando aprobación rival",
+    "partidos.officialConfirmed": "Oficial Confirmado",
+    "partidos.score": "Marcador",
+    "partidos.winner": "Ganador",
+    "partidos.winnerBadge": "GANADOR",
+    "partidos.loserBadge": "PERDEDOR",
+    "partidos.drawBadge": "EMPATE",
+    "partidos.tiebreak": "Tie-break",
 
-    // Parryn IA
-    parryn: "Parryn",
-    parrynSecretary: "Secretario IA",
-    parrynHeroTitle: "Secretaría del Club con Parryn IA",
-    parrynHeroSubtitle: "Tu secretario deportivo: recuerda todo, organiza las convocatorias y mantiene al club al día sin fricciones.",
-    parrynAskWhoMissing: "¿Quién falta confirmar?",
-    parrynDraftWhatsapp: "Redactar Convocatoria WhatsApp",
-    parrynPaymentReminder: "Recordatorio de Cobros",
-    parrynMatchSummary: "Resumen de la Jornada",
-    parrynOpenChat: "Hablar con Parryn",
-    parrynStatusOnline: "Secretario Activo",
+    // Jugadores
+    "jugadores.title": "Jugadores",
+    "jugadores.count": "{count} registrados",
+    "jugadores.new": "Nuevo Jugador",
+    "jugadores.search": "Buscar por nombre o apodo...",
+    "jugadores.noPlayers": "Sin jugadores encontrados",
+    "jugadores.deleteConfirm": "¿Eliminar a {name}? Esta acción no se puede deshacer.",
+    "jugadores.chatWhatsApp": "Chatear por WhatsApp",
+    "jugadores.profile": "Perfil del jugador",
+    "jugadores.edit": "Editar",
+    "jugadores.memberSince": "Miembro desde {date}",
+    "jugadores.winRate": "Porcentaje de victorias",
+    "jugadores.points": "Puntos",
+    "jugadores.wins": "Victorias",
+    "jugadores.losses": "Derrotas",
+    "jugadores.currentStreak": "Racha actual",
+    "jugadores.setStats": "Estadísticas de sets",
+    "jugadores.setsWon": "Sets ganados",
+    "jugadores.setsLost": "Sets perdidos",
+    "jugadores.totalMatches": "Partidos totales",
+    "jugadores.eloHistory": "Historial Elo",
+    "jugadores.eloMatchesCount": "{count} partidos",
+    "jugadores.recentMatches": "Últimos partidos",
+    "jugadores.playerNotFound": "Jugador no encontrado",
+    "jugadores.backToPlayers": "Volver a jugadores",
+    "jugadores.start": "Inicio",
+    "jugadores.now": "Ahora",
+    "jugadores.baseElo": "— 1500 base —",
+
+    // Cobros
+    "cobros.title": "Planilla de Cobros",
+    "cobros.subtitleStaff": "Control de pagos, desglose de ítems, arriendos de pista y gastos compartidos de torneos",
+    "cobros.subtitlePlayer": "Consulta el detalle exacto de tus cobros y adjunta tu comprobante de pago",
+    "cobros.tournamentCalc": "Calculadora de torneo",
+    "cobros.newPayment": "Nuevo cobro",
+    "cobros.remindParryn": "🤖 Recordatorio Parryn",
+    "cobros.calcTitle": "Calculadora de torneo",
+    "cobros.calcDesc": "Ingresa los costos compartidos y a qué jugadores se les reparte en partes iguales. Si a alguien le corresponde un descuento o saldo, ajústalo individualmente.",
+    "cobros.eventName": "Nombre (ej. 3er Torneo)",
+    "cobros.eventNamePlaceholder": "3er Torneo, Americano Viernes, etc.",
+    "cobros.sharedCosts": "Costos del evento o torneo",
+    "cobros.sharedCostsDesc": "Ingresa las canchas, pelotas, bebidas, tercer tiempo u otros gastos compartidos.",
+    "cobros.quickAdd": "Agregar rápido:",
+    "cobros.addCourt": "🏟️ + Cancha",
+    "cobros.addBalls": "🎾 + Pelotas",
+    "cobros.addDrinks": "🥤 + Bebidas",
+    "cobros.addTercerTiempo": "🍻 + Tercer Tiempo",
+    "cobros.addPrizes": "🏆 + Premios",
+    "cobros.addCustomConcept": "+ Agregar otro concepto personalizado",
+    "cobros.splitAmong": "Se divide entre:",
+    "cobros.ofPlayers": "de {total} jugadores",
+    "cobros.perPerson": "{amount} c/u",
+    "cobros.selectWhoPays": "⚙️ Seleccionar quiénes pagan este ítem",
+    "cobros.closeParticipants": "Cerrar participantes",
+    "cobros.playersPayingItem": "Jugadores que pagan \"{item}\":",
+    "cobros.convocados": "Jugadores convocados al evento ({count})",
+    "cobros.convocadosDesc": "Marca o desmarca quiénes asistieron al evento.",
+    "cobros.searchPlayerPlaceholder": "Buscar jugador en la lista...",
+    "cobros.baseShare": "Cuota base: {amount} c/u",
+    "cobros.adjustment": "Ajuste (+/-)",
+    "cobros.summary": "Resumen del reparto:",
+    "cobros.betweenPlayers": "entre {count} jugadores",
+    "cobros.applyAndGenerate": "Aplicar y generar cobros",
+    "cobros.notifyAdmin": "Notificar pago al Admin",
+    "cobros.remindPlayer": "Enviar recordatorio al jugador",
+    "cobros.paid": "Pagado",
+    "cobros.pending": "Pendiente",
+    "cobros.underReview": "Por revisar",
+    "cobros.receipt": "Comprobante",
+    "cobros.attachReceipt": "Adjuntar clip",
+    "cobros.noReceipt": "Sin comprobante",
+    "cobros.totalCollected": "Total Recaudado",
+    "cobros.totalPending": "Pendiente de Cobro",
+    "cobros.debtors": "Jugadores con saldo",
+    "cobros.validateAndMarkPaid": "Validar y Marcar como Pagado",
+    "cobros.revertToPending": "Revertir a pendiente",
+    "cobros.receiptModalTitle": "Comprobante de Pago — {name}",
+    "cobros.uploadPhoto": "Subir captura de transferencia (Foto / Archivo)",
+    "cobros.clickToUpload": "Haz clic para seleccionar o tomar foto",
+    "cobros.pasteUrl": "O pegar enlace web del comprobante",
+
+    // Encuentros & Fixture
+    "encuentros.title": "Encuentros y Jornadas",
+    "encuentros.new": "Nuevo Encuentro",
+    "encuentros.detail": "Detalle del Encuentro",
+    "encuentros.printFixture": "🖨️ Imprimir Fixture",
+    "encuentros.regenerateFixture": "Re-generar Fixture",
+    "encuentros.cleanFixture": "Limpiar",
+    "encuentros.round": "Ronda {number}",
+    "encuentros.restNotice": "⏳ Descanso de 2 minutos: {start} a {end} (Rotación de pistas y calentamiento corto)",
+    "encuentros.restingPlayers": "☕ Descansan en esta ronda: {names}",
+    "encuentros.court": "Pista {number}",
+    "encuentros.goldPoint": "Punto de Oro en 40-40",
+    "encuentros.timeFinish": "Finalización por tiempo al sonar la campana",
+    "encuentros.printModalTitle": "Planilla Oficial de Fixture e Impresión",
+    "encuentros.durationPerMatch": "Duración de cada partido:",
+    "encuentros.restBetweenRounds": "Descanso entre rondas:",
+    "encuentros.twoMinRest": "2 minutos (Rotación y calentamiento)",
+    "encuentros.printAction": "🖨️ Imprimir / Guardar en PDF",
+    "encuentros.confirmedAttendance": "Asistencia y Pagos Confirmados",
+    "encuentros.present": "Presente",
+    "encuentros.feePaid": "Pago cuota",
+    "encuentros.winnerP1": "[  ] Gana Pareja 1",
+    "encuentros.winnerP2": "[  ] Gana Pareja 2",
+    "encuentros.captainSignature": "Firma capitán / validación: _____________________",
+
+    // Parryn
+    "parryn.role": "Secretario Deportivo Oficial",
+    "parryn.motto": "\"No juega mejor. No gana partidos. Hace que todos puedan jugar.\"",
+    "parryn.badgeAlwaysAvailable": "Siempre disponible",
+    "parryn.badgeRemembersAll": "Recuerda todo",
+    "parryn.badgeOrganizesAll": "Organiza todo",
+    "parryn.badgeFairPlay": "Respeta el Fair Play",
+    "parryn.conversationalAssistant": "Asistente Conversacional",
+    "parryn.courtScheduling": "Turnos & Canchas",
+    "parryn.weatherAlerts": "Alertas Climáticas (Techadas vs Abiertas)",
+    "parryn.directChat": "Conversación Directa con Parryn",
+    "parryn.chatDesc": "Pregúntale sobre cualquier aspecto organizativo de tu club: convocatorias, desempates, cobros o turnos.",
+    "parryn.chatPlaceholder": "Escribe tu consulta a Parryn (ej: '¿Cómo armo un torneo americano de 8 jugadores?')",
+    "parryn.send": "Enviar",
+    "parryn.copyText": "Copiar texto",
+    "parryn.copied": "¡Copiado!",
+    "parryn.analyzing": "Parryn está analizando tu consulta...",
+    "parryn.initialGreeting": "¡Hola! Soy Parryn, tu Secretario Deportivo. ¿En qué te puedo ayudar hoy? Puedo asistirte en la distribución de turnos, convocatorias urgentes para WhatsApp, canchas techadas ante riesgo de clima o emparejamientos equilibrados.",
+    "parryn.courtTitle": "Distribución Inteligente de Pistas",
+    "parryn.courtDesc": "Configura la infraestructura de tu club para que Parryn distribuya los horarios sin colisiones.",
+    "parryn.coveredCourts": "Pistas Techadas / Indoor",
+    "parryn.openCourts": "Pistas Abiertas / Outdoor",
+    "parryn.currentWeather": "Pronóstico Actual",
+    "parryn.weatherGood": "☀️ Despejado / Óptimo",
+    "parryn.weatherRain": "🌧️ Riesgo de Lluvia / Viento",
+    "parryn.generatePlan": "Generar Plan con Parryn",
+    "parryn.calculatingPlan": "Calculando plan óptimo...",
+    "parryn.strategySuggested": "Estrategia Sugerida por Parryn:",
+    "parryn.weatherTitle": "Protección de Jornada (Techadas vs Abiertas)",
+    "parryn.weatherDesc": "Protocolos de contingencia automáticos para no suspender partidos por lluvia.",
+    "parryn.goldenRuleTitle": "🛡️ Regla de Oro de Parryn para Días de Clima Incierto",
+    "parryn.rule1": "1. Priorización de Pistas: Los encuentros con marcador oficial o puntos de ranking Elo se programan primero en las canchas techadas.",
+    "parryn.rule2": "2. Turnos escalonados: En caso de lluvia que inhabilite las canchas exteriores, los turnos pasan a formato de 60 minutos con desempate rápido para que ningún jugador se quede sin jugar.",
+    "parryn.rule3": "3. Aviso oportuno por WhatsApp: Parryn puede redactar el comunicado con 2 horas de anticipación para evitar traslados innecesarios.",
+    fairPlay: "Fair Play Deportivo",
+    pendingConfirmation: "Pendiente de validación rival",
+    confirmed: "Resultado Oficial Confirmado",
+    approveResult: "Aprobar resultado del rival",
+    adminApprove: "Aprobar como Administrador",
+    proposeScore: "Marcador propuesto por",
+    finalizeEncuentro: "Finalizar Encuentro",
+    generatePayments: "Generar Cobros del Encuentro",
+    whatsappShare: "Compartir por WhatsApp",
+    copySuccess: "¡Copiado al portapapeles!",
+    courtSide: "Posición en pista",
+    dominantHand: "Mano hábil",
+    drive: "Drive (Derecha)",
+    reves: "Revés (Izquierda)",
+    bothSides: "Ambos lados",
+    rightHanded: "Diestro",
+    leftHanded: "Zurdo",
+    waitingRival: "Esperando aprobación de tus rivales",
+    disputeScore: "Disputar / Corregir",
+
+    // Auth & Login
+    "auth.login": "Entrar",
+    "auth.selectTestAccount": "Selecciona cuenta de prueba:",
+    "auth.superAdmin": "Super Administrador",
+    "auth.clubAdmin": "Colaborador / Admin Club",
+    "auth.player": "Jugador",
+    "auth.guestNotice": "O navega libremente en Modo Invitado.",
+    "auth.role": "Rol",
+    "auth.superAdminPanel": "Panel Super Admin",
+    "auth.linkPlayer": "Vincular con ficha de jugador",
+    "auth.myProfile": "Mi perfil de jugador",
+    "auth.switchAccount": "Cambiar a otra cuenta de prueba:",
+    "auth.switchToSuperAdmin": "Cambiar a Super Administrador",
+    "auth.switchToClubAdmin": "Cambiar a Colaborador / Admin Club",
+    "auth.switchToPlayer": "Cambiar a Jugador",
+    "auth.logout": "Cerrar sesión (Modo Invitado)",
+    "auth.enterClub": "Entrar al club",
+    "auth.enterRegister": "Entrar / Registrarme",
+    "auth.connecting": "Conectando...",
+
+    // Cobros additions
+    "cobros.collected": "Recaudado",
+    "cobros.totalCharges": "Total Cobros",
+    "cobros.recordsInSystem": "Registros en el sistema",
+    "cobros.clubPlayers": "Disponibles en el club",
+    "cobros.confirmedPayments": "Pagos confirmados",
+    "cobros.playersWithBalance": "{count} jugadores con saldo",
+    "cobros.filterAll": "Todos ({count})",
+    "cobros.filterPending": "Pendientes ({count})",
+    "cobros.filterPaid": "Pagados ({count})",
+    "cobros.searchPlaceholder": "Buscar por jugador, concepto o ítem...",
+    "cobros.loadingPayments": "Cargando cobros del club...",
+    "cobros.noPaymentsFound": "No se encontraron cobros registrados",
+    "cobros.noPaymentsStaff": "Utiliza la Calculadora de Torneo o el botón de Nuevo Cobro para registrar pagos pendientes.",
+    "cobros.noPaymentsPlayer": "No tienes cobros pendientes en este momento.",
+    "cobros.thPlayer": "Jugador",
+    "cobros.thConcept": "¿Qué se está cobrando? (Detalle Ítems)",
+    "cobros.thReceipt": "Comprobante (Clip)",
+    "cobros.thAmount": "Monto",
+    "cobros.thStatus": "Estado",
+    "cobros.thActions": "Acciones",
+    "cobros.courtFee": "Cobro de cancha / cuota",
+    "cobros.viewReceipt": "Ver comprobante adjunto",
+    "cobros.removeReceipt": "Quitar comprobante",
+    "cobros.attachReceiptAction": "Adjuntar comprobante de transferencia",
+    "cobros.byConfirm": "por {name}",
+    "cobros.notifyAdminWA": "Notificar y confirmar pago al Administrador por WhatsApp para su revisión",
+    "cobros.remindPlayerWA": "Enviar recordatorio y detalle de cobro al jugador por WhatsApp",
+    "cobros.markAsPaid": "Marcar como pagado",
+    "cobros.deleteRecord": "Eliminar registro",
+    "cobros.deleteConfirm": "¿Seguro que deseas eliminar este registro de cobro?",
+    "cobros.removeReceiptConfirm": "¿Deseas quitar este comprobante adjunto?",
+    "cobros.newIndividualTitle": "Registrar nuevo cobro individual",
+    "cobros.selectPlayerOption": "Selecciona un jugador...",
+    "cobros.conceptLabel": "¿Qué se está cobrando? (Concepto detallado) *",
+    "cobros.conceptPlaceholder": "ej. Arriendo Cancha 2, Cuota torneo, Consumo hidratación",
+    "cobros.amountLabel": "Monto ($) *",
+    "cobros.notesLabel": "Observaciones adicionales (opcional)",
+    "cobros.notesPlaceholder": "ej. Cancha reservada de 19:00 a 20:30",
+    "cobros.savePayment": "Guardar cobro",
+    "cobros.previewReceipt": "Vista Previa del Comprobante",
+    "cobros.openOriginalImage": "Abrir imagen original en pestaña nueva",
+    "cobros.fileUploadSpecs": "PNG, JPG, WEBP hasta 8MB",
+    "cobros.saveReceipt": "Guardar comprobante",
+    "cobros.saving": "Guardando...",
+    "cobros.generating": "Generando...",
+    "cobros.amountDisplay": "Monto: ${amount}",
+    "cobros.customConceptPlaceholder": "Concepto (ej. Cancha {index}, Pelotas, Bebidas...)",
+    "cobros.deleteCostTooltip": "Eliminar este gasto",
+    "cobros.adjustmentTooltip": "Descuento (ej: -1000) o Saldo adicional (ej: +1500)",
+    "cobros.splitSummary": "Resumen del reparto: {total} entre {count} jugadores",
   },
 
   en: {
-    // Navigation
+    // Nav & Layout
     dashboard: "Dashboard",
     ranking: "Ranking",
     pairs: "Pairs",
@@ -331,6 +370,7 @@ export const translations: Record<Language, Record<string, string>> = {
     players: "Players",
     encuentros: "Events",
     payments: "Payments",
+    parrynSecretary: "AI Secretary (Parryn)",
     adminPanel: "Admin Panel",
     adminTitle: "Admin Panel",
     clubsRegistered: "registered clubs",
@@ -347,148 +387,340 @@ export const translations: Record<Language, Record<string, string>> = {
     padel: "Padel",
     tenis: "Tennis",
     futbol: "Soccer",
-    search: "Search",
-    filter: "Filter",
-    all: "All",
-    loading: "Loading...",
-    save: "Save",
-    saving: "Saving...",
-    cancel: "Cancel",
-    delete: "Delete",
-    close: "Close",
-    back: "Back",
-    confirm: "Confirm",
-    actions: "Actions",
-    status: "Status",
-    date: "Date",
-    location: "Location",
-    details: "Details",
-    total: "Total",
-    share: "Share",
-    copied: "Copied",
+
+    // Common
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
+    "common.delete": "Delete",
+    "common.edit": "Edit",
+    "common.create": "Create",
+    "common.back": "Back",
+    "common.search": "Search...",
+    "common.filter": "Filter",
+    "common.all": "All",
+    "common.actions": "Actions",
+    "common.loading": "Loading...",
+    "common.success": "Success",
+    "common.error": "Error",
+    "common.confirm": "Confirm",
+    "common.copy": "Copy",
+    "common.copied": "Copied!",
+    "common.yes": "Yes",
+    "common.no": "No",
+    "common.total": "Total",
+    "common.status": "Status",
+    "common.details": "Details",
+    "common.print": "Print",
+    "common.share": "Share",
+    "common.refresh": "Refresh",
+    "common.apply": "Apply",
+    "common.clear": "Clear",
+    "common.selectAll": "Select all",
+    "common.deselectAll": "Deselect all",
+    "common.backToHome": "Return to Home",
+    "common.viewAll": "View all",
 
     // Dashboard
-    welcome: "Welcome",
-    clubOverview: "Sports club overview and activity",
-    quickStats: "Quick Stats",
-    totalPlayers: "Total Players",
-    totalMatches: "Matches Played",
-    activeEvents: "Active Events",
-    recentMatches: "Recent Matches",
-    topPlayers: "Top Players",
-    viewAll: "View all",
-    noRecentMatches: "No matches recorded yet.",
-    noPlayersYet: "No players registered yet.",
-    newMatch: "New Match",
-    newEvent: "New Event",
-    newPlayer: "New Player",
-    matchesThisMonth: "Matches this month",
-    winRate: "Win Rate",
-    eloLeaderboard: "ELO Leaderboard",
+    "dashboard.subtitle": "Club overview & key metrics",
+    "dashboard.leader": "Leader",
+    "dashboard.activeCount": "{count} active",
+    "dashboard.recentMatches": "Recent Matches",
+    "dashboard.topRanking": "Top Ranking",
+    "dashboard.viewRanking": "View ranking",
+    "dashboard.noMatches": "No matches recorded yet",
+    "dashboard.noPlayers": "No players registered yet",
 
     // Ranking
-    playerRanking: "Player Rankings",
-    rankingSubtitle: "Official skill ratings and athletic performance",
-    rank: "Rank",
-    player: "Player",
-    elo: "ELO Rating",
-    matchesPlayed: "MP",
-    wins: "W",
-    losses: "L",
-    position: "Position",
-    category: "Category",
-    allSports: "All sports",
-    allCategories: "All categories",
-    noRankingsFound: "No ranked players found.",
+    "ranking.title": "Elo Ranking",
+    "ranking.subtitle": "Professional Elo system — score based on opponent strength",
+    "ranking.noData": "No ranking data yet",
+    "ranking.noDataDesc": "Record players and matches to start ranking",
+    "ranking.howEloWorks": "How Elo Works",
+    "ranking.eloBaseRule": "All players start with a baseline of 1000 points.",
+    "ranking.eloWinLossRule": "Beating higher-ranked opponents awards more points than lower-ranked rivals.",
+    "ranking.eloDrawRule": "Set and game differentials fine-tune the final score change.",
+    "ranking.pos": "#",
+    "ranking.player": "Player",
+    "ranking.points": "Elo Points",
+    "ranking.matches": "Matches",
+    "ranking.wins": "W",
+    "ranking.losses": "L",
+    "ranking.winRate": "%W",
+    "ranking.streak": "Streak",
 
-    // Matches
-    matchesTitle: "Matches",
-    matchesSubtitle: "Community match scores and historical results",
-    filterAll: "All",
-    filterConfirmed: "Confirmed",
-    filterPending: "Pending",
-    noMatchesFound: "No matches found matching filter.",
-    newMatchButton: "Record Match",
-    matchDetails: "Match Details",
-    sets: "Sets",
-    score: "Score",
-    pendingApproval: "Pending opponent approval",
-    confirmedStatus: "Confirmed",
-    approveResult: "Approve result",
-    proposedBy: "Proposed by",
-    vs: "vs",
-    completed: "Completed",
-    inProgress: "In progress",
-    editScore: "Edit score",
-    enterScore: "Enter score",
+    // Parejas
+    "parejas.title": "Pairs",
+    "parejas.subtitle": "Stats for all player combinations & partnerships",
+    "parejas.activeCount": "{count} active pairs",
+    "parejas.searchPlaceholder": "Search by player name...",
+    "parejas.noData": "No pairs found",
+    "parejas.viewHistory": "View full match history →",
+    "parejas.matches": "Matches",
+    "parejas.setsRatio": "Sets W/L",
+    "parejas.gamesWon": "Games W",
+    "parejas.gamesLost": "Games L",
+    "parejas.gameDiff": "Game Diff",
+    "parejas.avgElo": "Avg Elo",
+    "parejas.topRanking": "Ranking — Top {count} pairs",
+    "parejas.clearSearch": "Clear search",
+    "parejas.insufficientMatches": "Not enough matches",
+    "parejas.winsShort": "W",
+    "parejas.lossesShort": "L",
+    "parejas.matchesShort": "M",
 
-    // Players
-    playersTitle: "Club Players",
-    playersSubtitle: "Athlete profiles, individual stats and contact info",
-    searchPlaceholder: "Search by name or nickname...",
-    dominantHand: "Dominant hand",
-    courtPosition: "Court side",
-    rightSide: "Forehand (Right side)",
-    leftSide: "Backhand (Left side)",
+    // Partidos & Fair Play
+    "partidos.title": "Matches",
+    "partidos.count": "{count} match(es) recorded",
+    "partidos.new": "Record match",
+    "partidos.noMatches": "No matches yet",
+    "partidos.noMatchesDesc": "Record the first match to get started",
+    "partidos.deleteConfirm": "Delete this match? This action cannot be undone.",
+    "partidos.confirmFairPlay": "Approve score",
+    "partidos.waitingRival": "Waiting for opponent approval",
+    "partidos.officialConfirmed": "Official Confirmed",
+    "partidos.score": "Score",
+    "partidos.winner": "Winner",
+    "partidos.winnerBadge": "WINNER",
+    "partidos.loserBadge": "LOSER",
+    "partidos.drawBadge": "DRAW",
+    "partidos.tiebreak": "Tie-break",
+
+    // Jugadores
+    "jugadores.title": "Players",
+    "jugadores.count": "{count} registered",
+    "jugadores.new": "New Player",
+    "jugadores.search": "Search by name or nickname...",
+    "jugadores.noPlayers": "No players found",
+    "jugadores.deleteConfirm": "Delete {name}? This action cannot be undone.",
+    "jugadores.chatWhatsApp": "Chat on WhatsApp",
+    "jugadores.profile": "Player Profile",
+    "jugadores.edit": "Edit",
+    "jugadores.memberSince": "Member since {date}",
+    "jugadores.winRate": "Win Rate",
+    "jugadores.points": "Points",
+    "jugadores.wins": "Wins",
+    "jugadores.losses": "Losses",
+    "jugadores.currentStreak": "Current Streak",
+    "jugadores.setStats": "Set Statistics",
+    "jugadores.setsWon": "Sets won",
+    "jugadores.setsLost": "Sets lost",
+    "jugadores.totalMatches": "Total matches",
+    "jugadores.eloHistory": "Elo History",
+    "jugadores.eloMatchesCount": "{count} matches",
+    "jugadores.recentMatches": "Recent Matches",
+    "jugadores.playerNotFound": "Player not found",
+    "jugadores.backToPlayers": "Back to players",
+    "jugadores.start": "Start",
+    "jugadores.now": "Now",
+    "jugadores.baseElo": "— 1500 base —",
+
+    // Cobros
+    "cobros.title": "Payment Sheet",
+    "cobros.subtitleStaff": "Track payments, item breakdowns, court rentals, and shared tournament costs",
+    "cobros.subtitlePlayer": "Check your exact charges breakdown and attach your payment receipt",
+    "cobros.tournamentCalc": "Tournament Calculator",
+    "cobros.newPayment": "New Charge",
+    "cobros.remindParryn": "🤖 Parryn Reminder",
+    "cobros.calcTitle": "Tournament Calculator",
+    "cobros.calcDesc": "Enter shared costs and choose which players split each cost evenly. Adjust discounts or balances individually.",
+    "cobros.eventName": "Event Name (e.g. 3rd Tournament)",
+    "cobros.eventNamePlaceholder": "3rd Tournament, Friday Americano, etc.",
+    "cobros.sharedCosts": "Event & Tournament Costs",
+    "cobros.sharedCostsDesc": "Enter courts, balls, drinks, post-match social, or other shared expenses.",
+    "cobros.quickAdd": "Quick Add:",
+    "cobros.addCourt": "🏟️ + Court",
+    "cobros.addBalls": "🎾 + Balls",
+    "cobros.addDrinks": "🥤 + Drinks",
+    "cobros.addTercerTiempo": "🍻 + Post-Match",
+    "cobros.addPrizes": "🏆 + Prizes",
+    "cobros.addCustomConcept": "+ Add custom expense item",
+    "cobros.splitAmong": "Split among:",
+    "cobros.ofPlayers": "of {total} players",
+    "cobros.perPerson": "{amount} each",
+    "cobros.selectWhoPays": "⚙️ Select who pays for this item",
+    "cobros.closeParticipants": "Close participants",
+    "cobros.playersPayingItem": "Players paying for \"{item}\":",
+    "cobros.convocados": "Invited Players ({count})",
+    "cobros.convocadosDesc": "Check or uncheck players who attended the event.",
+    "cobros.searchPlayerPlaceholder": "Search player in list...",
+    "cobros.baseShare": "Base share: {amount} each",
+    "cobros.adjustment": "Adjustment (+/-)",
+    "cobros.summary": "Breakdown summary:",
+    "cobros.betweenPlayers": "among {count} players",
+    "cobros.applyAndGenerate": "Apply and Generate Charges",
+    "cobros.notifyAdmin": "Notify Admin of Payment",
+    "cobros.remindPlayer": "Send Reminder to Player",
+    "cobros.paid": "Paid",
+    "cobros.pending": "Pending",
+    "cobros.underReview": "Under Review",
+    "cobros.receipt": "Receipt",
+    "cobros.attachReceipt": "Attach receipt",
+    "cobros.noReceipt": "No receipt",
+    "cobros.totalCollected": "Total Collected",
+    "cobros.totalPending": "Pending Amount",
+    "cobros.debtors": "Players with balance",
+    "cobros.validateAndMarkPaid": "Validate and Mark as Paid",
+    "cobros.revertToPending": "Revert to pending",
+    "cobros.receiptModalTitle": "Payment Receipt — {name}",
+    "cobros.uploadPhoto": "Upload transfer screenshot (Photo / File)",
+    "cobros.clickToUpload": "Click to select or take a photo",
+    "cobros.pasteUrl": "Or paste receipt web link",
+
+    // Encuentros & Fixture
+    "encuentros.title": "Events & Matchdays",
+    "encuentros.new": "New Event",
+    "encuentros.detail": "Event Details",
+    "encuentros.printFixture": "🖨️ Print Fixture",
+    "encuentros.regenerateFixture": "Regenerate Fixture",
+    "encuentros.cleanFixture": "Clear",
+    "encuentros.round": "Round {number}",
+    "encuentros.restNotice": "⏳ 2-minute break: {start} to {end} (Court rotation and short warm-up)",
+    "encuentros.restingPlayers": "☕ Resting in this round: {names}",
+    "encuentros.court": "Court {number}",
+    "encuentros.goldPoint": "Golden Point at 40-40",
+    "encuentros.timeFinish": "Timed finish on bell sound",
+    "encuentros.printModalTitle": "Official Printable Fixture Sheet",
+    "encuentros.durationPerMatch": "Match duration:",
+    "encuentros.restBetweenRounds": "Break between rounds:",
+    "encuentros.twoMinRest": "2 minutes (Rotation and warm-up)",
+    "encuentros.printAction": "🖨️ Print / Save as PDF",
+    "encuentros.confirmedAttendance": "Confirmed Attendance & Payments",
+    "encuentros.present": "Present",
+    "encuentros.feePaid": "Fee Paid",
+    "encuentros.winnerP1": "[  ] Pair 1 Wins",
+    "encuentros.winnerP2": "[  ] Pair 2 Wins",
+    "encuentros.captainSignature": "Captain's Signature / Validation: _____________________",
+
+    // Parryn
+    "parryn.role": "Official Sports Secretary",
+    "parryn.motto": "\"Doesn't play better. Doesn't win matches. Makes sure everyone gets to play.\"",
+    "parryn.badgeAlwaysAvailable": "Always available",
+    "parryn.badgeRemembersAll": "Remembers everything",
+    "parryn.badgeOrganizesAll": "Organizes everything",
+    "parryn.badgeFairPlay": "Respects Fair Play",
+    "parryn.conversationalAssistant": "Conversational Assistant",
+    "parryn.courtScheduling": "Courts & Slots",
+    "parryn.weatherAlerts": "Weather Alerts (Indoor vs Outdoor)",
+    "parryn.directChat": "Direct Chat with Parryn",
+    "parryn.chatDesc": "Ask Parryn anything about organizing your club: invites, tiebreaks, payments, or court slots.",
+    "parryn.chatPlaceholder": "Ask Parryn anything (e.g. 'How to run an 8-player Americano tournament?')",
+    "parryn.send": "Send",
+    "parryn.copyText": "Copy text",
+    "parryn.copied": "Copied!",
+    "parryn.analyzing": "Parryn is analyzing your request...",
+    "parryn.initialGreeting": "Hello! I'm Parryn, your Official Sports Secretary. How can I assist you today? I can help with court scheduling, urgent WhatsApp invites, indoor contingency plans, or balanced pairings.",
+    "parryn.courtTitle": "Smart Court Scheduling",
+    "parryn.courtDesc": "Configure your club infrastructure so Parryn schedules match slots without clashes.",
+    "parryn.coveredCourts": "Indoor / Covered Courts",
+    "parryn.openCourts": "Outdoor / Open Courts",
+    "parryn.currentWeather": "Weather Forecast",
+    "parryn.weatherGood": "☀️ Clear / Optimal",
+    "parryn.weatherRain": "🌧️ Rain / Wind Risk",
+    "parryn.generatePlan": "Generate Plan with Parryn",
+    "parryn.calculatingPlan": "Calculating optimal plan...",
+    "parryn.strategySuggested": "Strategy Suggested by Parryn:",
+    "parryn.weatherTitle": "Matchday Protection (Indoor vs Outdoor)",
+    "parryn.weatherDesc": "Automatic contingency protocols so rain never stops the games.",
+    "parryn.goldenRuleTitle": "🛡️ Parryn's Golden Rule for Uncertain Weather",
+    "parryn.rule1": "1. Court Prioritization: Official matches with Elo ranking points are prioritized on covered courts.",
+    "parryn.rule2": "2. Staggered slots: If rain disables outdoor courts, match slots shift to 60-minute blocks with sudden-death tiebreak so everyone gets to play.",
+    "parryn.rule3": "3. Timely WhatsApp Notice: Parryn can draft the announcement 2 hours in advance to save players unnecessary travel.",
+    fairPlay: "Sports Fair Play",
+    pendingConfirmation: "Pending opponent confirmation",
+    confirmed: "Official Result Confirmed",
+    approveResult: "Approve opponent's score",
+    adminApprove: "Approve as Administrator",
+    proposeScore: "Score proposed by",
+    finalizeEncuentro: "Finish Event",
+    generatePayments: "Generate Event Fees",
+    whatsappShare: "Share via WhatsApp",
+    copySuccess: "Copied to clipboard!",
+    courtSide: "Court Side",
+    dominantHand: "Dominant Hand",
+    drive: "Drive (Right)",
+    reves: "Backhand (Left)",
     bothSides: "Both sides",
-    goalkeeper: "Goalkeeper",
-    defender: "Defender",
-    midfielder: "Midfielder",
-    forward: "Forward",
-    viewProfile: "View Profile",
-    unlinked: "Unlinked",
-    linked: "Linked",
-    noPlayersFound: "No players found.",
+    rightHanded: "Right-handed",
+    leftHanded: "Left-handed",
+    waitingRival: "Waiting for opponents' approval",
+    disputeScore: "Dispute / Correct",
 
-    // Payments
-    paymentsTitle: "Payments & Cost Splitting",
-    paymentsSubtitle: "Court booking calculator, split costs and WhatsApp payment links",
-    courtRental: "Court Rental Fee",
-    costPerPlayer: "Cost per Player",
-    totalAmount: "Total Amount",
-    courtCount: "Number of Courts",
-    shareWhatsappReport: "Send WhatsApp Payment Request",
-    splitCalculator: "Cost Split Calculator",
-    unpaid: "Pending",
-    paid: "Paid",
-    markAsPaid: "Mark as paid",
-    markAsUnpaid: "Mark as unpaid",
-    paymentSummary: "Payment Summary",
-    playersToCharge: "Players to Charge",
+    // Auth & Login
+    "auth.login": "Sign In",
+    "auth.selectTestAccount": "Select demo account:",
+    "auth.superAdmin": "Super Administrator",
+    "auth.clubAdmin": "Club Staff / Admin",
+    "auth.player": "Player",
+    "auth.guestNotice": "Or browse freely in Guest Mode.",
+    "auth.role": "Role",
+    "auth.superAdminPanel": "Super Admin Panel",
+    "auth.linkPlayer": "Link to player profile",
+    "auth.myProfile": "My player profile",
+    "auth.switchAccount": "Switch to another test account:",
+    "auth.switchToSuperAdmin": "Switch to Super Administrator",
+    "auth.switchToClubAdmin": "Switch to Club Staff / Admin",
+    "auth.switchToPlayer": "Switch to Player",
+    "auth.logout": "Log out (Guest Mode)",
+    "auth.enterClub": "Enter club",
+    "auth.enterRegister": "Sign In / Register",
+    "auth.connecting": "Connecting...",
 
-    // Pairs
-    pairsTitle: "Club Pairs",
-    pairsSubtitle: "Doubles performance and partnership chemistry",
-    topPairs: "Top Pairs",
-    matchesTogether: "Matches together",
-    chemistry: "Win rate",
-
-    // Encuentros
-    encuentrosTitle: "Sports Events",
-    encuentrosSubtitle: "Invitations, RSVP rosters and smart match rotations",
-    spotsAvailable: "Spots available",
-    waitlist: "Waitlist",
-    confirmedAttendance: "Confirmed Attendance",
-    shareInvitation: "Share Invitation",
-    generateMatches: "Generate Matches",
-    endEvent: "End Event",
-    spotsFull: "Spots full",
-
-    // Parryn IA
-    parryn: "Parryn",
-    parrynSecretary: "AI Secretary",
-    parrynHeroTitle: "Club Secretary with Parryn AI",
-    parrynHeroSubtitle: "Your sports club secretary: remembers everything, organizes invitations, and keeps the club running smoothly.",
-    parrynAskWhoMissing: "Who is missing to confirm?",
-    parrynDraftWhatsapp: "Draft WhatsApp Invitation",
-    parrynPaymentReminder: "Payment Reminder",
-    parrynMatchSummary: "Matchday Summary",
-    parrynOpenChat: "Chat with Parryn",
-    parrynStatusOnline: "Secretary Online",
+    // Cobros additions
+    "cobros.collected": "Collected",
+    "cobros.totalCharges": "Total Charges",
+    "cobros.recordsInSystem": "Records in system",
+    "cobros.clubPlayers": "Available in club",
+    "cobros.confirmedPayments": "Confirmed payments",
+    "cobros.playersWithBalance": "{count} players with balance",
+    "cobros.filterAll": "All ({count})",
+    "cobros.filterPending": "Pending ({count})",
+    "cobros.filterPaid": "Paid ({count})",
+    "cobros.searchPlaceholder": "Search by player, concept or item...",
+    "cobros.loadingPayments": "Loading club payments...",
+    "cobros.noPaymentsFound": "No payment records found",
+    "cobros.noPaymentsStaff": "Use the Tournament Calculator or New Payment button to record pending fees.",
+    "cobros.noPaymentsPlayer": "You have no pending payments at this time.",
+    "cobros.thPlayer": "Player",
+    "cobros.thConcept": "What is being charged? (Items Detail)",
+    "cobros.thReceipt": "Receipt (Clip)",
+    "cobros.thAmount": "Amount",
+    "cobros.thStatus": "Status",
+    "cobros.thActions": "Actions",
+    "cobros.courtFee": "Court fee / charge",
+    "cobros.viewReceipt": "View attached receipt",
+    "cobros.removeReceipt": "Remove receipt",
+    "cobros.attachReceiptAction": "Attach bank transfer receipt",
+    "cobros.byConfirm": "by {name}",
+    "cobros.notifyAdminWA": "Notify and confirm payment to Admin via WhatsApp for verification",
+    "cobros.remindPlayerWA": "Send payment reminder and breakdown to player via WhatsApp",
+    "cobros.markAsPaid": "Mark as paid",
+    "cobros.deleteRecord": "Delete record",
+    "cobros.deleteConfirm": "Are you sure you want to delete this payment record?",
+    "cobros.removeReceiptConfirm": "Do you want to remove this attached receipt?",
+    "cobros.newIndividualTitle": "Record new individual payment",
+    "cobros.selectPlayerOption": "Select a player...",
+    "cobros.conceptLabel": "What is being charged? (Detailed concept) *",
+    "cobros.conceptPlaceholder": "e.g. Court 2 rental, Tournament fee, Hydration drinks",
+    "cobros.amountLabel": "Amount ($) *",
+    "cobros.notesLabel": "Additional observations (optional)",
+    "cobros.notesPlaceholder": "e.g. Court reserved 19:00 to 20:30",
+    "cobros.savePayment": "Save payment",
+    "cobros.previewReceipt": "Receipt Preview",
+    "cobros.openOriginalImage": "Open original image in new tab",
+    "cobros.fileUploadSpecs": "PNG, JPG, WEBP up to 8MB",
+    "cobros.saveReceipt": "Save receipt",
+    "cobros.saving": "Saving...",
+    "cobros.generating": "Generating...",
+    "cobros.amountDisplay": "Amount: ${amount}",
+    "cobros.customConceptPlaceholder": "Concept (e.g. Court {index}, Balls, Drinks...)",
+    "cobros.deleteCostTooltip": "Delete this expense",
+    "cobros.adjustmentTooltip": "Discount (e.g. -1000) or Extra charge (e.g. +1500)",
+    "cobros.splitSummary": "Split summary: {total} among {count} players",
   },
 
   pt: {
-    // Navegação
+    // Nav & Layout
     dashboard: "Painel",
     ranking: "Classificação",
     pairs: "Duplas",
@@ -496,6 +728,7 @@ export const translations: Record<Language, Record<string, string>> = {
     players: "Jogadores",
     encuentros: "Encontros",
     payments: "Cobranças",
+    parrynSecretary: "Secretário IA (Parryn)",
     adminPanel: "Painel Admin",
     adminTitle: "Painel de Admin",
     clubsRegistered: "clubes registrados",
@@ -512,143 +745,409 @@ export const translations: Record<Language, Record<string, string>> = {
     padel: "Padel",
     tenis: "Tênis",
     futbol: "Futebol",
-    search: "Buscar",
-    filter: "Filtrar",
-    all: "Todos",
-    loading: "Carregando...",
-    save: "Salvar",
-    saving: "Salvando...",
-    cancel: "Cancelar",
-    delete: "Excluir",
-    close: "Fechar",
-    back: "Voltar",
-    confirm: "Confirmar",
-    actions: "Ações",
-    status: "Status",
-    date: "Data",
-    location: "Local",
-    details: "Detalhes",
-    total: "Total",
-    share: "Compartilhar",
-    copied: "Copiado",
+
+    // Common
+    "common.save": "Salvar",
+    "common.cancel": "Cancelar",
+    "common.close": "Fechar",
+    "common.delete": "Excluir",
+    "common.edit": "Editar",
+    "common.create": "Criar",
+    "common.back": "Voltar",
+    "common.search": "Buscar...",
+    "common.filter": "Filtrar",
+    "common.all": "Todos",
+    "common.actions": "Ações",
+    "common.loading": "Carregando...",
+    "common.success": "Sucesso",
+    "common.error": "Erro",
+    "common.confirm": "Confirmar",
+    "common.copy": "Copiar",
+    "common.copied": "Copiado!",
+    "common.yes": "Sim",
+    "common.no": "Não",
+    "common.total": "Total",
+    "common.status": "Status",
+    "common.details": "Detalhes",
+    "common.print": "Imprimir",
+    "common.share": "Compartilhar",
+    "common.refresh": "Atualizar",
+    "common.apply": "Aplicar",
+    "common.clear": "Limpar",
+    "common.selectAll": "Selecionar todos",
+    "common.deselectAll": "Desmarcar todos",
+    "common.backToHome": "Voltar ao Início",
+    "common.viewAll": "Ver todos",
 
     // Dashboard
-    welcome: "Bem-vindo",
-    clubOverview: "Visão geral do seu clube esportivo",
-    quickStats: "Estatísticas Rápidas",
-    totalPlayers: "Total de Jogadores",
-    totalMatches: "Partidas Jogadas",
-    activeEvents: "Encontros Ativos",
-    recentMatches: "Partidas Recentes",
-    topPlayers: "Melhores Jogadores",
-    viewAll: "Ver todos",
-    noRecentMatches: "Nenhuma partida registrada ainda.",
-    noPlayersYet: "Nenhum jogador registrado ainda.",
-    newMatch: "Nova Partida",
-    newEvent: "Novo Encontro",
-    newPlayer: "Novo Jogador",
-    matchesThisMonth: "Partidas neste mês",
-    winRate: "% Vitórias",
-    eloLeaderboard: "Líderes do Ranking",
+    "dashboard.subtitle": "Visão geral do clube",
+    "dashboard.leader": "Líder",
+    "dashboard.activeCount": "{count} ativos",
+    "dashboard.recentMatches": "Últimas Partidas",
+    "dashboard.topRanking": "Melhores no Ranking",
+    "dashboard.viewRanking": "Ver ranking",
+    "dashboard.noMatches": "Nenhuma partida registrada",
+    "dashboard.noPlayers": "Nenhum jogador registrado",
 
     // Ranking
-    playerRanking: "Classificação de Jogadores",
-    rankingSubtitle: "Pontuação oficial por nível esportivo e desempenho",
-    rank: "Posição",
-    player: "Jogador",
-    elo: "Pontuação ELO",
-    matchesPlayed: "PJ",
-    wins: "V",
-    losses: "D",
-    position: "Posição",
-    category: "Categoria",
-    allSports: "Todos os esportes",
-    allCategories: "Todas as categorias",
-    noRankingsFound: "Nenhum jogador encontrado no ranking.",
+    "ranking.title": "Classificação Elo",
+    "ranking.subtitle": "Sistema Elo profissional — pontuação baseada na força dos rivais",
+    "ranking.noData": "Sem dados de classificação",
+    "ranking.noDataDesc": "Registre jogadores e partidas para ver a classificação",
+    "ranking.howEloWorks": "Como funciona o Elo",
+    "ranking.eloBaseRule": "Todos os jogadores começam com 1000 pontos base.",
+    "ranking.eloWinLossRule": "Vencer rivais de nível mais alto dá mais pontos do que rivais de nível inferior.",
+    "ranking.eloDrawRule": "A diferença de sets e games influencia na pontuação final.",
+    "ranking.pos": "#",
+    "ranking.player": "Jogador",
+    "ranking.points": "Pontos Elo",
+    "ranking.matches": "Partidas",
+    "ranking.wins": "V",
+    "ranking.losses": "D",
+    "ranking.winRate": "%V",
+    "ranking.streak": "Sequência",
 
-    // Partidas
-    matchesTitle: "Partidas",
-    matchesSubtitle: "Histórico e placares das partidas da comunidade",
-    filterAll: "Todas",
-    filterConfirmed: "Confirmadas",
-    filterPending: "Pendentes",
-    noMatchesFound: "Nenhuma partida encontrada com o filtro.",
-    newMatchButton: "Registrar Partida",
-    matchDetails: "Detalhes da Partida",
-    sets: "Sets",
-    score: "Placar",
-    pendingApproval: "Aguardando confirmação do adversário",
-    confirmedStatus: "Confirmado",
-    approveResult: "Aprovar resultado",
-    proposedBy: "Proposto por",
-    vs: "vs",
-    completed: "Concluído",
-    inProgress: "Em andamento",
-    editScore: "Editar placar",
-    enterScore: "Inserir placar",
+    // Parejas
+    "parejas.title": "Duplas",
+    "parejas.subtitle": "Estatísticas de todas as combinações de jogadores",
+    "parejas.activeCount": "{count} duplas ativas",
+    "parejas.searchPlaceholder": "Buscar por nome do jogador...",
+    "parejas.noData": "Nenhuma dupla encontrada",
+    "parejas.viewHistory": "Ver histórico completo →",
+    "parejas.matches": "Partidas",
+    "parejas.setsRatio": "Sets V/D",
+    "parejas.gamesWon": "Games V",
+    "parejas.gamesLost": "Games D",
+    "parejas.gameDiff": "Dif G",
+    "parejas.avgElo": "Elo médio",
+    "parejas.topRanking": "Ranking — Top {count} duplas",
+    "parejas.clearSearch": "Limpar busca",
+    "parejas.insufficientMatches": "Sem partidas suficientes",
+    "parejas.winsShort": "V",
+    "parejas.lossesShort": "D",
+    "parejas.matchesShort": "P",
 
-    // Jogadores
-    playersTitle: "Jogadores do Clube",
-    playersSubtitle: "Perfis esportivos, estatísticas e contatos",
-    searchPlaceholder: "Buscar por nome ou apelido...",
+    // Partidos & Fair Play
+    "partidos.title": "Partidas",
+    "partidos.count": "{count} partida(s) registrada(s)",
+    "partidos.new": "Registrar partida",
+    "partidos.noMatches": "Nenhuma partida ainda",
+    "partidos.noMatchesDesc": "Registre a primeira partida para começar",
+    "partidos.deleteConfirm": "Excluir esta partida? Esta ação não pode ser desfeita.",
+    "partidos.confirmFairPlay": "Aprovar placar",
+    "partidos.waitingRival": "Aguardando aprovação do adversário",
+    "partidos.officialConfirmed": "Oficial Confirmado",
+    "partidos.score": "Placar",
+    "partidos.winner": "Vencedor",
+    "partidos.winnerBadge": "VENCEDOR",
+    "partidos.loserBadge": "PERDEDOR",
+    "partidos.drawBadge": "EMPATE",
+    "partidos.tiebreak": "Tie-break",
+
+    // Jugadores
+    "jugadores.title": "Jogadores",
+    "jugadores.count": "{count} registrados",
+    "jugadores.new": "Novo Jogador",
+    "jugadores.search": "Buscar por nome ou apelido...",
+    "jugadores.noPlayers": "Nenhum jogador encontrado",
+    "jugadores.deleteConfirm": "Excluir {name}? Esta ação não pode ser desfeita.",
+    "jugadores.chatWhatsApp": "Conversar no WhatsApp",
+    "jugadores.profile": "Perfil do Jogador",
+    "jugadores.edit": "Editar",
+    "jugadores.memberSince": "Membro desde {date}",
+    "jugadores.winRate": "Taxa de vitórias",
+    "jugadores.points": "Pontos",
+    "jugadores.wins": "Vitórias",
+    "jugadores.losses": "Derrotas",
+    "jugadores.currentStreak": "Sequência atual",
+    "jugadores.setStats": "Estatísticas de sets",
+    "jugadores.setsWon": "Sets vencidos",
+    "jugadores.setsLost": "Sets perdidos",
+    "jugadores.totalMatches": "Total de partidas",
+    "jugadores.eloHistory": "Histórico Elo",
+    "jugadores.eloMatchesCount": "{count} partidas",
+    "jugadores.recentMatches": "Últimas partidas",
+    "jugadores.playerNotFound": "Jogador não encontrado",
+    "jugadores.backToPlayers": "Voltar para jogadores",
+    "jugadores.start": "Início",
+    "jugadores.now": "Agora",
+    "jugadores.baseElo": "— 1500 base —",
+
+    // Cobros
+    "cobros.title": "Planilha de Cobranças",
+    "cobros.subtitleStaff": "Controle de pagamentos, divisão de itens, aluguel de quadras e despesas de torneios",
+    "cobros.subtitlePlayer": "Consulte o detalhe exato das suas cobranças e anexe o comprovante de pagamento",
+    "cobros.tournamentCalc": "Calculadora de Torneio",
+    "cobros.newPayment": "Nova Cobrança",
+    "cobros.remindParryn": "🤖 Lembrete Parryn",
+    "cobros.calcTitle": "Calculadora de Torneio",
+    "cobros.calcDesc": "Insira os custos compartilhados e selecione os jogadores para dividir em partes iguais. Ajuste descontos ou saldos individualmente.",
+    "cobros.eventName": "Nome (ex. 3º Torneio)",
+    "cobros.eventNamePlaceholder": "3º Torneio, Americana de Sexta, etc.",
+    "cobros.sharedCosts": "Custos do Evento ou Torneio",
+    "cobros.sharedCostsDesc": "Insira quadras, bolinhas, bebidas, confraternização ou outros gastos compartilhados.",
+    "cobros.quickAdd": "Adicionar rápido:",
+    "cobros.addCourt": "🏟️ + Quadra",
+    "cobros.addBalls": "🎾 + Bolinhas",
+    "cobros.addDrinks": "🥤 + Bebidas",
+    "cobros.addTercerTiempo": "🍻 + Resenha / Churrasco",
+    "cobros.addPrizes": "🏆 + Prêmios",
+    "cobros.addCustomConcept": "+ Adicionar outro item personalizado",
+    "cobros.splitAmong": "Divide-se entre:",
+    "cobros.ofPlayers": "de {total} jogadores",
+    "cobros.perPerson": "{amount} cada",
+    "cobros.selectWhoPays": "⚙️ Selecionar quem paga este item",
+    "cobros.closeParticipants": "Fechar participantes",
+    "cobros.playersPayingItem": "Jogadores que pagam \"{item}\":",
+    "cobros.convocados": "Jogadores convocados para o evento ({count})",
+    "cobros.convocadosDesc": "Marque ou desmarque quem compareceu ao evento.",
+    "cobros.searchPlayerPlaceholder": "Buscar jogador na lista...",
+    "cobros.baseShare": "Cota base: {amount} cada",
+    "cobros.adjustment": "Ajuste (+/-)",
+    "cobros.summary": "Resumo da divisão:",
+    "cobros.betweenPlayers": "entre {count} jogadores",
+    "cobros.applyAndGenerate": "Aplicar e Gerar Cobranças",
+    "cobros.notifyAdmin": "Notificar Pagamento ao Admin",
+    "cobros.remindPlayer": "Enviar Lembrete ao Jogador",
+    "cobros.paid": "Pago",
+    "cobros.pending": "Pendente",
+    "cobros.underReview": "Em Análise",
+    "cobros.receipt": "Comprovante",
+    "cobros.attachReceipt": "Anexar comprovante",
+    "cobros.noReceipt": "Sem comprovante",
+    "cobros.totalCollected": "Total Arrecadado",
+    "cobros.totalPending": "Pendente de Cobrança",
+    "cobros.debtors": "Jogadores com saldo",
+    "cobros.validateAndMarkPaid": "Validar e Marcar como Pago",
+    "cobros.revertToPending": "Reverter para pendente",
+    "cobros.receiptModalTitle": "Comprovante de Pagamento — {name}",
+    "cobros.uploadPhoto": "Enviar captura do PIX/Transferência (Foto / Arquivo)",
+    "cobros.clickToUpload": "Clique para selecionar ou tirar foto",
+    "cobros.pasteUrl": "Ou colar link web do comprovante",
+
+    // Encuentros & Fixture
+    "encuentros.title": "Encontros e Torneios",
+    "encuentros.new": "Novo Encontro",
+    "encuentros.detail": "Detalhes do Encontro",
+    "encuentros.printFixture": "🖨️ Imprimir Fixture",
+    "encuentros.regenerateFixture": "Regenerar Fixture",
+    "encuentros.cleanFixture": "Limpar",
+    "encuentros.round": "Rodada {number}",
+    "encuentros.restNotice": "⏳ Descanso de 2 minutos: {start} às {end} (Rotação de quadras e aquecimento rápido)",
+    "encuentros.restingPlayers": "☕ Descansam nesta rodada: {names}",
+    "encuentros.court": "Quadra {number}",
+    "encuentros.goldPoint": "Ponto de Ouro no 40-40",
+    "encuentros.timeFinish": "Término por tempo ao soar do sino",
+    "encuentros.printModalTitle": "Planilha Oficial de Fixture e Impressão",
+    "encuentros.durationPerMatch": "Duração de cada partida:",
+    "encuentros.restBetweenRounds": "Descanso entre rodadas:",
+    "encuentros.twoMinRest": "2 minutos (Rotação e aquecimento)",
+    "encuentros.printAction": "🖨️ Imprimir / Salvar em PDF",
+    "encuentros.confirmedAttendance": "Presença e Pagamentos Confirmados",
+    "encuentros.present": "Presente",
+    "encuentros.feePaid": "Taxa Paga",
+    "encuentros.winnerP1": "[  ] Vitória Dupla 1",
+    "encuentros.winnerP2": "[  ] Vitória Dupla 2",
+    "encuentros.captainSignature": "Assinatura do capitão / validação: _____________________",
+
+    // Parryn
+    "parryn.role": "Secretário Esportivo Oficial",
+    "parryn.motto": "\"Não joga melhor. Não ganha partidas. Faz com que todos possam jogar.\"",
+    "parryn.badgeAlwaysAvailable": "Sempre disponível",
+    "parryn.badgeRemembersAll": "Lembra de tudo",
+    "parryn.badgeOrganizesAll": "Organiza tudo",
+    "parryn.badgeFairPlay": "Respeita o Fair Play",
+    "parryn.conversationalAssistant": "Assistente Conversacional",
+    "parryn.courtScheduling": "Horários e Quadras",
+    "parryn.weatherAlerts": "Alertas Climáticos (Cobertas vs Abertas)",
+    "parryn.directChat": "Conversa Direta com o Parryn",
+    "parryn.chatDesc": "Pergunte sobre qualquer aspecto organizacional do seu clube: convocações, desempates, cobranças ou horários.",
+    "parryn.chatPlaceholder": "Faça sua pergunta ao Parryn (ex: 'Como organizar uma americana com 8 jogadores?')",
+    "parryn.send": "Enviar",
+    "parryn.copyText": "Copiar texto",
+    "parryn.copied": "Copiado!",
+    "parryn.analyzing": "Parryn está analisando sua consulta...",
+    "parryn.initialGreeting": "Olá! Sou o Parryn, seu Secretário Esportivo. Como posso te ajudar hoje? Posso te auxiliar na divisão de horários, convocações urgentes para WhatsApp, quadras cobertas em dias de chuva ou duplas equilibradas.",
+    "parryn.courtTitle": "Distribuição Inteligente de Quadras",
+    "parryn.courtDesc": "Configure a infraestrutura do seu clube para o Parryn organizar os horários sem conflitos.",
+    "parryn.coveredCourts": "Quadras Cobertas / Indoor",
+    "parryn.openCourts": "Quadras Abertas / Outdoor",
+    "parryn.currentWeather": "Previsão do Tempo",
+    "parryn.weatherGood": "☀️ Ensolarado / Ótimo",
+    "parryn.weatherRain": "🌧️ Risco de Chuva / Vento",
+    "parryn.generatePlan": "Gerar Plano com o Parryn",
+    "parryn.calculatingPlan": "Calculando plano ideal...",
+    "parryn.strategySuggested": "Estratégia Sugerida pelo Parryn:",
+    "parryn.weatherTitle": "Proteção de Rodada (Cobertas vs Abertas)",
+    "parryn.weatherDesc": "Protocolos automáticos de contingência para não cancelar jogos pela chuva.",
+    "parryn.goldenRuleTitle": "🛡️ Regra de Ouro do Parryn para Dias de Clima Incerto",
+    "parryn.rule1": "1. Priorização de Quadras: Partidas oficiais com pontos de ranking Elo são agendadas primeiro nas quadras cobertas.",
+    "parryn.rule2": "2. Horários reduzidos: Em caso de chuva nas quadras abertas, os horários passam para blocos de 60 minutos com tie-break rápido para ninguém ficar sem jogar.",
+    "parryn.rule3": "3. Aviso rápido no WhatsApp: O Parryn pode redigir o aviso com 2 horas de antecedência para evitar deslocamentos desnecessários.",
+    fairPlay: "Fair Play Esportivo",
+    pendingConfirmation: "Pendente de validação do adversário",
+    confirmed: "Resultado Oficial Confirmado",
+    approveResult: "Aprovar placar do adversário",
+    adminApprove: "Aprovar como Administrador",
+    proposeScore: "Placar proposto por",
+    finalizeEncuentro: "Finalizar Encontro",
+    generatePayments: "Gerar Cobranças do Encontro",
+    whatsappShare: "Compartilhar no WhatsApp",
+    copySuccess: "Copiado para a área de transferência!",
+    courtSide: "Posição na quadra",
     dominantHand: "Mão dominante",
-    courtPosition: "Lado de jogo",
-    rightSide: "Drive (Direita)",
-    leftSide: "Revés (Esquerda)",
+    drive: "Drive (Direita)",
+    reves: "Revés (Esquerda)",
     bothSides: "Ambos os lados",
-    goalkeeper: "Goleiro",
-    defender: "Defensor",
-    midfielder: "Meio-campista",
-    forward: "Atacante",
-    viewProfile: "Ver Perfil",
-    unlinked: "Sem vínculo",
-    linked: "Vinculado",
-    noPlayersFound: "Nenhum jogador encontrado.",
+    rightHanded: "Destro",
+    leftHanded: "Canhoto",
+    waitingRival: "Aguardando aprovação dos adversários",
+    disputeScore: "Disputar / Corregir",
 
-    // Cobranças
-    paymentsTitle: "Controle de Cobranças & Finanças",
-    paymentsSubtitle: "Calculadora de quadra, divisão de custos e cobrança por WhatsApp",
-    courtRental: "Aluguel das Quadras",
-    costPerPlayer: "Custo por Jogador",
-    totalAmount: "Valor Total",
-    courtCount: "Número de Quadras",
-    shareWhatsappReport: "Enviar Cobrança por WhatsApp",
-    splitCalculator: "Calculadora de Divisão",
-    unpaid: "Pendente",
-    paid: "Pago",
-    markAsPaid: "Marcar como pago",
-    markAsUnpaid: "Marcar como pendente",
-    paymentSummary: "Resumo de Cobrança",
-    playersToCharge: "Jogadores a Cobrar",
+    // Auth & Login
+    "auth.login": "Entrar",
+    "auth.selectTestAccount": "Selecione uma conta de teste:",
+    "auth.superAdmin": "Super Administrador",
+    "auth.clubAdmin": "Colaborador / Admin do Clube",
+    "auth.player": "Jogador",
+    "auth.guestNotice": "Ou navegue livremente no Modo Convidado.",
+    "auth.role": "Função",
+    "auth.superAdminPanel": "Painel Super Admin",
+    "auth.linkPlayer": "Vincular à ficha de jogador",
+    "auth.myProfile": "Meu perfil de jogador",
+    "auth.switchAccount": "Alternar para outra conta de teste:",
+    "auth.switchToSuperAdmin": "Mudar para Super Administrador",
+    "auth.switchToClubAdmin": "Mudar para Colaborador / Admin do Clube",
+    "auth.switchToPlayer": "Mudar para Jogador",
+    "auth.logout": "Sair (Modo Convidado)",
+    "auth.enterClub": "Entrar no clube",
+    "auth.enterRegister": "Entrar / Cadastrar-se",
+    "auth.connecting": "Conectando...",
 
-    // Duplas
-    pairsTitle: "Duplas do Clube",
-    pairsSubtitle: "Desempenho e entrosamento das duplas em torneios",
-    topPairs: "Melhores Duplas",
-    matchesTogether: "Partidas juntos",
-    chemistry: "Aproveitamento",
-
-    // Encontros
-    encuentrosTitle: "Encontros Esportivos",
-    encuentrosSubtitle: "Convocações, confirmações de presença e rotação inteligente",
-    spotsAvailable: "Vagas disponíveis",
-    waitlist: "Lista de Espera",
-    confirmedAttendance: "Presença Confirmada",
-    shareInvitation: "Compartilhar Convocação",
-    generateMatches: "Gerar Partidas",
-    endEvent: "Finalizar Encontro",
-    spotsFull: "Vagas esgotadas",
-
-    // Parryn IA
-    parryn: "Parryn",
-    parrynSecretary: "Secretário IA",
-    parrynHeroTitle: "Secretaria do Clube com Parryn IA",
-    parrynHeroSubtitle: "Seu secretário esportivo: lembra de tudo, organiza convocações e mantém o clube em dia sem atritos.",
-    parrynAskWhoMissing: "Quem falta confirmar?",
-    parrynDraftWhatsapp: "Redigir Convocação WhatsApp",
-    parrynPaymentReminder: "Lembrete de Cobrança",
-    parrynMatchSummary: "Resumo da Rodada",
-    parrynOpenChat: "Falar com Parryn",
-    parrynStatusOnline: "Secretário Ativo",
+    // Cobros additions
+    "cobros.collected": "Arrecadado",
+    "cobros.totalCharges": "Total de Cobranças",
+    "cobros.recordsInSystem": "Registros no sistema",
+    "cobros.clubPlayers": "Disponíveis no clube",
+    "cobros.confirmedPayments": "Pagamentos confirmados",
+    "cobros.playersWithBalance": "{count} jogadores com saldo",
+    "cobros.filterAll": "Todos ({count})",
+    "cobros.filterPending": "Pendentes ({count})",
+    "cobros.filterPaid": "Pagos ({count})",
+    "cobros.searchPlaceholder": "Buscar por jogador, conceito ou item...",
+    "cobros.loadingPayments": "Carregando cobranças do clube...",
+    "cobros.noPaymentsFound": "Nenhuma cobrança encontrada",
+    "cobros.noPaymentsStaff": "Use a Calculadora de Torneio ou o botão Nova Cobrança para registrar pagamentos pendentes.",
+    "cobros.noPaymentsPlayer": "Você não tem cobranças pendentes no momento.",
+    "cobros.thPlayer": "Jogador",
+    "cobros.thConcept": "O que está sendo cobrado? (Detalhamento dos Itens)",
+    "cobros.thReceipt": "Comprovante (Anexo)",
+    "cobros.thAmount": "Valor",
+    "cobros.thStatus": "Status",
+    "cobros.thActions": "Ações",
+    "cobros.courtFee": "Cobrança de quadra / taxa",
+    "cobros.viewReceipt": "Ver comprovante anexado",
+    "cobros.removeReceipt": "Remover comprovante",
+    "cobros.attachReceiptAction": "Anexar comprovante de transferência",
+    "cobros.byConfirm": "por {name}",
+    "cobros.notifyAdminWA": "Notificar e confirmar pagamento ao Administrador via WhatsApp para conferência",
+    "cobros.remindPlayerWA": "Enviar lembrete e detalhamento de cobrança ao jogador por WhatsApp",
+    "cobros.markAsPaid": "Marcar como pago",
+    "cobros.deleteRecord": "Excluir registro",
+    "cobros.deleteConfirm": "Tem certeza de que deseja excluir este registro de cobrança?",
+    "cobros.removeReceiptConfirm": "Deseja remover este comprovante anexado?",
+    "cobros.newIndividualTitle": "Registrar nova cobrança individual",
+    "cobros.selectPlayerOption": "Selecione um jogador...",
+    "cobros.conceptLabel": "O que está sendo cobrado? (Conceito detalhado) *",
+    "cobros.conceptPlaceholder": "ex. Aluguel Quadra 2, Taxa de torneio, Bebidas",
+    "cobros.amountLabel": "Valor ($) *",
+    "cobros.notesLabel": "Observações adicionais (opcional)",
+    "cobros.notesPlaceholder": "ex. Quadra reservada das 19:00 às 20:30",
+    "cobros.savePayment": "Salvar cobrança",
+    "cobros.previewReceipt": "Pré-visualização do Comprovante",
+    "cobros.openOriginalImage": "Abrir imagem original em nova aba",
+    "cobros.fileUploadSpecs": "PNG, JPG, WEBP até 8MB",
+    "cobros.saveReceipt": "Salvar comprovante",
+    "cobros.saving": "Salvando...",
+    "cobros.generating": "Gerando...",
+    "cobros.amountDisplay": "Valor: ${amount}",
+    "cobros.customConceptPlaceholder": "Conceito (ex. Quadra {index}, Bolas, Bebidas...)",
+    "cobros.deleteCostTooltip": "Excluir esta despesa",
+    "cobros.adjustmentTooltip": "Desconto (ex: -1000) ou Saldo adicional (ex: +1500)",
+    "cobros.splitSummary": "Resumo da divisão: {total} entre {count} jogadores",
   },
 };
+
+/**
+ * Traduce el nombre de un deporte según el idioma activo
+ */
+export function formatSportName(name: string | undefined | null, lang: Language | string): string {
+  if (!name) return "";
+  const lower = name.toLowerCase();
+  if (lower.includes("padel") || lower.includes("pádel")) {
+    return lang === "es" ? "Pádel" : "Padel";
+  }
+  if (lower.includes("tenis") || lower.includes("tennis")) {
+    return lang === "es" ? "Tenis" : lang === "pt" ? "Tênis" : "Tennis";
+  }
+  if (lower.includes("futbol") || lower.includes("fútbol") || lower.includes("soccer") || lower.includes("football")) {
+    return lang === "es" ? "Fútbol" : lang === "pt" ? "Futebol" : "Football";
+  }
+  return name;
+}
+
+/**
+ * Traduce conceptos de cobro dinámicos almacenados (ej: "(Cuota parte)", "Cancha: ...", "Descuento aplicado")
+ */
+export function formatCobroConcepto(concepto: string | undefined | null, lang: Language | string): string {
+  if (!concepto) return "";
+  if (lang === "en") {
+    return concepto
+      .replace(/\(Cuota parte\)/gi, "(Split share)")
+      .replace(/^Cancha:/i, "Court:")
+      .replace(/^Cancha /i, "Court ")
+      .replace(/^Descuento aplicado$/i, "Applied discount")
+      .replace(/^Saldo \/ Ajuste adicional$/i, "Additional adjustment / balance");
+  }
+  if (lang === "pt") {
+    return concepto
+      .replace(/\(Cuota parte\)/gi, "(Cota-parte)")
+      .replace(/^Cancha:/i, "Quadra:")
+      .replace(/^Cancha /i, "Quadra ")
+      .replace(/^Descuento aplicado$/i, "Desconto aplicado")
+      .replace(/^Saldo \/ Ajuste adicional$/i, "Saldo / Ajuste adicional");
+  }
+  return concepto;
+}
+
+/**
+ * Traduce notas de cobro dinámicas (ej: 'Reparto torneo "..." ($... entre ... jugadores)')
+ */
+export function formatCobroNotas(notas: string | null | undefined, lang: Language | string): string | null {
+  if (!notas) return null;
+  if (lang === "en") {
+    let res = notas.replace(
+      /Reparto (?:torneo|evento) "(.*?)" \(\$([0-9.,]+) entre (\d+) jugadores\)/gi,
+      'Tournament split "$1" ($$2 among $3 players)'
+    );
+    res = res.replace(
+      /Reparto evento "(.*?)" \(Total: \$([0-9.,]+)\)/gi,
+      'Event split "$1" (Total: $$2)'
+    );
+    res = res.replace(/Arriendo de Cancha \/ Cuota/gi, "Court Rental / Fee");
+    return res;
+  }
+  if (lang === "pt") {
+    let res = notas.replace(
+      /Reparto (?:torneo|evento) "(.*?)" \(\$([0-9.,]+) entre (\d+) jugadores\)/gi,
+      'Rateio torneio "$1" ($$2 entre $3 jogadores)'
+    );
+    res = res.replace(
+      /Reparto evento "(.*?)" \(Total: \$([0-9.,]+)\)/gi,
+      'Rateio evento "$1" (Total: $$2)'
+    );
+    res = res.replace(/Arriendo de Cancha \/ Cuota/gi, "Aluguel de Quadra / Cota");
+    return res;
+  }
+  return notas;
+}

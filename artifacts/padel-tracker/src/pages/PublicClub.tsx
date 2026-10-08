@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@workspace/replit-auth-web";
 import { hexToHslChannels } from "@/lib/utils";
 import type { CSSProperties } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 interface PublicClubData {
   id: number;
@@ -29,6 +30,7 @@ interface PublicClubData {
 export default function PublicClub() {
   const [location] = useLocation();
   const { user, login } = useAuth();
+  const { t } = useLanguage();
   const [club, setClub] = useState<PublicClubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -61,9 +63,20 @@ export default function PublicClub() {
 
   if (error || !club) {
     return (
-      <div className="py-20 text-center">
-        <h1 className="text-3xl font-bold">Club no encontrado</h1>
-        <p className="mt-2 text-muted-foreground">El enlace público no existe o el club está inactivo.</p>
+      <div className="py-20 text-center space-y-4 max-w-md mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-destructive/15 text-destructive flex items-center justify-center mx-auto text-2xl">
+          🎾
+        </div>
+        <h1 className="text-2xl font-bold">Club no encontrado</h1>
+        <p className="text-sm text-muted-foreground">
+          El enlace público no existe o el club está inactivo.
+        </p>
+        <Link
+          href="/"
+          className="inline-block px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-opacity"
+        >
+          Volver al Inicio
+        </Link>
       </div>
     );
   }
@@ -109,7 +122,7 @@ export default function PublicClub() {
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button onClick={() => login()} className="gap-2">
               {user ? <LogIn size={16} /> : <UserPlus size={16} />}
-              {user ? "Entrar al club" : "Entrar / Registrarme"}
+              {user ? t("auth.enterClub") : t("auth.enterRegister")}
             </Button>
             {publicMapUrl && (
               <Button asChild variant="outline" className="gap-2">

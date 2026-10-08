@@ -23,9 +23,11 @@ import {
   MessageSquare,
   Map as MapIcon,
   ExternalLink,
-  AtSign
+  AtSign,
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ClubPlansModal } from "@/components/ClubPlansModal";
 
 interface Sport {
   id: number;
@@ -170,6 +172,7 @@ export default function Admin() {
   }, []);
 
   const [adminMode, setAdminMode] = useState<"new" | "existing">("new");
+  const [justCreatedClub, setJustCreatedClub] = useState<Club | null>(null);
 
   const [newClub, setNewClub] = useState({ 
     name: "", 
@@ -191,10 +194,31 @@ export default function Admin() {
     adminEmail: "",
     adminPhone: "",
     adminWhatsappAlias: "",
+    createAdminPlayer: true,
     contactPreference: "whatsapp" as "whatsapp" | "email" | "both"
   });
 
   const [editingClub, setEditingClub] = useState<Club | null>(null);
+  const [plansModalClub, setPlansModalClub] = useState<Club | null>(null);
+
+  const handlePlanChange = async (newPlan: "basic" | "pro" | "elite") => {
+    if (!plansModalClub) return;
+    try {
+      const res = await fetch(`/api/admin/clubs/${plansModalClub.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      if (res.ok) {
+        setClubs((prev) =>
+          prev.map((c) => (c.id === plansModalClub.id ? { ...c, plan: newPlan } : c))
+        );
+        setPlansModalClub({ ...plansModalClub, plan: newPlan });
+      }
+    } catch (err) {
+      console.error("Error al actualizar plan:", err);
+    }
+  };
   const [editForm, setEditForm] = useState({ 
     name: "", 
     plan: "basic", 
@@ -483,6 +507,7 @@ export default function Admin() {
 
       setClubs(prev => [createdClub, ...prev]);
       setShowNewClub(false);
+      setJustCreatedClub(createdClub);
 
       setNewClub({ 
         name: "", 
@@ -630,25 +655,40 @@ export default function Admin() {
 
   if (isLoading || loading) return <div className="p-10 text-center text-muted-foreground">Cargando panel de gestión...</div>;
   if (!isAdmin) {
+    const isMaster = typeof window !== "undefined" && (
+      window.location.search.includes("admin=master") || 
+      window.location.search.includes("super=1") ||
+      sessionStorage.getItem("enable_superadmin") === "1"
+    );
+
     return (
       <div className="max-w-md mx-auto my-16 p-8 bg-card border border-border rounded-2xl text-center space-y-4 shadow-lg">
-        <div className="w-14 h-14 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-2 border border-purple-500/30">
+        <div className="w-14 h-14 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto mb-2 border border-red-500/30">
           <Shield size={32} />
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">Acceso de Super Administrador</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Acceso Restringido</h2>
         <p className="text-sm text-muted-foreground">
-          Esta sección está reservada exclusivamente para el Super Administrador de la plataforma (gestión de clubes, planes y deportes).
+          Esta sección está reservada exclusivamente para la administración del sistema.
         </p>
         <div className="pt-2">
-          <button
-            type="button"
-            disabled={isLoggingInSuperAdmin}
-            onClick={handleSuperAdminLoginClick}
-            className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-lg transition-colors shadow-md cursor-pointer"
-          >
-            <Shield size={16} />
-            {isLoggingInSuperAdmin ? "Conectando..." : "Entrar como Super Administrador (mbau73@hotmail.com)"}
-          </button>
+          {isMaster ? (
+            <button
+              type="button"
+              disabled={isLoggingInSuperAdmin}
+              onClick={handleSuperAdminLoginClick}
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-lg transition-colors shadow-md cursor-pointer"
+            >
+              <Shield size={16} />
+              {isLoggingInSuperAdmin ? "Conectando..." : "Acceso Maestro (Super Admin)"}
+            </button>
+          ) : (
+            <a
+              href="/"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors shadow-md"
+            >
+              Volver al Inicio
+            </a>
+          )}
         </div>
       </div>
     );
@@ -713,14 +753,15 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Plan contratado</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">⚡ Plan Contratado</label>
                 <select 
                   value={newClub.plan} 
                   onChange={e => setNewClub({...newClub, plan: e.target.value})}
-                  className="w-full p-2 border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full p-2 border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                 >
-                  <option value="basic">Plan Basic</option>
-                  <option value="pro">Plan Pro</option>
+                  <option value="basic">Starter Club (Básico - 1 deporte, 25 jugadores)</option>
+                  <option value="pro">Pro Sport Hub (Recomendado - Multideporte, 150 jugadores, Torneos, Parryn IA)</option>
+                  <option value="elite">Elite Enterprise (Completo - Jugadores ilimitados, Multisede, Auditoría)</option>
                 </select>
               </div>
 
@@ -1073,6 +1114,18 @@ export default function Admin() {
                   </div>
                 </div>
 
+                <div className="col-span-full pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={newClub.createAdminPlayer}
+                      onChange={(e) => setNewClub({ ...newClub, createAdminPlayer: e.target.checked })}
+                      className="rounded border-input text-primary focus:ring-primary w-4 h-4"
+                    />
+                    <span>¿Crear automáticamente ficha deportiva de jugador para este administrador?</span>
+                  </label>
+                </div>
+
               </div>
             )}
           </div>
@@ -1124,9 +1177,22 @@ export default function Admin() {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-lg">{club.name}</h3>
-                      <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase", club.plan === "pro" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                        {club.plan}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPlansModalClub(club)}
+                        className={cn(
+                          "text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 border transition-all cursor-pointer shadow-xs",
+                          club.plan === "elite"
+                            ? "bg-purple-500/15 text-purple-400 border-purple-500/30 hover:bg-purple-500/25"
+                            : club.plan === "pro"
+                            ? "bg-yellow-500/15 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/25"
+                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                        )}
+                        title="Ver y configurar motor de planes y límites"
+                      >
+                        <Zap size={11} className={club.plan === "pro" ? "fill-yellow-500 text-yellow-500" : ""} />
+                        <span>Plan {club.plan}</span>
+                      </button>
 
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-secondary/20 text-secondary-foreground flex items-center gap-1 border">
                         <span>{langInfo.flag}</span>
@@ -1186,6 +1252,14 @@ export default function Admin() {
                   >
                     <ExternalLink size={14} /> {t("visit")}
                   </a>
+
+                  <button
+                    onClick={() => setPlansModalClub(club)}
+                    className="p-2 border rounded-lg text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-1.5 cursor-pointer bg-yellow-500/10 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/20"
+                    title="Configurar motor de planes y límites del club"
+                  >
+                    <Zap size={14} /> <span>Planes</span>
+                  </button>
 
                   <button
                     onClick={() => openEditModal(club)}
@@ -1289,14 +1363,15 @@ export default function Admin() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Plan contratado</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">⚡ Plan Contratado</label>
                   <select
                     value={editForm.plan}
                     onChange={e => setEditForm({...editForm, plan: e.target.value})}
-                    className="w-full p-2 border rounded-lg text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full p-2 border rounded-lg text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary font-medium"
                   >
-                    <option value="basic">Plan Basic</option>
-                    <option value="pro">Plan Pro</option>
+                    <option value="basic">Starter Club (Básico - 1 deporte, 25 jugadores)</option>
+                    <option value="pro">Pro Sport Hub (Recomendado - Multideporte, 150 jugadores, Torneos, Parryn IA)</option>
+                    <option value="elite">Elite Enterprise (Completo - Jugadores ilimitados, Multisede, Auditoría)</option>
                   </select>
                 </div>
 
@@ -1636,6 +1711,64 @@ export default function Admin() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Celebración y Tarjeta de Invitación WhatsApp */}
+      {justCreatedClub && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center text-2xl font-bold">
+                🎉
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-foreground">¡Club {justCreatedClub.name} Creado!</h3>
+                <p className="text-xs text-muted-foreground">Categorías deportivas estándar precargadas con éxito</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-xl space-y-1.5 text-xs font-mono">
+              <p className="text-muted-foreground font-sans">Enlace de invitación directa:</p>
+              <p className="text-foreground font-semibold break-all">
+                {window.location.origin}/{justCreatedClub.slug}?code={justCreatedClub.inviteCode}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const inviteUrl = `${window.location.origin}/${justCreatedClub.slug}?code=${justCreatedClub.inviteCode}`;
+                  const message = `🎾 ¡Hola! Te invito a unirte a *${justCreatedClub.name}* en Padel Tracker IA para ver el ranking, confirmar partidos y registrar resultados:\n\n👉 ${inviteUrl}\n\nCódigo de acceso: *${justCreatedClub.inviteCode}*`;
+                  navigator.clipboard.writeText(message);
+                  alert("¡Mensaje de invitación copiado al portapapeles! Listo para enviar por WhatsApp.");
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5"
+              >
+                <Copy size={14} />
+                Copiar Mensaje para WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setJustCreatedClub(null)}
+                className="px-4 py-2 border rounded-lg text-xs font-medium hover:bg-muted"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Motor de Planes y Límites */}
+      {plansModalClub && (
+        <ClubPlansModal
+          isOpen={!!plansModalClub}
+          onClose={() => setPlansModalClub(null)}
+          club={plansModalClub}
+          isSuperAdmin={isAdmin}
+          onPlanChange={handlePlanChange}
+        />
       )}
     </div>
   );

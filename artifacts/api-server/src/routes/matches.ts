@@ -10,6 +10,7 @@ import {
   clubSportsTable,
   sportModalitiesTable,
   playerSportRatingsTable,
+  encuentrosTable,
 } from "@workspace/db";
 import {
   calculateMatchEloChanges,
@@ -418,11 +419,37 @@ async function enrichMatch(
       m.sets,
 
     result:
-      m.result,
+      m.result === "team1" || m.result === "team2" || m.result === "draw"
+        ? m.result
+        : (m.team1Score ?? 0) > (m.team2Score ?? 0)
+          ? "team1"
+          : (m.team2Score ?? 0) > (m.team1Score ?? 0)
+            ? "team2"
+            : "draw",
 
     status:
       (m as any).status ??
       "confirmed",
+
+    submittedByPlayerId:
+      (m as any).submittedByPlayerId ??
+      null,
+
+    submittedByPlayerName:
+      (m as any).submittedByPlayerId
+        ? playerMap[(m as any).submittedByPlayerId] ?? null
+        : null,
+
+    confirmedByUserId:
+      (m as any).confirmedByUserId ??
+      null,
+
+    confirmedAt:
+      (m as any).confirmedAt
+        ? (m as any).confirmedAt instanceof Date
+          ? (m as any).confirmedAt.toISOString()
+          : String((m as any).confirmedAt)
+        : null,
 
     reportedBy:
       (m as any).reportedBy ??
@@ -724,6 +751,9 @@ router.post(
 
           status,
 
+          submittedByPlayerId:
+            (req.user as any)?.playerId ?? null,
+
           encuentroId:
             encuentroId ??
             null,
@@ -947,15 +977,52 @@ router.post(
     }
 
     // ----------------------------------------------------------
-    // Confirmar
+    // Reglas de Seguridad Fair Play: Validación Cruzada
+    // ----------------------------------------------------------
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+
+    if (!isStaff) {
+      const userPlayerId = user?.playerId;
+      if (!userPlayerId) {
+        res.status(403).json({
+          error: "Debes tener una ficha de jugador vinculada para confirmar resultados deportivos.",
+        });
+        return;
+      }
+
+      const playerInMatch = matchPlayers.find((p) => p.playerId === userPlayerId);
+      if (!playerInMatch) {
+        res.status(403).json({
+          error: "No participaste en este partido. La confirmación debe ser realizada por un contrincante o por el administrador.",
+        });
+        return;
+      }
+
+      // Si el partido registra quién cargó el marcador, verificar que el aprobador NO sea de su mismo equipo
+      const submitterId = (existing as any).submittedByPlayerId;
+      if (submitterId) {
+        const submitterInMatch = matchPlayers.find((p) => p.playerId === submitterId);
+        if (submitterInMatch && submitterInMatch.team === playerInMatch.team) {
+          res.status(400).json({
+            error: "No puedes auto-aprobar el marcador cargado por tu propio equipo. La confirmación debe ser realizada por un contrincante o por el administrador del club.",
+          });
+          return;
+        }
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Confirmar y Auditoría
     // ----------------------------------------------------------
 
     const [updated] =
       await db
         .update(matchesTable)
         .set({
-          status:
-            "confirmed",
+          status: "confirmed",
+          confirmedByUserId: String(user.id || user.email || (isStaff ? "admin" : "rival")),
+          confirmedAt: new Date(),
         } as any)
         .where(
           eq(
@@ -1119,6 +1186,42 @@ router.patch(
       return;
     }
 
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+
+    let isEncuentroOrganizer = false;
+    if (existing.encuentroId) {
+      const [encuentro] = await db
+        .select()
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, existing.encuentroId));
+      if (
+        encuentro &&
+        (String(encuentro.organizerId) === String(user?.id) ||
+          (user?.playerId && String(encuentro.organizerId) === String(user.playerId)))
+      ) {
+        isEncuentroOrganizer = true;
+      }
+    }
+
+    const currentMatchPlayers = await db
+      .select()
+      .from(matchPlayersTable)
+      .where(eq(matchPlayersTable.matchId, id));
+
+    const isParticipant = Boolean(
+      user?.playerId &&
+        currentMatchPlayers.some((p) => p.playerId === user.playerId)
+    );
+
+    if (!isStaff && !isEncuentroOrganizer && !isParticipant) {
+      res.status(403).json({
+        error:
+          "No tienes permisos para modificar este partido. Solo los jugadores del partido, el organizador del encuentro o los administradores pueden editarlo.",
+      });
+      return;
+    }
+
     const {
       team1PlayerIds,
       team2PlayerIds,
@@ -1129,6 +1232,18 @@ router.patch(
       playedAt,
       status,
     } = req.body;
+
+    if (
+      !isStaff &&
+      !isEncuentroOrganizer &&
+      (team1PlayerIds !== undefined || team2PlayerIds !== undefined)
+    ) {
+      res.status(403).json({
+        error:
+          "Solo los administradores del club o el organizador del encuentro pueden modificar la alineación de jugadores.",
+      });
+      return;
+    }
 
     const resultingModalityId =
       modalityId === undefined
@@ -1526,6 +1641,31 @@ router.delete(
           "Forbidden",
       });
 
+      return;
+    }
+
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+
+    let isEncuentroOrganizer = false;
+    if (existing.encuentroId) {
+      const [encuentro] = await db
+        .select()
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, existing.encuentroId));
+      if (
+        encuentro &&
+        (String(encuentro.organizerId) === String(user?.id) ||
+          (user?.playerId && String(encuentro.organizerId) === String(user.playerId)))
+      ) {
+        isEncuentroOrganizer = true;
+      }
+    }
+
+    if (!isStaff && !isEncuentroOrganizer) {
+      res.status(403).json({
+        error: "Solo los administradores del club o el organizador del encuentro pueden eliminar partidos.",
+      });
       return;
     }
 
