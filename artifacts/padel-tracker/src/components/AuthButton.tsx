@@ -124,15 +124,13 @@ export function AuthButton() {
             </div>
           </DropdownMenuItem>
 
-          {showSuperAdminOption && (
-            <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2.5 cursor-pointer py-2 border-t border-border/50">
-              <Shield className="h-4 w-4 text-purple-500" />
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-purple-400">{t("auth.superAdmin")}</span>
-                <span className="text-[10px] text-muted-foreground">mbau73@hotmail.com</span>
-              </div>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2.5 cursor-pointer py-2 border-t border-border/50">
+            <Shield className="h-4 w-4 text-purple-500" />
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-purple-400">Mauricio Bau ({t("auth.superAdmin")})</span>
+              <span className="text-[10px] text-muted-foreground">mauricio.bau@gmail.com</span>
+            </div>
+          </DropdownMenuItem>
 
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
