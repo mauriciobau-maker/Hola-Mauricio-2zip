@@ -39,40 +39,81 @@ export function AuthButton() {
     return <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />;
   }
 
-  const handleLoginAs = async (role: "superadmin" | "colaborador" | "jugador") => {
+  const handleLoginAs = async (role: "superadmin" | "admin_central" | "admin_tenis" | "admin_futbol" | "admin_multi" | "colaborador" | "jugador") => {
     let demoUser: any = null;
-    if (role === "jugador") {
-      demoUser = {
-        id: "demo-jugador-1",
-        email: "jugador@padeltracker.com",
-        firstName: "Carlos",
-        lastName: "Ruiz",
-        role: "player",
-        isAdmin: 0,
-        isClubAdmin: 0,
-        clubId: 1
-      };
-    } else if (role === "colaborador") {
-      demoUser = {
-        id: "demo-admin-1",
-        email: "admin.club@padeltracker.com",
-        firstName: "Admin",
-        lastName: "Club",
-        role: "club_admin",
-        isAdmin: 1,
-        isClubAdmin: 1,
-        clubId: 1
-      };
-    } else {
+    if (role === "superadmin") {
       demoUser = {
         id: "demo-superadmin-1",
         email: "mauricio.bau@gmail.com",
         firstName: "Mauricio",
         lastName: "Bau",
+        name: "Mauricio Bau",
         role: "superadmin",
         isAdmin: 2,
         isClubAdmin: 1,
-        clubId: 1
+        clubId: 1,
+        playerId: 9 // Mauricio Bau en Neon
+      };
+    } else if (role === "admin_tenis") {
+      demoUser = {
+        id: "demo-admin-tenis",
+        email: "admin.tenis@club.com",
+        firstName: "Admin",
+        lastName: "Tenis",
+        name: "Admin Real Tenis",
+        role: "club_admin",
+        isAdmin: 0,
+        isClubAdmin: 1,
+        clubId: 2 // Real Tenis Club (Solo Tenis)
+      };
+    } else if (role === "admin_futbol") {
+      demoUser = {
+        id: "demo-admin-futbol",
+        email: "admin.futbol@club.com",
+        firstName: "Admin",
+        lastName: "Fútbol",
+        name: "Admin Liga Fútbol",
+        role: "club_admin",
+        isAdmin: 0,
+        isClubAdmin: 1,
+        clubId: 3 // Liga Fútbol (Solo Fútbol)
+      };
+    } else if (role === "admin_multi") {
+      demoUser = {
+        id: "demo-admin-multi",
+        email: "admin.multisport@club.com",
+        firstName: "Admin",
+        lastName: "Multisport",
+        name: "Admin Multisport",
+        role: "club_admin",
+        isAdmin: 0,
+        isClubAdmin: 1,
+        clubId: 4 // Multisport Arena Pro (Todos los deportes)
+      };
+    } else if (role === "colaborador" || role === "admin_central") {
+      demoUser = {
+        id: "demo-admin-1",
+        email: "admin.club@padeltracker.com",
+        firstName: "Admin",
+        lastName: "Central",
+        name: "Admin Pádel Central",
+        role: "club_admin",
+        isAdmin: 0,
+        isClubAdmin: 1,
+        clubId: 1 // Club Pádel Central (Pádel + Tenis)
+      };
+    } else {
+      demoUser = {
+        id: "demo-jugador-1",
+        email: "jugador@padeltracker.com",
+        firstName: "Carlos",
+        lastName: "Ruiz",
+        name: "Carlos Ruiz",
+        role: "player",
+        isAdmin: 0,
+        isClubAdmin: 0,
+        clubId: 1,
+        playerId: 1
       };
     }
 
@@ -86,7 +127,7 @@ export function AuthButton() {
         }
       }
     } catch (e) {
-      // Offline or static Vercel fallback
+      // Offline / fallback
     }
 
     localStorage.setItem("padel_auth_token", `demo-token-${role}`);
@@ -105,35 +146,59 @@ export function AuthButton() {
             <ChevronDown className="h-3 w-3 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuLabel className="text-xs text-muted-foreground">{t("auth.selectTestAccount")}</DropdownMenuLabel>
           
-          <DropdownMenuItem onClick={() => handleLoginAs("jugador")} className="gap-2.5 cursor-pointer py-2">
-            <Users className="h-4 w-4 text-emerald-500" />
+          <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2.5 cursor-pointer py-2 bg-purple-500/10 border-b border-border/50">
+            <Shield className="h-4 w-4 text-purple-400 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-foreground">{t("auth.player")} (Carlos Ruiz)</span>
-              <span className="text-[10px] text-muted-foreground">jugador@padeltracker.com</span>
+              <span className="text-xs font-bold text-purple-300">Mauricio Bau (Super Admin & Jugador)</span>
+              <span className="text-[10px] text-muted-foreground">Acceso global + Ficha de jugador</span>
             </div>
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => handleLoginAs("colaborador")} className="gap-2.5 cursor-pointer py-2">
-            <Building2 className="h-4 w-4 text-blue-500" />
+          <DropdownMenuItem onClick={() => handleLoginAs("admin_central")} className="gap-2.5 cursor-pointer py-1.5">
+            <Building2 className="h-4 w-4 text-emerald-500 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-foreground">{t("auth.clubAdmin")}</span>
-              <span className="text-[10px] text-muted-foreground">admin.club@padeltracker.com</span>
+              <span className="text-xs font-semibold text-foreground">Admin Club Pádel Central</span>
+              <span className="text-[10px] text-muted-foreground">Mixto: Pádel y Tenis</span>
             </div>
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2.5 cursor-pointer py-2 border-t border-border/50">
-            <Shield className="h-4 w-4 text-purple-500" />
+          <DropdownMenuItem onClick={() => handleLoginAs("admin_tenis")} className="gap-2.5 cursor-pointer py-1.5">
+            <Building2 className="h-4 w-4 text-orange-500 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-purple-400">Mauricio Bau ({t("auth.superAdmin")})</span>
-              <span className="text-[10px] text-muted-foreground">mauricio.bau@gmail.com</span>
+              <span className="text-xs font-semibold text-foreground">Admin Real Tenis Club</span>
+              <span className="text-[10px] text-orange-400/90 font-medium">Monodeporte: Solo Tenis</span>
+            </div>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => handleLoginAs("admin_futbol")} className="gap-2.5 cursor-pointer py-1.5">
+            <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-foreground">Admin Liga Fútbol 5 & 7</span>
+              <span className="text-[10px] text-blue-400/90 font-medium">Monodeporte: Solo Fútbol</span>
+            </div>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => handleLoginAs("admin_multi")} className="gap-2.5 cursor-pointer py-1.5">
+            <Building2 className="h-4 w-4 text-purple-500 shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-foreground">Admin Multisport Arena</span>
+              <span className="text-[10px] text-purple-400 font-medium">Todos: Pádel, Tenis y Fútbol</span>
+            </div>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => handleLoginAs("jugador")} className="gap-2.5 cursor-pointer py-2 border-t border-border/50">
+            <Users className="h-4 w-4 text-emerald-500 shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-foreground">Carlos Ruiz (Jugador)</span>
+              <span className="text-[10px] text-muted-foreground">Presente en Club 1 y Club 2 de forma aislada</span>
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
-          <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+          <div className="px-2 py-1 text-[11px] text-muted-foreground">
             {t("auth.guestNotice")}
           </div>
         </DropdownMenuContent>
@@ -212,24 +277,35 @@ export function AuthButton() {
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[11px] text-muted-foreground">{t("auth.switchAccount")}</DropdownMenuLabel>
         
-        {(!isClubAdmin || isSuperAdmin) && (
-          <DropdownMenuItem onClick={() => handleLoginAs("colaborador")} className="gap-2 cursor-pointer text-xs">
-            <Building2 className="h-3.5 w-3.5 text-blue-400" />
-            {t("auth.switchToClubAdmin")}
-          </DropdownMenuItem>
-        )}
-        {(isSuperAdmin || isClubAdmin) && (
-          <DropdownMenuItem onClick={() => handleLoginAs("jugador")} className="gap-2 cursor-pointer text-xs">
-            <Users className="h-3.5 w-3.5 text-emerald-400" />
-            {t("auth.switchToPlayer")} (Carlos Ruiz)
-          </DropdownMenuItem>
-        )}
-        {showSuperAdminOption && !isSuperAdmin && (
-          <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2 cursor-pointer text-xs border-t border-border/50 text-purple-400">
-            <Shield className="h-3.5 w-3.5 text-purple-400" />
-            {t("auth.switchToSuperAdmin")}
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem onClick={() => handleLoginAs("superadmin")} className="gap-2 cursor-pointer text-xs font-semibold text-purple-400">
+          <Shield className="h-3.5 w-3.5 text-purple-400" />
+          Mauricio Bau (Super Admin & Jugador)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleLoginAs("admin_central")} className="gap-2 cursor-pointer text-xs">
+          <Building2 className="h-3.5 w-3.5 text-emerald-400" />
+          Admin Club Pádel Central (Pádel + Tenis)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleLoginAs("admin_tenis")} className="gap-2 cursor-pointer text-xs">
+          <Building2 className="h-3.5 w-3.5 text-orange-400" />
+          Admin Real Tenis Club (Solo Tenis)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleLoginAs("admin_futbol")} className="gap-2 cursor-pointer text-xs">
+          <Building2 className="h-3.5 w-3.5 text-blue-400" />
+          Admin Liga Fútbol 5 & 7 (Solo Fútbol)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleLoginAs("admin_multi")} className="gap-2 cursor-pointer text-xs">
+          <Building2 className="h-3.5 w-3.5 text-purple-400" />
+          Admin Multisport Arena (Pádel, Tenis, Fútbol)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleLoginAs("jugador")} className="gap-2 cursor-pointer text-xs border-t border-border/50 text-emerald-400">
+          <Users className="h-3.5 w-3.5 text-emerald-400" />
+          Carlos Ruiz (Jugador Multi-Club)
+        </DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="gap-2 cursor-pointer text-destructive focus:text-destructive text-xs">
