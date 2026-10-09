@@ -180,19 +180,64 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
 
 function getMockSessionForRole(roleParamRaw?: string): SessionData {
   const roleParam = (roleParamRaw || "superadmin").toLowerCase();
-  if (roleParam === "colaborador" || roleParam === "adminclub" || roleParam === "club_admin") {
+  if (roleParam === "admin_tenis" || roleParam === "tenis") {
+    return {
+      user: {
+        id: "usr_admin_tenis",
+        email: "admin.tenis@club.com",
+        firstName: "Admin",
+        lastName: "Real Tenis Club",
+        profileImageUrl: null,
+        clubId: 2, // Real Tenis Club (Solo Tenis)
+        isAdmin: 0,
+        isClubAdmin: 1,
+      },
+      access_token: "mock-token-tenis",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  } else if (roleParam === "admin_futbol" || roleParam === "futbol") {
+    return {
+      user: {
+        id: "usr_admin_futbol",
+        email: "admin.futbol@club.com",
+        firstName: "Admin",
+        lastName: "Liga Fútbol 5 & 7",
+        profileImageUrl: null,
+        clubId: 3, // Liga Fútbol (Solo Fútbol)
+        isAdmin: 0,
+        isClubAdmin: 1,
+      },
+      access_token: "mock-token-futbol",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  } else if (roleParam === "admin_multi" || roleParam === "multisport") {
+    return {
+      user: {
+        id: "usr_admin_multi",
+        email: "admin.multisport@club.com",
+        firstName: "Admin",
+        lastName: "Multisport Arena",
+        profileImageUrl: null,
+        clubId: 4, // Multisport Arena Pro (Pádel, Tenis y Fútbol)
+        isAdmin: 0,
+        isClubAdmin: 1,
+      },
+      access_token: "mock-token-multi",
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+  } else if (roleParam === "admin_central" || roleParam === "colaborador" || roleParam === "adminclub" || roleParam === "club_admin") {
     return {
       user: {
         id: "usr_colaborador_demo",
         email: "admin.club@padeltracker.com",
-        firstName: "Roberto",
-        lastName: "Gómez (Colaborador)",
+        firstName: "Admin",
+        lastName: "Pádel Central",
         profileImageUrl: null,
         clubId: 1,
         isAdmin: 0,
         isClubAdmin: 1,
       },
-      access_token: "mock-token",
+      access_token: "mock-token-colaborador",
       expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
     };
   } else if (roleParam === "jugador" || roleParam === "player") {
@@ -208,22 +253,23 @@ function getMockSessionForRole(roleParamRaw?: string): SessionData {
         isAdmin: 0,
         isClubAdmin: 0,
       },
-      access_token: "mock-token",
+      access_token: "mock-token-jugador",
       expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
     };
   } else {
     return {
       user: {
-        id: "60741545",
-        email: "mbau73@hotmail.com",
-        firstName: "Super",
-        lastName: "Admin",
+        id: "usr_superadmin_mauricio",
+        email: "mauricio.bau@gmail.com",
+        firstName: "Mauricio",
+        lastName: "Bau",
         profileImageUrl: null,
         clubId: 1,
-        isAdmin: 1,
+        playerId: 9,
+        isAdmin: 2,
         isClubAdmin: 1,
       },
-      access_token: "mock-token",
+      access_token: "mock-token-superadmin",
       expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
     };
   }
