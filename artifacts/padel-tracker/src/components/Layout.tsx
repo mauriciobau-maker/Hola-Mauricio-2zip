@@ -99,6 +99,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex flex-col" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        {/* Fila 1: Marca del Club y Perfil de Usuario */}
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2.5 tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
             {club?.logoUrl ? (
@@ -113,7 +114,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <div className="flex flex-col leading-tight">
-              <span className="text-foreground font-black text-sm md:text-base tracking-tight truncate max-w-[200px] md:max-w-[280px]">
+              <span className="text-foreground font-black text-sm md:text-base tracking-tight truncate max-w-[200px] md:max-w-[320px]">
                 {club?.name || "Club Pádel"}
               </span>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
@@ -124,46 +125,94 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
 
-          {!isPublicClubRoute && <nav className="hidden xl:flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <LanguageSelector />
+            <AuthButton />
+            {!isPublicClubRoute && (
+              <button
+                className="md:hidden p-2 rounded-md hover:bg-muted/50 text-foreground cursor-pointer"
+                onClick={() => setMobileOpen((v) => !v)}
+                aria-label="Toggle menu"
+              >
+                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Fila 2: Barra de Navegación Principal */}
+        {!isPublicClubRoute && (
+          <div className="hidden md:block border-t border-border/60 bg-muted/20">
+            <div className="max-w-7xl mx-auto px-4 flex items-center gap-1.5 py-1.5 overflow-x-auto">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0",
+                    location === item.href
+                      ? "bg-primary/15 text-primary font-bold shadow-xs border border-primary/30"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  )}
+                >
+                  <item.icon size={14} />
+                  {t(item.key)}
+                </Link>
+              ))}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ml-auto",
+                    location === "/admin"
+                      ? "bg-purple-500/25 text-purple-300 border border-purple-500/40"
+                      : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                  )}
+                >
+                  <Shield size={14} className="text-purple-400" />
+                  {t("adminPanel")}
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Menú Desplegable Móvil */}
+        {mobileOpen && !isPublicClubRoute && (
+          <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", location === item.href ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}>
-                <item.icon size={14} />{t(item.key)}
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  location === item.href
+                    ? "bg-primary/15 text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <item.icon size={16} />
+                {t(item.key)}
               </Link>
             ))}
             {isAdmin && (
               <Link
                 href="/admin"
+                onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
-                  location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  location === "/admin"
+                    ? "bg-primary/15 text-primary font-semibold"
+                    : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
                 )}
               >
-                <Shield size={14} className="text-purple-400" />
+                <Shield size={16} className="text-purple-400" />
                 {t("adminPanel")}
               </Link>
             )}
-          </nav>}
-
-          <div className="hidden xl:flex items-center gap-2 shrink-0"><LanguageSelector /><AuthButton /></div>
-          <div className="xl:hidden flex items-center gap-2 shrink-0"><LanguageSelector /><AuthButton />{!isPublicClubRoute && <button className="p-2 rounded-md hover:bg-muted/50 text-foreground" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">{mobileOpen ? <X size={20} /> : <Menu size={20} />}</button>}</div>
-        </div>
-
-        {mobileOpen && !isPublicClubRoute && <div className="xl:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
-          {navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={cn("flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors", location === item.href ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}><item.icon size={16} />{t(item.key)}</Link>)}
-          {isAdmin && (
-            <Link
-              href="/admin"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-              )}
-            >
-              <Shield size={16} className="text-purple-400" />
-              {t("adminPanel")}
-            </Link>
-          )}
-        </div>}
+          </div>
+        )}
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
