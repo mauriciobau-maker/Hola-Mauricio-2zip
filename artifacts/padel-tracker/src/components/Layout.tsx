@@ -227,10 +227,68 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {!isPublicClubRoute && (
         <>
           <ParrynFloatingWidget />
-          <nav className="xl:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex z-40">
-            {navItems.map((item) => <Link key={item.href} href={item.href} className={cn("flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors", location === item.href ? "text-primary" : "text-muted-foreground")}><item.icon size={18} /><span className="text-[10px]">{t(item.key)}</span></Link>)}
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex items-center justify-around z-40 h-14 px-1 shadow-lg">
+            <Link
+              href="/"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
+                location === "/" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutDashboard size={18} />
+              <span className="text-[10px] leading-tight truncate">{t("dashboard")}</span>
+            </Link>
+
+            <Link
+              href="/ranking"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
+                location === "/ranking" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Trophy size={18} />
+              <span className="text-[10px] leading-tight truncate">{t("ranking")}</span>
+            </Link>
+
+            <Link
+              href="/encuentros"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
+                location === "/encuentros" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Calendar size={18} />
+              <span className="text-[10px] leading-tight truncate">{t("encuentros")}</span>
+            </Link>
+
+            <Link
+              href="/jugadores"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
+                location === "/jugadores" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Users size={18} />
+              <span className="text-[10px] leading-tight truncate">{t("players")}</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+                mobileOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+              <span className="text-[10px] leading-tight truncate">{mobileOpen ? "Cerrar" : "Más"}</span>
+            </button>
           </nav>
-          <div className="xl:hidden h-16" />
+          <div className="md:hidden h-16" />
         </>
       )}
     </div>
