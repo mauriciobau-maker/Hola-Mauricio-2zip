@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
+  clubSportsTable,
   matchPlayersTable,
   matchesTable,
   playerSportRatingsTable,
@@ -12,17 +13,33 @@ import { resolveEffectiveClubId } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
-async function getSelectedSportId(rawSportId: unknown): Promise<number | null> {
+async function getSelectedSportId(rawSportId: unknown, clubId: number | null): Promise<number | null> {
   if (rawSportId !== undefined) {
     const sportId = Number(rawSportId);
     return Number.isInteger(sportId) && sportId > 0 ? sportId : null;
   }
+
+  if (clubId) {
+    const [clubSport] = await db
+      .select({ sportId: sportsTable.id })
+      .from(clubSportsTable)
+      .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+      .where(and(eq(clubSportsTable.clubId, clubId), eq(clubSportsTable.active, true), eq(sportsTable.active, true)))
+      .orderBy(clubSportsTable.id)
+      .limit(1);
+
+    if (clubSport?.sportId) {
+      return clubSport.sportId;
+    }
+  }
+
   const [sport] = await db
     .select({ id: sportsTable.id })
     .from(sportsTable)
     .where(eq(sportsTable.active, true))
     .orderBy(sportsTable.id)
     .limit(1);
+
   return sport?.id ?? null;
 }
 
@@ -35,14 +52,15 @@ function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
 }
 
 router.get("/ranking", async (req, res): Promise<void> => {
-  const sportId = await getSelectedSportId(req.query.sportId);
-  if (!sportId) {
-    res.status(400).json({ error: "sportId inválido" });
-    return;
-  }
   const clubId = await resolveEffectiveClubId(req);
   if (!clubId) {
     res.json([]);
+    return;
+  }
+
+  const sportId = await getSelectedSportId(req.query.sportId, clubId);
+  if (!sportId) {
+    res.status(400).json({ error: "sportId inválido" });
     return;
   }
 
@@ -141,11 +159,6 @@ router.get("/ranking", async (req, res): Promise<void> => {
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {
-  const sportId = await getSelectedSportId(req.query.sportId);
-  if (!sportId) {
-    res.status(400).json({ error: "sportId inválido" });
-    return;
-  }
   const clubId = await resolveEffectiveClubId(req);
   if (!clubId) {
     res.json({
@@ -156,6 +169,13 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     });
     return;
   }
+
+  const sportId = await getSelectedSportId(req.query.sportId, clubId);
+  if (!sportId) {
+    res.status(400).json({ error: "sportId inválido" });
+    return;
+  }
+
   const [players, matches] = await Promise.all([
     db.select().from(playersTable).where(eq(playersTable.clubId, clubId)),
     db
@@ -217,3 +237,72 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 });
 
 export default router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

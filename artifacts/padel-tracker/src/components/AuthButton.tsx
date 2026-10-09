@@ -21,7 +21,7 @@ export function AuthButton() {
 
   // Super Admin se oculta para testers y solo se activa para el dueño (por email) o mediante acceso maestro (?admin=master o ?super=1)
   const isMasterAuthorized = typeof window !== "undefined" && (
-    window.location.search.includes("admin=master") || 
+    window.location.search.includes("admin=master") ||
     window.location.search.includes("super=1") ||
     sessionStorage.getItem("enable_superadmin") === "1"
   );
@@ -31,6 +31,24 @@ export function AuthButton() {
       sessionStorage.setItem("enable_superadmin", "1");
     }
   }, []);
+
+  const persistAuthSession = (nextUser: any, token?: string | null) => {
+    if (typeof window === "undefined") return;
+
+    if (token) {
+      localStorage.setItem("padel_auth_token", token);
+    } else {
+      localStorage.removeItem("padel_auth_token");
+    }
+
+    if (nextUser) {
+      localStorage.setItem("padel_auth_user", JSON.stringify(nextUser));
+    } else {
+      localStorage.removeItem("padel_auth_user");
+    }
+
+    window.dispatchEvent(new CustomEvent("padel_auth_update", { detail: nextUser ?? null }));
+  };
 
   const isOwnerEmail = user?.email === "mbau73@hotmail.com" || user?.email === "mauricio.bau@gmail.com";
   const showSuperAdminOption = isMasterAuthorized || isOwnerEmail;
@@ -122,17 +140,16 @@ export function AuthButton() {
       if (res.ok) {
         const data = await res.json();
         if (data.token && data.user) {
-          demoUser = data.user;
-          localStorage.setItem("padel_auth_token", data.token);
+          persistAuthSession(data.user, data.token);
+          window.location.reload();
+          return;
         }
       }
     } catch (e) {
       // Offline / fallback
     }
 
-    localStorage.setItem("padel_auth_token", `demo-token-${role}`);
-    localStorage.setItem("padel_auth_user", JSON.stringify(demoUser));
-    window.dispatchEvent(new CustomEvent("padel_auth_update", { detail: demoUser }));
+    persistAuthSession(demoUser, `demo-token-${role}`);
     window.location.reload();
   };
 
@@ -316,3 +333,251 @@ export function AuthButton() {
     </DropdownMenu>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

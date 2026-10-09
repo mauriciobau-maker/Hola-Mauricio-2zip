@@ -82,15 +82,15 @@ export function useAuth(): AuthState {
               localStorage.setItem("padel_auth_user", JSON.stringify(data.user));
             } catch {}
           } else {
-            // Keep existing localStorage user if no server user
             const stored = localStorage.getItem("padel_auth_user");
-            if (stored) {
+            if (stored && token) {
               try {
                 const parsed = JSON.parse(stored);
                 if (parsed) setUser(parsed);
               } catch {}
             } else {
               setUser(null);
+              localStorage.removeItem("padel_auth_user");
             }
           }
           setIsLoading(false);
@@ -99,11 +99,14 @@ export function useAuth(): AuthState {
       .catch(() => {
         if (!cancelled) {
           const stored = localStorage.getItem("padel_auth_user");
-          if (stored) {
+          if (stored && token) {
             try {
               const parsed = JSON.parse(stored);
               if (parsed) setUser(parsed);
             } catch {}
+          } else {
+            setUser(null);
+            localStorage.removeItem("padel_auth_user");
           }
           setIsLoading(false);
         }
@@ -136,3 +139,64 @@ export function useAuth(): AuthState {
     logout,
   };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
