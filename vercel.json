@@ -1,17 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "installCommand": "bun install",
-  "buildCommand": "node build-vercel.js || node scripts/build-vercel.js",
+  "buildCommand": "node build-vercel.js",
   "outputDirectory": "public",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://parryn-api.onrender.com/api/$1"
+      "src": "/api/(.*)",
+      "dest": "https://parryn-api.onrender.com/api/$1"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }

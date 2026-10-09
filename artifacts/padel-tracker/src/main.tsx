@@ -16,6 +16,16 @@ if (isVercel) {
     let url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
     if (url.startsWith("/api/")) {
       url = `${API_BASE}${url}`;
+      try {
+        const stored = localStorage.getItem("padel_auth_user");
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u?.clubId && !url.includes("clubId=")) {
+            const separator = url.includes("?") ? "&" : "?";
+            url = `${url}${separator}clubId=${u.clubId}`;
+          }
+        }
+      } catch {}
       return originalFetch(url, { ...init, credentials: init?.credentials || "include" });
     }
     return originalFetch(input, init);

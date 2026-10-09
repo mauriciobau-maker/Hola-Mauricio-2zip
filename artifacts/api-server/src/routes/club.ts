@@ -154,17 +154,25 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/current — Devuelve el club actual respetando estrictamente los roles de usuario
+// GET /clubs/current — Devuelve el club actual respetando query param clubId o usuario
 router.get("/clubs/current", async (req, res): Promise<void> => {
   try {
     const user = req.user as any;
+    const queryClubId = req.query.clubId ? Number(req.query.clubId) : null;
 
-    if (!user) {
-      res.json(null);
-      return;
+    if (queryClubId && !Number.isNaN(queryClubId)) {
+      const [club] = await db
+        .select()
+        .from(clubsTable)
+        .where(eq(clubsTable.id, queryClubId));
+
+      if (club) {
+        res.json(club);
+        return;
+      }
     }
 
-    if (user.clubId) {
+    if (user && user.clubId) {
       const [club] = await db
         .select()
         .from(clubsTable)
@@ -176,15 +184,8 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
       }
     }
 
-    const isSuperAdmin = user.isAdmin === 1 || user.role === "SUPER_ADMIN";
-
-    if (isSuperAdmin) {
-      const [firstClub] = await db.select().from(clubsTable).limit(1);
-      res.json(firstClub || null);
-      return;
-    }
-
-    res.json(null);
+    const [firstClub] = await db.select().from(clubsTable).limit(1);
+    res.json(firstClub || null);
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
     res.json(null);

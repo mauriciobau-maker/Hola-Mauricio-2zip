@@ -68,17 +68,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (user && ((user as any).clubId || isAdmin)) {
-      fetch("/api/clubs/current")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data) {
-            setClub(data);
-            if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
-          }
-        })
-        .catch((err) => console.error("Error cargando marca blanca:", err));
-    } else setClub(null);
+    const activeClubId = (user as any)?.clubId;
+    const url = activeClubId ? `/api/clubs/current?clubId=${activeClubId}` : "/api/clubs/current";
+    fetch(url)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setClub(data);
+          if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
+        } else {
+          setClub(null);
+        }
+      })
+      .catch((err) => console.error("Error cargando marca blanca:", err));
   }, [user, isAdmin, isPublicClubRoute, location, setClubDefaultLanguage]);
 
   const dynamicStyles: Record<string, string> = {};
