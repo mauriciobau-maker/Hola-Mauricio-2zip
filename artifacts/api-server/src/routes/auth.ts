@@ -178,6 +178,48 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
   });
 });
 
+router.post("/auth/switch-club", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || !req.user) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
+  const { clubId } = req.body;
+  if (!clubId || typeof clubId !== "number") {
+    res.status(400).json({ error: "clubId requerido" });
+    return;
+  }
+
+  const [club] = await db
+    .select()
+    .from(clubsTable)
+    .where(eq(clubsTable.id, clubId));
+
+  if (!club) {
+    res.status(404).json({ error: "Club no encontrado" });
+    return;
+  }
+
+  if (!club.active) {
+    res.status(403).json({ error: "Este club no está activo" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ clubId, updatedAt: new Date() })
+    .where(eq(usersTable.id, req.user.id))
+    .returning();
+
+  const userWithClub = await getUserWithClub(updated.id);
+
+  res.json({
+    success: true,
+    club: { id: club.id, name: club.name, slug: club.slug },
+    user: userWithClub ?? updated,
+  });
+});
+
 function getMockSessionForRole(roleParamRaw?: string): SessionData {
   const roleParam = (roleParamRaw || "superadmin").toLowerCase();
   if (roleParam === "admin_tenis" || roleParam === "tenis") {
