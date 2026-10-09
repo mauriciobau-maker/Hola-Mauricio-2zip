@@ -86,38 +86,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (club?.secondaryColor) dynamicStyles["--secondary"] = hexToHslChannels(club.secondaryColor);
 
   const LanguageSelector = () => (
-    <div className="flex items-center gap-1 bg-muted/40 border border-border px-2 py-1 rounded-lg shrink-0">
-      <Globe size={14} className="text-muted-foreground" />
-      <select value={language} onChange={(e) => setLanguage(e.target.value as any, true)} className="bg-transparent text-foreground text-xs font-medium focus:outline-none cursor-pointer">
-        <option value="es" className="bg-background text-foreground">🇪🇸 ES</option>
-        <option value="en" className="bg-background text-foreground">🇺🇸 EN</option>
-        <option value="pt" className="bg-background text-foreground">🇧🇷 PT</option>
+    <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/40 border border-border px-1.5 sm:px-2 py-1 rounded-lg shrink-0">
+      <Globe size={13} className="text-muted-foreground shrink-0" />
+      <select value={language} onChange={(e) => setLanguage(e.target.value as any, true)} className="bg-transparent text-foreground text-[11px] sm:text-xs font-medium focus:outline-none cursor-pointer">
+        <option value="es" className="bg-background text-foreground">ES</option>
+        <option value="en" className="bg-background text-foreground">EN</option>
+        <option value="pt" className="bg-background text-foreground">PT</option>
       </select>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" style={dynamicStyles as React.CSSProperties}>
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full overflow-x-hidden">
         {/* Fila 1: Marca del Club y Perfil de Usuario */}
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2.5 tracking-tight shrink-0 whitespace-nowrap overflow-hidden">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-4 h-13 sm:h-14 flex items-center justify-between gap-1.5 sm:gap-3 w-full">
+          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 tracking-tight shrink min-w-0 whitespace-nowrap overflow-hidden">
             {club?.logoUrl ? (
               <img
                 src={club.logoUrl}
                 alt={club.name}
-                className="w-9 h-9 rounded-xl object-contain bg-background/80 border border-border/60 p-0.5 shadow-sm shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-background/80 border border-border/60 p-0.5 shadow-sm shrink-0"
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/40 flex items-center justify-center text-primary font-black text-sm shadow-sm shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/40 flex items-center justify-center text-primary font-black text-xs sm:text-sm shadow-sm shrink-0">
                 {(club?.name ? club.name.trim().slice(0, 2).toUpperCase() : "CP")}
               </div>
             )}
-            <div className="flex flex-col leading-tight">
-              <span className="text-foreground font-black text-sm md:text-base tracking-tight truncate max-w-[200px] md:max-w-[320px]">
+            <div className="flex flex-col leading-tight min-w-0">
+              <span className="text-foreground font-black text-xs sm:text-sm md:text-base tracking-tight truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]">
                 {club?.name || "Club Pádel"}
               </span>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+              <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
                 <span className="opacity-75">powered by</span>
                 <span className="font-semibold text-foreground/80">Parryn Sport Hub</span>
                 <span className="text-[9px] font-bold bg-primary/20 text-primary px-1 py-0.2 rounded border border-primary/30">IA</span>
@@ -125,16 +125,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <LanguageSelector />
             <AuthButton />
             {!isPublicClubRoute && (
               <button
-                className="md:hidden p-2 rounded-md hover:bg-muted/50 text-foreground cursor-pointer"
+                className="md:hidden p-1.5 sm:p-2 rounded-md hover:bg-muted/50 text-foreground cursor-pointer"
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-label="Toggle menu"
               >
-                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+                {mobileOpen ? <X size={18} /> : <Menu size={18} />}
               </button>
             )}
           </div>
@@ -215,7 +215,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">{children}</main>
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">

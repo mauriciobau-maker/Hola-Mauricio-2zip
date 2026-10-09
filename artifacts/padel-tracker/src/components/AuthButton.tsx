@@ -99,8 +99,8 @@ export function AuthButton() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10">
-            <LogIn className="h-4 w-4" />
+          <Button size="sm" variant="outline" className="h-8 sm:h-9 gap-1 sm:gap-2 px-2 sm:px-3 text-xs border-white/20 text-white hover:bg-white/10">
+            <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">{t("auth.login")}</span>
             <ChevronDown className="h-3 w-3 opacity-60" />
           </Button>
@@ -158,17 +158,17 @@ export function AuthButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-9 px-2 gap-2 rounded-full border border-white/10 hover:bg-white/10">
-          <Avatar className="h-7 w-7">
+        <Button variant="ghost" className="h-8 sm:h-9 px-1 sm:px-2 gap-1.5 sm:gap-2 rounded-full border border-white/10 hover:bg-white/10">
+          <Avatar className="h-6 w-6 sm:h-7 sm:h-7">
             {user.profileImageUrl && <AvatarImage src={user.profileImageUrl} alt={initials} />}
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+            <AvatarFallback className="bg-primary text-primary-foreground text-[10px] sm:text-xs font-bold">
               {initials}
             </AvatarFallback>
           </Avatar>
           <span className="hidden md:inline text-xs font-medium text-white/90 truncate max-w-[120px]">
             {user.firstName || user.email?.split("@")[0]}
           </span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${roleColor}`}>
+          <span className={`hidden sm:inline text-[10px] px-1.5 py-0.5 rounded border font-medium ${roleColor}`}>
             {roleLabel}
           </span>
         </Button>
