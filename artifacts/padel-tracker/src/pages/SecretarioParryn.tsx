@@ -50,11 +50,32 @@ export function SecretarioParryn() {
   }, [language, t]);
 
   // Estados de simulación operativa
+  const [club, setClub] = useState<any>(null);
   const [clubName, setClubName] = useState("Club Pádel Central");
   const [coveredCourts, setCoveredCourts] = useState("2");
   const [openCourts, setOpenCourts] = useState("2");
   const [weatherCondition, setWeatherCondition] = useState("rain_risk");
   const [schedulingPlan, setSchedulingPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) {
+          setClub(data);
+          if (data.name) setClubName(data.name);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const isFutbolClub =
+    club?.isFootball ||
+    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
+    club?.name?.toLowerCase().includes("fútbol") ||
+    club?.name?.toLowerCase().includes("futbol") ||
+    (user as any)?.clubId === 3 ||
+    (user as any)?.email?.includes("futbol");
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -76,6 +97,8 @@ export function SecretarioParryn() {
             clubName,
             userRole: (user as any)?.isAdmin === 1 ? "SuperAdmin" : "ClubAdmin",
             lang: language,
+            clubId: club?.id || (user as any)?.clubId,
+            isFootball: isFutbolClub,
           },
         }),
       });
@@ -96,9 +119,11 @@ export function SecretarioParryn() {
         {
           sender: "parryn",
           text: language === "en"
-            ? "There was a brief connection hiccup, but I'm here! I suggest prioritizing indoor courts and checking attendance on WhatsApp."
+            ? "There was a brief connection hiccup, but I'm here! I suggest checking match attendance and team lineups on WhatsApp."
             : language === "pt"
-            ? "Houve uma breve oscilação de conexão, mas estou aqui! Sugiro priorizar quadras cobertas e confirmar a presença no WhatsApp."
+            ? "Houve uma breve oscilação de conexão, mas estou aqui! Sugiro confirmar os times e a presença dos atletas no WhatsApp."
+            : isFutbolClub
+            ? "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero confirmar los equipos y la asistencia de los jugadores para la pichanga por WhatsApp."
             : "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero priorizar canchas techadas y confirmar la asistencia de tus jugadores por WhatsApp.",
         },
       ]);
@@ -110,15 +135,21 @@ export function SecretarioParryn() {
   const handlePlanScheduling = async () => {
     setLoading(true);
     try {
+      const promptQuery = isFutbolClub
+        ? `Diseña un plan de contingencia y distribución de turnos para partidos de fútbol 5 o 7. Disponemos de ${coveredCourts} canchas techadas y ${openCourts} al aire libre. Condición climática prevista: ${
+            weatherCondition === "rain_risk" ? "Riesgo de lluvia / viento" : "Clima despejado"
+          }.`
+        : `Diseña un plan de contingencia y distribución de turnos. Disponemos de ${coveredCourts} canchas techadas y ${openCourts} descubiertas. Condición climática prevista: ${
+            weatherCondition === "rain_risk" ? "Riesgo de lluvia / viento" : "Clima despejado"
+          }.`;
+
       const res = await fetch("/api/parryn/asistente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          query: `Diseña un plan de contingencia y distribución de turnos. Disponemos de ${coveredCourts} canchas techadas y ${openCourts} descubiertas. Condición climática prevista: ${
-            weatherCondition === "rain_risk" ? "Riesgo de lluvia / viento" : "Clima despejado"
-          }.`,
-          clubContext: { clubName, lang: language },
+          query: promptQuery,
+          clubContext: { clubName, lang: language, clubId: club?.id || (user as any)?.clubId, isFootball: isFutbolClub },
         }),
       });
       const data = await res.json();
@@ -126,9 +157,15 @@ export function SecretarioParryn() {
     } catch {
       setSchedulingPlan(
         language === "en"
-          ? "Parryn's Plan: Assign official ranking matches to indoor courts with 75-minute rotation blocks."
+          ? isFutbolClub
+            ? "Parryn's Plan: Assign official soccer matches to covered turf with 60-minute match slots and 15-min warmups."
+            : "Parryn's Plan: Assign official ranking matches to indoor courts with 75-minute rotation blocks."
           : language === "pt"
-          ? "Plano do Parryn: Alocar partidas oficiais em quadras cobertas com blocos de rotação de 75 min."
+          ? isFutbolClub
+            ? "Plano do Parryn: Alocar partidas oficiais de futebol em quadras cobertas com blocos de 60 min."
+            : "Plano do Parryn: Alocar partidas oficiais em quadras cobertas com blocos de rotação de 75 min."
+          : isFutbolClub
+          ? "Plan de Parryn: Asignar partidos oficiales de fútbol a canchas techadas con bloques de 60 min y 15 min de descanso entre turnos."
           : "Plan de Parryn: Asignar partidos oficiales a pistas techadas con rotación en bloques de 75 min."
       );
     } finally {
@@ -164,7 +201,7 @@ export function SecretarioParryn() {
             </div>
           </div>
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/15 backdrop-blur-lg border border-white/20 flex items-center justify-center text-4xl shadow-inner shrink-0">
-            🤖🎾
+            {isFutbolClub ? "🤖⚽" : "🤖🎾"}
           </div>
         </div>
       </div>
@@ -244,14 +281,14 @@ export function SecretarioParryn() {
                         <div className="flex items-center justify-between border-b border-border/50 pb-2">
                           <div className="flex items-center gap-2">
                             <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs">
-                              🎾
+                              {isFutbolClub ? "⚽" : "🎾"}
                             </span>
                             <div>
                               <h4 className="font-bold text-sm text-foreground">
                                 {msg.createdEncuentro.title}
                               </h4>
                               <span className="text-[11px] text-muted-foreground">
-                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} canchas)
+                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} {isFutbolClub ? "cancha sintética" : "canchas"})
                               </span>
                             </div>
                           </div>
@@ -332,7 +369,11 @@ export function SecretarioParryn() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("parryn.chatPlaceholder")}
+                placeholder={
+                  isFutbolClub
+                    ? "Escribe a Parryn (ej: 'Convoca para fútbol 7 este viernes con 14 cupos')..."
+                    : t("parryn.chatPlaceholder")
+                }
                 className="flex-1"
                 disabled={loading}
               />
@@ -343,21 +384,44 @@ export function SecretarioParryn() {
             </form>
 
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-              <span className="text-[11px] text-muted-foreground font-semibold">Ejemplos rápidos:</span>
-              <button
-                type="button"
-                onClick={() => setQuery("Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel")}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
-              >
-                🎾 "Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuery("Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas")}
-                className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
-              >
-                ⚡ "Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas"
-              </button>
+              <span className="text-[11px] text-muted-foreground font-semibold">
+                {isFutbolClub ? "Ejemplos rápidos (Fútbol):" : "Ejemplos rápidos:"}
+              </span>
+              {isFutbolClub ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética")}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    ⚽ "Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5")}
+                    className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    🥅 "Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5"
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel")}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    🎾 "Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas")}
+                    className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    ⚡ "Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas"
+                  </button>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -372,13 +436,17 @@ export function SecretarioParryn() {
               {t("parryn.courtTitle")}
             </CardTitle>
             <CardDescription>
-              {t("parryn.courtDesc")}
+              {isFutbolClub
+                ? "Optimiza la distribución de canchas de fútbol, horarios de pichangas y contingencia climática."
+                : t("parryn.courtDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">{t("parryn.coveredCourts")}</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  {isFutbolClub ? "Canchas Techadas / Sintéticas" : t("parryn.coveredCourts")}
+                </label>
                 <Input
                   type="number"
                   value={coveredCourts}
@@ -387,7 +455,9 @@ export function SecretarioParryn() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">{t("parryn.openCourts")}</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  {isFutbolClub ? "Canchas al Aire Libre" : t("parryn.openCourts")}
+                </label>
                 <Input
                   type="number"
                   value={openCourts}

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useGetRanking } from "@workspace/api-client-react";
 import { Trophy, Medal, TrendingUp, TrendingDown, Zap } from "lucide-react";
@@ -11,7 +12,21 @@ function initials(name: string) {
 export default function Ranking() {
   const { t } = useLanguage();
   const { data: ranking, isLoading } = useGetRanking();
-  const isFootball = (ranking as any)?.[0]?.isFootball || (ranking as any)?.[0]?.sportSlug === "futbol" || (ranking as any)?.[0]?.sportName?.toLowerCase().includes("fútbol");
+  const [club, setClub] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClub(d))
+      .catch(() => {});
+  }, []);
+
+  const isFootball =
+    club?.isFootball ||
+    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
+    (ranking as any)?.[0]?.isFootball ||
+    (ranking as any)?.[0]?.sportSlug === "futbol" ||
+    (ranking as any)?.[0]?.sportName?.toLowerCase().includes("fútbol");
 
   return (
     <div className="space-y-5">

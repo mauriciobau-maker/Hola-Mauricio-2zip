@@ -7,7 +7,7 @@ import {
   getGetPlayerStatsQueryKey,
   getGetPlayerEloHistoryQueryKey,
 } from "@workspace/api-client-react";
-import { ArrowLeft, TrendingUp, TrendingDown, Award, Target, Flame, Pencil, Zap } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Award, Target, Flame, Pencil, Zap, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -60,6 +60,12 @@ export default function JugadorDetalle() {
     );
   }
 
+  const isFootball =
+    (player as any)?.isFootball ||
+    (stats as any)?.isFootball ||
+    (player as any)?.sportSlug === "futbol" ||
+    (player as any)?.sportName?.toLowerCase().includes("fútbol");
+
   const winRate = stats?.winRate ?? 0;
   const eloDiff = player.elo - 1500;
 
@@ -82,7 +88,7 @@ export default function JugadorDetalle() {
         </Link>
       </div>
 
-      {/* Player card with Elo */}
+      {/* Player card with Points or Elo */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0">
@@ -102,24 +108,35 @@ export default function JugadorDetalle() {
               })}
             </p>
           </div>
-          {/* Elo badge */}
-          <div className="flex flex-col items-center gap-0.5 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
-            <div className="flex items-center gap-1">
-              <Zap size={12} className="text-primary" />
-              <span className="text-xs font-semibold text-primary">ELO</span>
+          {/* Badge */}
+          {isFootball ? (
+            <div className="flex flex-col items-center gap-0.5 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
+              <div className="flex items-center gap-1">
+                <Trophy size={13} className="text-primary" />
+                <span className="text-xs font-semibold text-primary">PUNTOS</span>
+              </div>
+              <span className="text-2xl font-bold tabular-nums text-foreground">{stats?.points ?? 0}</span>
+              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Liga Oficial</span>
             </div>
-            <span className="text-2xl font-bold tabular-nums text-foreground">{player.elo}</span>
-            {eloDiff !== 0 && (
-              <span
-                className={cn(
-                  "text-xs font-semibold tabular-nums",
-                  eloDiff > 0 ? "text-green-400" : "text-red-400",
-                )}
-              >
-                {eloDiff > 0 ? "+" : ""}{eloDiff}
-              </span>
-            )}
-          </div>
+          ) : (
+            <div className="flex flex-col items-center gap-0.5 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
+              <div className="flex items-center gap-1">
+                <Zap size={12} className="text-primary" />
+                <span className="text-xs font-semibold text-primary">ELO</span>
+              </div>
+              <span className="text-2xl font-bold tabular-nums text-foreground">{player.elo}</span>
+              {eloDiff !== 0 && (
+                <span
+                  className={cn(
+                    "text-xs font-semibold tabular-nums",
+                    eloDiff > 0 ? "text-green-400" : "text-red-400",
+                  )}
+                >
+                  {eloDiff > 0 ? "+" : ""}{eloDiff}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Win rate bar */}
@@ -144,61 +161,94 @@ export default function JugadorDetalle() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatTile
             icon={<Award size={16} className="text-yellow-400" />}
-            label={t("jugadores.points")}
+            label={isFootball ? "Puntos Liga (3 pts x V)" : t("jugadores.points")}
             value={stats.points}
             accent
           />
           <StatTile
             icon={<TrendingUp size={16} className="text-primary" />}
-            label={t("jugadores.wins")}
+            label={isFootball ? "Partidos Ganados (PG)" : t("jugadores.wins")}
             value={stats.wins}
           />
+          {isFootball ? (
+            <StatTile
+              icon={<Zap size={16} className="text-amber-400" />}
+              label="Partidos Empatados (PE)"
+              value={(stats as any).draws ?? 0}
+            />
+          ) : (
+            <StatTile
+              icon={<Target size={16} className="text-muted-foreground" />}
+              label={t("jugadores.losses")}
+              value={stats.losses}
+            />
+          )}
           <StatTile
-            icon={<Target size={16} className="text-muted-foreground" />}
-            label={t("jugadores.losses")}
-            value={stats.losses}
-          />
-          <StatTile
-            icon={<Flame size={16} className="text-orange-400" />}
-            label={t("jugadores.currentStreak")}
-            value={`${stats.currentStreak}${t("parejas.winsShort") || "V"}`}
+            icon={isFootball ? <Target size={16} className="text-muted-foreground" /> : <Flame size={16} className="text-orange-400" />}
+            label={isFootball ? "Partidos Perdidos (PP)" : t("jugadores.currentStreak")}
+            value={isFootball ? stats.losses : `${stats.currentStreak}${t("parejas.winsShort") || "V"}`}
           />
         </div>
       )}
 
-      {/* Sets stats */}
+      {/* Sets stats or Football match performance */}
       {stats && (
         <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="font-semibold text-sm mb-3">{t("jugadores.setStats")}</h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-primary">{stats.setsWon}</p>
-              <p className="text-xs text-muted-foreground">{t("jugadores.setsWon")}</p>
+          <h3 className="font-semibold text-sm mb-3">
+            {isFootball ? "Rendimiento en Cancha (Fútbol)" : t("jugadores.setStats")}
+          </h3>
+          {isFootball ? (
+            <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold">{stats.totalMatches}</p>
+                <p className="text-xs text-muted-foreground">Partidos (PJ)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-400">{stats.wins}</p>
+                <p className="text-xs text-muted-foreground">Ganados (PG)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-yellow-400">{(stats as any).draws ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Empatados (PE)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-400">{stats.losses}</p>
+                <p className="text-xs text-muted-foreground">Perdidos (PP)</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-muted-foreground">{stats.setsLost}</p>
-              <p className="text-xs text-muted-foreground">{t("jugadores.setsLost")}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-primary">{stats.setsWon}</p>
+                <p className="text-xs text-muted-foreground">{t("jugadores.setsWon")}</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-muted-foreground">{stats.setsLost}</p>
+                <p className="text-xs text-muted-foreground">{t("jugadores.setsLost")}</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.totalMatches}</p>
+                <p className="text-xs text-muted-foreground">{t("jugadores.totalMatches")}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.totalMatches}</p>
-              <p className="text-xs text-muted-foreground">{t("jugadores.totalMatches")}</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Elo history */}
+      {/* Elo history / Match history */}
       {eloHistory && eloHistory.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
             <Zap size={13} className="text-primary" />
-            <h3 className="font-semibold text-sm">{t("jugadores.eloHistory")}</h3>
+            <h3 className="font-semibold text-sm">
+              {isFootball ? "Historial de Partidos Registrados" : t("jugadores.eloHistory")}
+            </h3>
             <span className="text-xs text-muted-foreground ml-auto">
               {t("jugadores.eloMatchesCount", { count: eloHistory.length })}
             </span>
           </div>
-          {/* Mini sparkline */}
-          <EloSparkline history={eloHistory as any} t={t} />
+          {/* Mini sparkline only for Padel/Tennis */}
+          {!isFootball && <EloSparkline history={eloHistory as any} t={t} />}
           {/* List — last 8 entries reversed (most recent first) */}
           <div className="divide-y divide-border">
             {[...eloHistory].reverse().slice(0, 8).map((entry) => {

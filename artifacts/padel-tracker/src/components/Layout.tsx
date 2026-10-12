@@ -98,6 +98,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  const isFutbolClub =
+    (club as any)?.isFootball ||
+    (club as any)?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
+    (club as any)?.name?.toLowerCase().includes("fútbol") ||
+    (club as any)?.name?.toLowerCase().includes("futbol") ||
+    (user as any)?.clubId === 3;
+
+  const activeNavItems = navItems.filter((item) => !(isFutbolClub && item.href === "/parejas"));
+
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full overflow-x-hidden">
@@ -146,7 +155,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {!isPublicClubRoute && (
           <div className="hidden md:block border-t border-border/60 bg-muted/20">
             <div className="max-w-7xl mx-auto px-4 flex items-center gap-1.5 py-1.5 overflow-x-auto">
-              {navItems.map((item) => (
+              {activeNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -182,7 +191,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Menú Desplegable Móvil */}
         {mobileOpen && !isPublicClubRoute && (
           <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
-            {navItems.map((item) => (
+            {activeNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -228,7 +237,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {!isPublicClubRoute && (
         <>
-          <ParrynFloatingWidget />
+          <ParrynFloatingWidget club={club} />
           <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex items-center justify-around z-40 h-14 px-1 shadow-lg">
             <Link
               href="/"

@@ -31,6 +31,7 @@ export default function Dashboard() {
   }
 
   const top5 = (ranking ?? []).slice(0, 5);
+  const isFootball = (dashboard as any)?.isFootball || (ranking as any)?.[0]?.isFootball;
 
   return (
     <div className="space-y-6">
@@ -59,7 +60,11 @@ export default function Dashboard() {
           icon={<Trophy size={18} className="text-yellow-400" />}
           label={t("dashboard.leader")}
           value={dashboard?.topPlayer?.name ?? "—"}
-          sub={dashboard?.topPlayer ? `${(dashboard.topPlayer as any).elo ?? dashboard.topPlayer.points ?? ""} pts` : undefined}
+          sub={
+            dashboard?.topPlayer
+              ? `${(dashboard.topPlayer as any).isFootball ? ((dashboard.topPlayer as any).points ?? 0) : ((dashboard.topPlayer as any).elo ?? (dashboard.topPlayer as any).points ?? "")} pts`
+              : undefined
+          }
           href="/ranking"
         />
         <StatCard
@@ -133,7 +138,9 @@ export default function Dashboard() {
                       {entry.wins}{t("parejas.winsShort") || "V"} / {entry.losses}{t("parejas.lossesShort") || "D"}{entry.draws > 0 ? ` / ${entry.draws}E` : ""}
                     </p>
                   </div>
-                  <span className="font-bold text-primary text-sm">{entry.elo ?? entry.points} pts</span>
+                  <span className="font-bold text-primary text-sm">
+                    {entry.isFootball ? (entry.points ?? 0) : (entry.elo ?? entry.points)} pts
+                  </span>
                 </Link>
               ))}
             </div>

@@ -142,7 +142,88 @@ const WIDGET_TEXTS = {
   },
 };
 
-export function ParrynFloatingWidget() {
+const FOOTBALL_HINTS = {
+  es: {
+    encuentros: [
+      { label: "📢 Convocatoria Pichanga", query: "Redáctame un mensaje para el grupo de WhatsApp convocando al próximo partido de fútbol para completar los equipos de 5 o 7." },
+      { label: "🌧️ Cancha Sintética y Clima", query: "¿Cómo coordinar si hay lluvia para el partido de fútbol en cancha sintética?" },
+    ],
+    cobros: [
+      { label: "💳 Cuota Cancha y Balón", query: "Redacta un recordatorio amable para el grupo de WhatsApp recordando transferir la cuota de la cancha de fútbol." },
+      { label: "💰 División 10/14 Jugadores", query: "¿Cómo dividir el costo del arriendo de la cancha entre los jugadores de la pichanga?" },
+    ],
+    partidos: [
+      { label: "⚖️ Fair Play en Fútbol", query: "Explícame las reglas de Fair Play y cómo registrar el marcador del partido de fútbol." },
+      { label: "🏆 Crónica de la Pichanga", query: "Redacta la crónica del partido de fútbol para WhatsApp destacando los goles y el Fair Play." },
+    ],
+    ranking: [
+      { label: "⚽ Puntos y Tabla de Liga", query: "Explica cómo se calculan los puntos en la tabla de posiciones de fútbol (3 por victoria, 1 por empate)." },
+      { label: "🥅 Balance Equipo A vs B", query: "¿Cómo armar los dos equipos de fútbol para que la pichanga sea pareja y competitiva?" },
+    ],
+    admin: [
+      { label: "📲 Invitación WhatsApp al Club", query: "Redacta la invitación oficial de bienvenida con el enlace y código del club para sumar socios por WhatsApp." },
+      { label: "🛡️ Buenas Prácticas", query: "¿Cuáles son las 3 mejores prácticas para mantener activa a la comunidad de socios todas las semanas?" },
+    ],
+    general: [
+      { label: "⚽ Consejos para la Pichanga", query: "¿Cuáles son las mejores recomendaciones para organizar un partido de fútbol 5 o 7 a tiempo y sin roces?" },
+      { label: "⚡ Tips para el Organizador", query: "Dame 3 consejos clave para que el partido de fútbol salga excelente." },
+    ],
+  },
+  en: {
+    encuentros: [
+      { label: "📢 Soccer Match Invite", query: "Draft a WhatsApp invite for our next soccer match to complete 5v5 or 7v7 teams." },
+      { label: "🌧️ Turf & Weather Check", query: "How to handle rain contingency for synthetic turf matches?" },
+    ],
+    cobros: [
+      { label: "💳 Pitch Fee Reminder", query: "Draft a polite WhatsApp reminder to collect pitch rental fees." },
+      { label: "💰 Cost Splitting", query: "How to split the pitch rental fairly among all players?" },
+    ],
+    partidos: [
+      { label: "⚖️ Fair Play Rules", query: "Explain soccer match confirmation and Fair Play rules." },
+      { label: "🏆 Match Recap", query: "Draft a soccer matchday recap for WhatsApp celebrating goals and sportsmanship." },
+    ],
+    ranking: [
+      { label: "⚽ League Table Points", query: "Explain how football league points work (3 for win, 1 for draw)." },
+      { label: "🥅 Team A vs B Balance", query: "How to balance two soccer teams for a fair and competitive match?" },
+    ],
+    admin: [
+      { label: "📲 Club WhatsApp Invite", query: "Draft an official WhatsApp welcome invitation for new club members." },
+      { label: "🛡️ Best Practices", query: "What are 3 best practices to keep members engaged every week?" },
+    ],
+    general: [
+      { label: "⚽ Match Organizer Tips", query: "What are the best tips to run a friendly 5v5 match on time?" },
+      { label: "⚡ Tips for Organizer", query: "Give me 3 practical tips for organizing today's soccer event." },
+    ],
+  },
+  pt: {
+    encuentros: [
+      { label: "📢 Convocação Pelada", query: "Redija uma mensagem para o WhatsApp convocando para o futebol e completando os times de 5 ou 7." },
+      { label: "🌧️ Quadra Sintética e Chuva", query: "Como coordenar em caso de chuva para a pelada na quadra sintética?" },
+    ],
+    cobros: [
+      { label: "💳 Taxa da Quadra e Bola", query: "Redija um lembrete gentil para o WhatsApp cobrando a taxa do aluguel da quadra de futebol." },
+      { label: "💰 Divisão entre Jogadores", query: "Como dividir o valor do aluguel da quadra entre os jogadores da pelada?" },
+    ],
+    partidos: [
+      { label: "⚖️ Fair Play no Futebol", query: "Explique como funciona a confirmação de placar e Fair Play no futebol." },
+      { label: "🏆 Resumo da Pelada", query: "Redija a crônica do futebol para o WhatsApp destacando os gols e o Fair Play." },
+    ],
+    ranking: [
+      { label: "⚽ Pontos e Tabela da Liga", query: "Explique como são calculados os pontos na tabela de futebol (3 por vitória, 1 por empate)." },
+      { label: "🥅 Equilíbrio Time A vs B", query: "Como dividir os times de futebol para que o jogo seja equilibrado e competitivo?" },
+    ],
+    admin: [
+      { label: "📲 Convite WhatsApp para o Clube", query: "Redija o convite oficial de boas-vindas com o link e código do clube para novos sócios." },
+      { label: "🛡️ Melhores Práticas", query: "Quais são as 3 melhores práticas para manter a comunidade ativa toda semana?" },
+    ],
+    general: [
+      { label: "⚽ Dicas para a Pelada", query: "Quais são as melhores dicas para organizar um futebol de 5 ou 7 no horário e com harmonia?" },
+      { label: "⚡ Dicas para o Organizador", query: "Dê 3 dicas para que o evento esportivo de hoje ocorra no horário e com harmonia." },
+    ],
+  },
+};
+
+export function ParrynFloatingWidget({ club }: { club?: any }) {
   const [location] = useLocation();
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -171,6 +252,16 @@ export function ParrynFloatingWidget() {
   const langKey = (language as "es" | "en" | "pt") || "es";
   const texts = WIDGET_TEXTS[langKey] || WIDGET_TEXTS.es;
 
+  const isFutbolClub =
+    club?.isFootball ||
+    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
+    club?.name?.toLowerCase().includes("fútbol") ||
+    club?.name?.toLowerCase().includes("futbol") ||
+    (user as any)?.clubId === 3 ||
+    (user as any)?.email?.includes("futbol");
+
+  const widgetEmoji = isFutbolClub ? "⚽" : "🎾";
+
   // Detección contextual de la pantalla actual
   const getScreenCategory = (): keyof typeof texts.screenHints => {
     if (location.startsWith("/encuentros")) return "encuentros";
@@ -182,7 +273,10 @@ export function ParrynFloatingWidget() {
   };
 
   const currentCategory = getScreenCategory();
-  const hints = texts.screenHints[currentCategory] || texts.screenHints.general;
+  const activeHintsSource = isFutbolClub
+    ? (FOOTBALL_HINTS[langKey] || FOOTBALL_HINTS.es)
+    : texts.screenHints;
+  const hints = activeHintsSource[currentCategory] || activeHintsSource.general;
 
   const handleAsk = async (textToAsk: string) => {
     if (!textToAsk.trim() || loading) return;
@@ -216,9 +310,6 @@ export function ParrynFloatingWidget() {
       setLoading(false);
     }
   };
-
-  const isFutbolClub = (user as any)?.clubId === 3 || (user as any)?.email?.includes("futbol");
-  const widgetEmoji = isFutbolClub ? "⚽" : "🎾";
 
   const handleCopy = () => {
     if (!response) return;
@@ -378,7 +469,15 @@ export function ParrynFloatingWidget() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={texts.inputPlaceholder}
+                placeholder={
+                  isFutbolClub
+                    ? langKey === "en"
+                      ? "Ask Parryn (e.g. 'How to balance teams for 5v5?')..."
+                      : langKey === "pt"
+                      ? "Pergunte ao Parryn (ex: 'Como dividir os times para 5v5?')..."
+                      : "Escribe a Parryn (ej: '¿Cómo armo los equipos para 5v5?')..."
+                    : texts.inputPlaceholder
+                }
                 className="flex-1 bg-background border border-border text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-foreground"
               />
               <Button

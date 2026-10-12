@@ -227,9 +227,68 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       match.status === "confirmed" &&
       ["team1", "team2", "draw"].includes(match.result),
   );
-  const top = [...players]
-    .map((player) => ({ id: player.id, name: player.name, elo: ratingMap.get(player.id) ?? 1500 }))
-    .sort((a, b) => b.elo - a.elo)[0];
+  const [sportRecord] = await db
+    .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug })
+    .from(sportsTable)
+    .where(eq(sportsTable.id, sportId))
+    .limit(1);
+
+  const isFootball = sportRecord?.slug === "futbol" || sportRecord?.name?.toLowerCase().includes("fútbol");
+
+  const playerStats = new Map(players.map((p) => [p.id, { wins: 0, losses: 0, draws: 0, points: 0 }]));
+  for (const m of confirmed) {
+    let effResult = m.result;
+    if (!["team1", "team2", "draw"].includes(effResult)) {
+      const t1 = Number(m.team1Score ?? 0);
+      const t2 = Number(m.team2Score ?? 0);
+      if (t1 > t2) effResult = "team1";
+      else if (t2 > t1) effResult = "team2";
+      else effResult = "draw";
+    }
+    const rows = grouped[m.id] ?? [];
+    const team1 = rows.filter((r) => r.team === "team1").map((r) => r.playerId);
+    const team2 = rows.filter((r) => r.team === "team2").map((r) => r.playerId);
+    if (effResult === "draw") {
+      for (const pid of [...team1, ...team2]) {
+        const ps = playerStats.get(pid);
+        if (ps) { ps.draws++; ps.points += 1; }
+      }
+    } else {
+      const winners = effResult === "team1" ? team1 : team2;
+      const losers = effResult === "team1" ? team2 : team1;
+      for (const pid of winners) {
+        const ps = playerStats.get(pid);
+        if (ps) { ps.wins++; ps.points += 3; }
+      }
+      for (const pid of losers) {
+        const ps = playerStats.get(pid);
+        if (ps) ps.losses++;
+      }
+    }
+  }
+
+  let topPlayer: any = null;
+  if (isFootball) {
+    const sorted = [...players]
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        points: playerStats.get(p.id)?.points ?? 0,
+        wins: playerStats.get(p.id)?.wins ?? 0,
+        draws: playerStats.get(p.id)?.draws ?? 0,
+        losses: playerStats.get(p.id)?.losses ?? 0,
+        isFootball: true,
+      }))
+      .sort((a, b) => b.points - a.points || b.wins - a.wins);
+    if (sorted[0]) {
+      topPlayer = sorted[0];
+    }
+  } else {
+    const top = [...players]
+      .map((player) => ({ id: player.id, name: player.name, elo: ratingMap.get(player.id) ?? 1500, isFootball: false }))
+      .sort((a, b) => b.elo - a.elo)[0];
+    topPlayer = top && top.elo > 1500 ? top : (top || null);
+  }
 
   const recentMatches = confirmed.slice(0, 5).map((match) => {
     const rows = grouped[match.id] ?? [];
@@ -253,8 +312,9 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   res.json({
     totalPlayers: players.length,
     totalMatches: confirmed.length,
-    topPlayer: top && top.elo > 1500 ? top : null,
+    topPlayer,
     recentMatches,
+    isFootball,
   });
 });
 

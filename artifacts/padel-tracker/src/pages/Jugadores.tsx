@@ -90,7 +90,12 @@ export default function Jugadores() {
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
           {filteredPlayers?.map((player: any, idx) => {
-            const points = player.elo ?? 1500;
+            const isFootball =
+              player.isFootball ||
+              player.sportSlug === "futbol" ||
+              player.sportName?.toLowerCase().includes("fútbol");
+            const points = isFootball ? (player.points ?? 0) : (player.elo ?? 1500);
+            const label = isFootball ? "Pts" : "Elo";
 
             return (
               <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
@@ -105,7 +110,7 @@ export default function Jugadores() {
                   </div>
                   <div className="text-right mr-2">
                     <span className="text-lg font-black text-primary tracking-tighter">{points}</span>
-                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold -mt-1">Pts</p>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold -mt-1">{label}</p>
                   </div>
                 </Link>
 

@@ -9,6 +9,8 @@ import {
   playerCategoriesTable,
   clubSportCategoriesTable,
   clubsTable,
+  sportsTable,
+  clubSportsTable,
 } from "@workspace/db";
 import {
   CreatePlayerBody,
@@ -80,6 +82,88 @@ async function enrichPlayer(
     categories = [];
   }
 
+  let isFootball = false;
+  let useSets = true;
+  let sportName = "Pádel";
+  let sportSlug = "padel";
+
+  if (player.clubId) {
+    try {
+      const [clubSport] = await db
+        .select({
+          id: sportsTable.id,
+          name: sportsTable.name,
+          slug: sportsTable.slug,
+          useSets: sportsTable.useSets,
+        })
+        .from(clubSportsTable)
+        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+        .where(
+          and(
+            eq(clubSportsTable.clubId, player.clubId),
+            eq(clubSportsTable.active, true),
+            eq(sportsTable.active, true)
+          )
+        )
+        .orderBy(clubSportsTable.id)
+        .limit(1);
+
+      if (clubSport) {
+        sportName = clubSport.name;
+        sportSlug = clubSport.slug;
+        useSets = clubSport.useSets;
+        isFootball = clubSport.slug === "futbol" || clubSport.name.toLowerCase().includes("fútbol");
+      }
+    } catch {}
+  }
+
+  let points = 0;
+  let wins = 0;
+  let draws = 0;
+  let losses = 0;
+
+  if (isFootball) {
+    try {
+      const matchRows = await db
+        .select({
+          matchId: matchPlayersTable.matchId,
+          team: matchPlayersTable.team,
+          status: matchesTable.status,
+          result: matchesTable.result,
+          team1Score: matchesTable.team1Score,
+          team2Score: matchesTable.team2Score,
+        })
+        .from(matchPlayersTable)
+        .innerJoin(matchesTable, eq(matchPlayersTable.matchId, matchesTable.id))
+        .where(
+          and(
+            eq(matchPlayersTable.playerId, player.id),
+            eq(matchesTable.status, "confirmed")
+          )
+        );
+
+      for (const m of matchRows) {
+        let effResult = m.result;
+        if (!["team1", "team2", "draw"].includes(effResult)) {
+          const t1 = Number(m.team1Score ?? 0);
+          const t2 = Number(m.team2Score ?? 0);
+          if (t1 > t2) effResult = "team1";
+          else if (t2 > t1) effResult = "team2";
+          else effResult = "draw";
+        }
+        if (effResult === "draw") {
+          draws++;
+          points += 1;
+        } else if (effResult === m.team) {
+          wins++;
+          points += 3;
+        } else {
+          losses++;
+        }
+      }
+    } catch {}
+  }
+
   return {
     id: player.id,
     name: player.name,
@@ -96,6 +180,14 @@ async function enrichPlayer(
       player.language ?? "es",
     clubId:
       player.clubId ?? null,
+    isFootball,
+    useSets,
+    sportName,
+    sportSlug,
+    points,
+    wins,
+    draws,
+    losses,
     avatarInitials:
       player.name
         .split(" ")
@@ -890,6 +982,41 @@ router.get(
         }
       );
 
+    let isFootball = false;
+    let useSets = true;
+    let sportName = "Pádel";
+    let sportSlug = "padel";
+
+    if (player.clubId) {
+      try {
+        const [clubSport] = await db
+          .select({
+            id: sportsTable.id,
+            name: sportsTable.name,
+            slug: sportsTable.slug,
+            useSets: sportsTable.useSets,
+          })
+          .from(clubSportsTable)
+          .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+          .where(
+            and(
+              eq(clubSportsTable.clubId, player.clubId),
+              eq(clubSportsTable.active, true),
+              eq(sportsTable.active, true)
+            )
+          )
+          .orderBy(clubSportsTable.id)
+          .limit(1);
+
+        if (clubSport) {
+          sportName = clubSport.name;
+          sportSlug = clubSport.slug;
+          useSets = clubSport.useSets;
+          isFootball = clubSport.slug === "futbol" || clubSport.name.toLowerCase().includes("fútbol");
+        }
+      } catch {}
+    }
+
     if (
       playerMatches.length ===
       0
@@ -908,6 +1035,10 @@ router.get(
         setsLost: 0,
         currentStreak: 0,
         recentMatches: [],
+        isFootball,
+        useSets,
+        sportName,
+        sportSlug,
       });
 
       return;
@@ -1129,6 +1260,10 @@ router.get(
       setsLost,
       currentStreak,
       recentMatches,
+      isFootball,
+      useSets,
+      sportName,
+      sportSlug,
     });
   }
 );

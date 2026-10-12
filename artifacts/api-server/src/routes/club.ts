@@ -159,33 +159,60 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
   try {
     const user = req.user as any;
     const queryClubId = req.query.clubId ? Number(req.query.clubId) : null;
+    let targetClub: any = null;
 
     if (queryClubId && !Number.isNaN(queryClubId)) {
       const [club] = await db
         .select()
         .from(clubsTable)
         .where(eq(clubsTable.id, queryClubId));
-
-      if (club) {
-        res.json(club);
-        return;
-      }
+      if (club) targetClub = club;
     }
 
-    if (user && user.clubId) {
+    if (!targetClub && user && user.clubId) {
       const [club] = await db
         .select()
         .from(clubsTable)
         .where(eq(clubsTable.id, user.clubId));
-
-      if (club) {
-        res.json(club);
-        return;
-      }
+      if (club) targetClub = club;
     }
 
-    const [firstClub] = await db.select().from(clubsTable).limit(1);
-    res.json(firstClub || null);
+    if (!targetClub) {
+      const [firstClub] = await db.select().from(clubsTable).limit(1);
+      targetClub = firstClub;
+    }
+
+    if (!targetClub) {
+      res.json(null);
+      return;
+    }
+
+    let sports: any[] = [];
+    try {
+      sports = await db
+        .select({
+          id: sportsTable.id,
+          name: sportsTable.name,
+          slug: sportsTable.slug,
+          useSets: sportsTable.useSets,
+        })
+        .from(clubSportsTable)
+        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+        .where(
+          and(
+            eq(clubSportsTable.clubId, targetClub.id),
+            eq(clubSportsTable.active, true),
+            eq(sportsTable.active, true)
+          )
+        );
+    } catch {}
+
+    const isFootball =
+      sports.some((s) => s.slug === "futbol" || s.name.toLowerCase().includes("fútbol")) ||
+      targetClub.name.toLowerCase().includes("fútbol") ||
+      targetClub.id === 3;
+
+    res.json({ ...targetClub, sports, isFootball });
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
     res.json(null);
