@@ -133,6 +133,14 @@ router.get("/ranking", async (req, res): Promise<void> => {
     }
   }
 
+  const [sportRecord] = await db
+    .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug })
+    .from(sportsTable)
+    .where(eq(sportsTable.id, sportId))
+    .limit(1);
+
+  const isFootball = sportRecord?.slug === "futbol" || (sportRecord?.name?.toLowerCase().includes("fútbol") ?? false);
+
   const ranking = players
     .map((player) => {
       const playerStats = stats.get(player.id)!;
@@ -143,6 +151,9 @@ router.get("/ranking", async (req, res): Promise<void> => {
         playerName: player.name,
         nickname: player.nickname ?? null,
         sportId,
+        sportSlug: sportRecord?.slug ?? "padel",
+        sportName: sportRecord?.name ?? "Pádel",
+        isFootball,
         elo,
         points: playerStats.points,
         wins: playerStats.wins,
@@ -152,7 +163,18 @@ router.get("/ranking", async (req, res): Promise<void> => {
         winRate: totalMatches ? Math.round((playerStats.wins / totalMatches) * 100) : 0,
       };
     })
-    .sort((a, b) => b.elo - a.elo || b.wins - a.wins || a.losses - b.losses)
+    .sort((a, b) => {
+      if (isFootball) {
+        return (
+          b.points - a.points ||
+          b.wins - a.wins ||
+          b.draws - a.draws ||
+          a.losses - b.losses ||
+          b.elo - a.elo
+        );
+      }
+      return b.elo - a.elo || b.wins - a.wins || a.losses - b.losses;
+    })
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   res.json(ranking);

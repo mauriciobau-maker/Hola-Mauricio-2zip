@@ -11,13 +11,16 @@ function initials(name: string) {
 export default function Ranking() {
   const { t } = useLanguage();
   const { data: ranking, isLoading } = useGetRanking();
+  const isFootball = (ranking as any)?.[0]?.isFootball || (ranking as any)?.[0]?.sportSlug === "futbol" || (ranking as any)?.[0]?.sportName?.toLowerCase().includes("fútbol");
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("ranking.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {isFootball ? "Tabla de Posiciones" : t("ranking.title")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {t("ranking.subtitle")}
+          {isFootball ? "Clasificación oficial de la liga por puntos, partidos y efectividad." : t("ranking.subtitle")}
         </p>
       </div>
 
@@ -42,28 +45,40 @@ export default function Ranking() {
           {/* Podium top 3 */}
           {ranking.length >= 3 && (
             <div className="grid grid-cols-3 gap-3 mb-2">
-              <PodiumCard entry={ranking[1]} />
-              <PodiumCard entry={ranking[0]} isFirst />
-              <PodiumCard entry={ranking[2]} />
+              <PodiumCard entry={ranking[1]} isFootball={isFootball} />
+              <PodiumCard entry={ranking[0]} isFirst isFootball={isFootball} />
+              <PodiumCard entry={ranking[2]} isFootball={isFootball} />
             </div>
           )}
 
           {/* Full table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <div className="col-span-1">{t("ranking.pos")}</div>
-              <div className="col-span-4">{t("ranking.player")}</div>
-              <div className="col-span-3 text-center">Elo</div>
-              <div className="col-span-1 text-center">{t("ranking.wins")}</div>
-              <div className="col-span-1 text-center">{t("ranking.losses")}</div>
-              <div className="col-span-2 text-center">{t("ranking.winRate")}</div>
-            </div>
+            {isFootball ? (
+              <div className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-1">{t("ranking.pos")}</div>
+                <div className="col-span-4">{t("ranking.player")}</div>
+                <div className="col-span-2 text-center text-primary">PTS</div>
+                <div className="col-span-1 text-center">PJ</div>
+                <div className="col-span-1 text-center text-green-400">PG</div>
+                <div className="col-span-1 text-center text-yellow-400">PE</div>
+                <div className="col-span-2 text-center">% Efic.</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-1">{t("ranking.pos")}</div>
+                <div className="col-span-4">{t("ranking.player")}</div>
+                <div className="col-span-3 text-center">Elo</div>
+                <div className="col-span-1 text-center">{t("ranking.wins")}</div>
+                <div className="col-span-1 text-center">{t("ranking.losses")}</div>
+                <div className="col-span-2 text-center">{t("ranking.winRate")}</div>
+              </div>
+            )}
             <div className="divide-y divide-border">
-              {ranking.map((entry) => (
+              {ranking.map((entry: any) => (
                 <Link
                   key={entry.playerId}
                   href={`/jugadores/${entry.playerId}`}
-                  className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-muted/20 transition-colors"
+                  className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-3 items-center hover:bg-muted/20 transition-colors"
                 >
                   <div className="col-span-1">
                     <RankBadge rank={entry.rank} />
@@ -79,42 +94,96 @@ export default function Ranking() {
                       )}
                     </div>
                   </div>
-                  <div className="col-span-3 text-center">
-                    <EloDisplay elo={entry.elo} />
-                  </div>
-                  <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
-                  <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
-                  <div className="col-span-2 text-center">
-                    <WinRateBar rate={entry.winRate} />
-                  </div>
+
+                  {isFootball ? (
+                    <>
+                      <div className="col-span-2 text-center">
+                        <PointsDisplay points={entry.points ?? 0} />
+                      </div>
+                      <div className="col-span-1 text-center text-sm font-medium text-foreground/80">
+                        {entry.totalMatches ?? (entry.wins + entry.losses + (entry.draws || 0))}
+                      </div>
+                      <div className="col-span-1 text-center text-sm text-green-400 font-medium">
+                        {entry.wins}
+                      </div>
+                      <div className="col-span-1 text-center text-sm text-yellow-400 font-medium">
+                        {entry.draws ?? 0}
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <WinRateBar rate={entry.winRate} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-span-3 text-center">
+                        <EloDisplay elo={entry.elo} />
+                      </div>
+                      <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
+                      <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
+                      <div className="col-span-2 text-center">
+                        <WinRateBar rate={entry.winRate} />
+                      </div>
+                    </>
+                  )}
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* Elo explanation */}
-          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Zap size={14} className="text-primary" />
-              <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
+          {/* Rules / Explanation */}
+          {isFootball ? (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚽</span>
+                <h3 className="text-sm font-semibold">Sistema de Puntuación de Liga (Fútbol)</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-400 mt-0.5 flex-shrink-0" />
+                  <span><strong className="text-foreground">3 Puntos:</strong> Por cada victoria en partido oficial o pichanga.</span>
+                </div>
+                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 mt-0.5 flex-shrink-0" />
+                  <span><strong className="text-foreground">1 Punto:</strong> Por empate oficial entre ambos equipos.</span>
+                </div>
+                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary/70 mt-0.5 flex-shrink-0" />
+                  <span><strong className="text-foreground">Efectividad:</strong> Porcentaje de rendimiento acumulado por jugador.</span>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
-              <div className="flex items-start gap-2">
-                <TrendingUp size={12} className="text-green-400 mt-0.5 flex-shrink-0" />
-                <span>{t("ranking.eloWinLossRule")}</span>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap size={14} className="text-primary" />
+                <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
               </div>
-              <div className="flex items-start gap-2">
-                <TrendingDown size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-                <span>{t("ranking.eloDrawRule")}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="w-3 h-3 rounded-full bg-primary/50 flex-shrink-0 mt-0.5" />
-                <span>{t("ranking.eloBaseRule")}</span>
+              <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <TrendingUp size={12} className="text-green-400 mt-0.5 flex-shrink-0" />
+                  <span>{t("ranking.eloWinLossRule")}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <TrendingDown size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  <span>{t("ranking.eloDrawRule")}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-3 h-3 rounded-full bg-primary/50 flex-shrink-0 mt-0.5" />
+                  <span>{t("ranking.eloBaseRule")}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+function PointsDisplay({ points }: { points: number }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-sm font-bold tabular-nums text-primary">{points} pts</span>
     </div>
   );
 }
@@ -158,7 +227,7 @@ function WinRateBar({ rate }: { rate: number }) {
   );
 }
 
-function PodiumCard({ entry, isFirst = false }: { entry: any; isFirst?: boolean }) {
+function PodiumCard({ entry, isFirst = false, isFootball = false }: { entry: any; isFirst?: boolean; isFootball?: boolean }) {
   const colors = {
     1: "border-yellow-500/40 bg-yellow-500/10",
     2: "border-gray-400/40 bg-gray-400/10",
@@ -180,8 +249,12 @@ function PodiumCard({ entry, isFirst = false }: { entry: any; isFirst?: boolean 
       </div>
       <p className="text-xs font-semibold truncate max-w-full">{entry.playerName.split(" ")[0]}</p>
       <div className="flex flex-col items-center">
-        <span className="text-sm font-bold text-primary tabular-nums">{entry.elo}</span>
-        <span className="text-xs text-muted-foreground">Elo</span>
+        <span className="text-sm font-bold text-primary tabular-nums">
+          {isFootball ? `${entry.points ?? 0} pts` : entry.elo}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {isFootball ? "Puntos Liga" : "Elo"}
+        </span>
       </div>
     </Link>
   );

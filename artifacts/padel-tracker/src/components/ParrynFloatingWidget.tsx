@@ -201,6 +201,7 @@ export function ParrynFloatingWidget() {
             screen: location,
             userRole: (user as any)?.isAdmin === 1 ? "Admin" : "Jugador",
             lang: language,
+            clubId: (user as any)?.clubId,
           },
         }),
       });
@@ -215,6 +216,9 @@ export function ParrynFloatingWidget() {
       setLoading(false);
     }
   };
+
+  const isFutbolClub = (user as any)?.clubId === 3 || (user as any)?.email?.includes("futbol");
+  const widgetEmoji = isFutbolClub ? "⚽" : "🎾";
 
   const handleCopy = () => {
     if (!response) return;
@@ -233,7 +237,7 @@ export function ParrynFloatingWidget() {
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs md:text-sm shadow-xl shadow-emerald-950/30 border border-emerald-400/40 transition-all transform hover:scale-105 active:scale-95 group"
             title="Abrir Secretario Parryn IA"
           >
-            <span className="text-base group-hover:rotate-12 transition-transform">🎾</span>
+            <span className="text-base group-hover:rotate-12 transition-transform">{widgetEmoji}</span>
             <Sparkles className="w-4 h-4 text-emerald-200 animate-pulse" />
             <span className="font-bold tracking-tight">{texts.floatingButton}</span>
             <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping ml-0.5" />
@@ -247,7 +251,7 @@ export function ParrynFloatingWidget() {
             <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-sm">
-                  🎾
+                  {widgetEmoji}
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
