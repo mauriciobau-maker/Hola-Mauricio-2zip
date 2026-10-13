@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { GoogleGenAI } from "@google/genai";
-import { requireAuth, resolveEffectiveClubId } from "../middlewares/requireCommunity";
-import { db, encuentrosTable, clubsTable, sportsTable, clubSportsTable } from "@workspace/db";
+import { isSuperAdminUser, requireAuth, resolveEffectiveClubId } from "../middlewares/requireCommunity";
+import { db, encuentrosTable, clubsTable, sportsTable, clubSportsTable, sportModalitiesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
 const router: Router = Router();
@@ -535,6 +535,100 @@ function isCreateEventQuery(text: string): boolean {
   const hasAction = norm.includes("haz") || norm.includes("hqz") || norm.includes("arma") || norm.includes("crea") || norm.includes("organiza") || norm.includes("monta") || norm.includes("programa") || norm.includes("genera");
   const hasEvent = norm.includes("convocatoria") || norm.includes("encuentro") || norm.includes("torneo") || norm.includes("partido") || norm.includes("pichanga") || norm.includes("americano");
   return (hasAction && hasEvent) || norm.includes("convocatoria para") || norm.includes("torneo para") || norm.includes("partido para");
+}
+
+function normalizeIntentText(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function normalizeSportIdentifier(value: string): string {
+  const normalized = normalizeIntentText(value);
+  if (/\b(padel)\b/.test(normalized)) return "padel";
+  if (/\b(tenis|tennis)\b/.test(normalized)) return "tenis";
+  if (/\b(futbol|football|soccer)\b/.test(normalized)) return "futbol";
+  return normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function resolveEventClubId(req: Request, clubContext: any): number | null {
+  const user = req.user as any;
+  const userClubId = Number(user?.clubId);
+  const hasUserClub = Number.isSafeInteger(userClubId) && userClubId > 0;
+  const isPlatformAdmin = isSuperAdminUser(user) && user?.isClubAdmin !== 1 && user?.isClubAdmin !== true;
+
+  if (isPlatformAdmin) {
+    const selectedClubId = Number(clubContext?.clubId);
+    if (Number.isSafeInteger(selectedClubId) && selectedClubId > 0) return selectedClubId;
+    if (req.query.clubId || req.query.club) return null;
+  }
+
+  return hasUserClub ? userClubId : null;
+}
+
+type EventCreationModality = {
+  id: number;
+  name: string;
+  slug: string;
+  teamSize: number;
+  useSets: boolean;
+};
+
+type EventModalityChoice = {
+  modality: EventCreationModality;
+  format: string;
+  formatLabel: string;
+};
+
+function chooseEventModality(
+  sportSlug: string,
+  query: string,
+  modalities: EventCreationModality[],
+): EventModalityChoice | null {
+  const normalizedQuery = normalizeIntentText(query);
+  const individualRequested = /\b(individual|individuales|single|singles)\b/.test(normalizedQuery);
+  const doublesRequested = /\b(doble|dobles|double|doubles|dupla|duplas)\b/.test(normalizedQuery);
+  if (individualRequested && doublesRequested) return null;
+
+  if (sportSlug === "futbol") {
+    const namedSize = normalizedQuery.match(/\b(?:futbol|football|soccer)\s*[- ]?(5|7|8|11)\b/);
+    const versusSize = normalizedQuery.match(/\b(5|7|8|11)\s*(?:v|vs|x)\s*(5|7|8|11)\b/);
+    const teamSize = Number(namedSize?.[1] || (
+      versusSize?.[1] === versusSize?.[2] ? versusSize[1] : NaN
+    ));
+    const modality = Number.isFinite(teamSize)
+      ? modalities.find((item) => item.teamSize === teamSize)
+      : modalities.length === 1 ? modalities[0] : undefined;
+    return modality ? { modality, format: modality.slug, formatLabel: modality.name } : null;
+  }
+
+  if (sportSlug === "tenis") {
+    const teamSize = individualRequested ? 1 : doublesRequested ? 2 : null;
+    const modality = teamSize !== null
+      ? modalities.find((item) => item.teamSize === teamSize)
+      : modalities.length === 1 ? modalities[0] : undefined;
+    return modality ? { modality, format: modality.slug, formatLabel: modality.name } : null;
+  }
+
+  if (sportSlug === "padel") {
+    const styles = [
+      { slug: "americana", label: "Americana", pattern: /\bamerican[ao]s?\b/ },
+      { slug: "parejas_fijas", label: "Parejas fijas", pattern: /\bparejas?\s+fijas?\b|\bfixed\s+pairs?\b/ },
+      { slug: "desafio", label: "Desafío", pattern: /\bdesafios?\b|\bchallenge\b/ },
+    ].filter((style) => style.pattern.test(normalizedQuery));
+    if (styles.length !== 1) return null;
+
+    const style = styles[0];
+    const teamSize = style.slug === "desafio"
+      ? individualRequested ? 1 : doublesRequested ? 2 : null
+      : 2;
+    if (teamSize === null) return null;
+    const modality = modalities.find((item) => item.teamSize === teamSize);
+    return modality ? { modality, format: style.slug, formatLabel: style.label } : null;
+  }
+
+  if (modalities.length === 1) {
+    return { modality: modalities[0], format: modalities[0].slug, formatLabel: modalities[0].name };
+  }
+  return null;
 }
 
 // 5. Asistente General de Operaciones (Scheduling, Clima, Canchas, Dudas & Creación Automática)
