@@ -29,6 +29,7 @@ function getGenAI(): GoogleGenAI | null {
 function getSystemInstruction(sportName = "Pádel", sportSlug = "padel"): string {
   const isFutbol = sportSlug === "futbol" || sportName.toLowerCase().includes("fútbol") || sportName.toLowerCase().includes("futbol");
   const isTenis = sportSlug === "tenis" || sportName.toLowerCase().includes("tenis") || sportName.toLowerCase().includes("tennis");
+  const isPadel = sportSlug === "padel" || sportName.toLowerCase().includes("pádel") || sportName.toLowerCase().includes("padel");
 
   let sportSpecificRules = "";
   if (isFutbol) {
@@ -42,12 +43,19 @@ function getSystemInstruction(sportName = "Pádel", sportSlug = "padel"): string
     sportSpecificRules = `
 - DEPORTE ACTIVO: TENIS.
 - Emojis principales: 🎾 🏆 🥇.
-- Vocabulario tenístico obligatorio: singles (individuales) o dobles, sets, games, tie-break, saque, canchas de arcilla / polvo de ladrillo, cemento o pasto.`;
-  } else {
+- Vocabulario tenístico: individuales/singles o dobles, sets, games, tie-break, saque y superficies de arcilla, cemento o pasto.
+- Nunca uses Drive/Revés, torneo americano, punto de oro ni rotación de parejas como reglas de tenis.
+- No inventes sets, games, resultados, superficie disponible ni modalidad si el contexto no los indica.`;
+  } else if (isPadel) {
     sportSpecificRules = `
 - DEPORTE ACTIVO: PÁDEL.
 - Emojis principales: 🎾 ⚡ 🏆.
 - Vocabulario de pádel obligatorio: pistas de cristal, parejas (Drive y Revés), torneo americano, punto de oro, sets y games.`;
+  } else {
+    sportSpecificRules = `
+- DEPORTE ACTIVO: ${sportName}.
+- Usa únicamente reglas confirmadas para ${sportName}; no asumas reglas de fútbol, tenis ni pádel.
+- Si faltan datos sobre modalidad o reglas, pregunta antes de inventarlos.`;
   }
 
   return `Eres Parryn, el Secretario Deportivo inteligente de Parryn Sport Hub IA.
@@ -103,10 +111,11 @@ async function resolveSportForContext(req: Request, explicitSport?: string, club
 // 1. Convocatoria y Bajas de Última Hora
 router.post("/convocatoria", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, dateTime, location, sportName, maxSpots, confirmedCount, missingCount, confirmedNames = [], lang = "es" } = req.body;
-    const sport = await resolveSportForContext(req, sportName, req.body.clubContext);
+    const { title, dateTime, location, sportName, sportSlug, maxSpots, confirmedCount, missingCount, confirmedNames = [], lang = "es" } = req.body;
+    const sport = await resolveSportForContext(req, sportSlug || sportName, req.body.clubContext);
     const resolvedSportName = sport.name;
     const isFutbol = sport.slug === "futbol";
+    const isTenis = sport.slug === "tenis";
 
     const prompt = `Genera un mensaje de convocatoria y urgencia para el grupo de WhatsApp del club deportivo.
 Datos del evento:
@@ -158,6 +167,17 @@ ${confirmedNames.length > 0 ? confirmedNames.map((n: string, i: number) => `${i 
 ${missingCount > 0 ? `🚨 *¡Atención! Faltan ${missingCount} jugador(es) para armar los dos equipos.* ¿Quién se pone la camiseta?` : "✅ *¡Equipos completos! Se viene partidazo.*"}
 
 📲 Confirma tu asistencia en la app oficial del club.`
+      : isTenis
+      ? `🎾 *CONVOCATORIA DE TENIS: ${title.toUpperCase()}*
+📍 *Cancha:* ${location}
+⏰ *Horario:* ${dateTime}
+
+👥 *Confirmados (${confirmedCount}${maxSpots ? `/${maxSpots}` : ""}):*
+${confirmedNames.length > 0 ? confirmedNames.map((n: string, i: number) => `${i + 1}. ${n}`).join("\n") : "• Aún sin confirmados"}
+
+${missingCount > 0 ? `🚨 *Faltan ${missingCount} jugador(es).* Confirma si jugarán individuales o dobles para organizar los partidos.` : "✅ *¡La convocatoria está completa!*"}
+
+📲 Confirma tu asistencia en la app oficial del club.`
       : `${sportEmoji} *CONVOCATORIA OFICIAL: ${title.toUpperCase()}*
 📍 *Lugar:* ${location}
 ⏰ *Horario:* ${dateTime}
@@ -178,9 +198,10 @@ ${missingCount > 0 ? `🚨 *¡Atención! Nos faltan ${missingCount} jugador(es) 
 // 2. Matchmaking y Equilibrio Deportivo (Drive/Revés en Pádel vs Equipos A/B en Fútbol)
 router.post("/matchmaking", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { players = [], sportName, lang = "es" } = req.body;
-    const sport = await resolveSportForContext(req, sportName, req.body.clubContext);
+    const { players = [], sportName, sportSlug, lang = "es" } = req.body;
+    const sport = await resolveSportForContext(req, sportSlug || sportName, req.body.clubContext);
     const isFutbol = sport.slug === "futbol";
+    const isTenis = sport.slug === "tenis";
 
     if (players.length < 4) {
       res.status(400).json({ error: "Se necesitan al menos 4 jugadores para el análisis de emparejamiento." });
@@ -195,6 +216,15 @@ Tu objetivo como Parryn:
 1. Divide a los convocados en Equipo A y Equipo B buscando la mayor paridad competitiva posible.
 2. Si hay posiciones indicadas (arquero, defensa, delantero), distribúyelos equitativamente.
 3. Explica brevemente el balance para el organizador de la pichanga.`
+      : isTenis
+      ? `Analiza estos jugadores de tenis y su nivel:
+${JSON.stringify(players, null, 2)}
+
+Tu objetivo como Parryn:
+1. Recomienda cruces individuales equilibrados por nivel/ELO.
+2. Si el organizador indicó dobles, equilibra las parejas; no uses posiciones Drive/Revés.
+3. Si no está indicado si es singles o dobles, aclara esa suposición antes de recomendar parejas.
+4. Explica brevemente la lógica de paridad.`
       : `Analiza estos jugadores para emparejamiento de ${sport.name}:
 ${JSON.stringify(players, null, 2)}
 
@@ -240,6 +270,15 @@ Tu objetivo como Parryn:
       return;
     }
 
+    if (isTenis) {
+      const name = (player: any, index: number) => player.name || `Jugador ${index + 1}`;
+      res.json({
+        analysis: `🎾 *Cruces de tenis equilibrados por nivel:*\n• Individuales: ${name(sorted[0], 0)} vs ${name(sorted[3], 3)} y ${name(sorted[1], 1)} vs ${name(sorted[2], 2)}.\n\nConfirma si la jornada será de individuales o dobles antes de fijar las parejas. No se asumieron posiciones de pádel.`,
+        aiPowered: false,
+      });
+      return;
+    }
+
     res.json({
       analysis: `🤖 *Análisis de Parryn:* Se ordenaron los jugadores por nivel para equilibrar fuerzas. Pareja recomendada: ${sorted[0]?.name} (${sorted[0]?.elo ?? 1500}) + ${sorted[3]?.name} (${sorted[3]?.elo ?? 1500}) contra ${sorted[1]?.name} (${sorted[1]?.elo ?? 1500}) + ${sorted[2]?.name} (${sorted[2]?.elo ?? 1500}). Paridad deportiva estimada: 50% - 50%.`,
       aiPowered: false,
@@ -252,9 +291,10 @@ Tu objetivo como Parryn:
 // 3. Crónica Oficial de la Jornada para WhatsApp
 router.post("/cierre", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, date, matches = [], sportName, lang = "es" } = req.body;
-    const sport = await resolveSportForContext(req, sportName, req.body.clubContext);
+    const { title, date, matches = [], sportName, sportSlug, lang = "es" } = req.body;
+    const sport = await resolveSportForContext(req, sportSlug || sportName, req.body.clubContext);
     const isFutbol = sport.slug === "futbol";
+    const isTenis = sport.slug === "tenis";
 
     const prompt = isFutbol
       ? `Genera la Crónica Oficial de Cierre de la Fecha de Fútbol lista para enviar al grupo de WhatsApp del club.
@@ -269,6 +309,15 @@ Estructura:
 - Resultados oficiales, goles destacados y felicitación al Fair Play.
 - Impacto en la Tabla de Posiciones y Puntos de la liga.
 - Recordatorio sutil de revisar la app para ver estadísticas completas.`
+      : isTenis
+      ? `Genera la crónica de tenis para WhatsApp usando estos resultados:
+Datos:
+- Evento: ${title}
+- Fecha: ${date}
+- Partidos y resultados (incluye sets si están disponibles): ${JSON.stringify(matches, null, 2)}
+- Idioma: ${lang}
+
+Destaca los resultados sin inventar sets, games ni tie-breaks que no estén en los datos; felicita a los jugadores y al Fair Play.`
       : `Genera la Crónica Oficial de Cierre de Jornada de ${sport.name} lista para enviar al grupo de WhatsApp del club.
 Datos:
 - Evento: ${title}
@@ -318,6 +367,19 @@ ${matches.map((m: any, idx: number) => {
 
 🏆 *¡Gran entrega de todos en la cancha y tremendo tercer tiempo!*
 📈 La Tabla de Posiciones y Puntos de la liga ya han sido actualizados en la plataforma oficial del club.`
+      : isTenis
+      ? `🎾 *CRÓNICA DE TENIS: ${title.toUpperCase()}*
+📅 *Fecha:* ${date}
+
+🎾 *Resultados registrados:*
+${matches.map((m: any, idx: number) => {
+  const t1 = m.team1Names || "Jugador/a 1";
+  const t2 = m.team2Names || "Jugador/a 2";
+  const score = m.score || `${m.team1Score ?? 0} - ${m.team2Score ?? 0}`;
+  return `• Partido ${idx + 1}: ${t1} vs ${t2} ➔ *${score}*`;
+}).join("\n")}
+
+🏆 ¡Felicitaciones por la jornada y el buen espíritu deportivo!`
       : `${sport.emoji} *CRÓNICA OFICIAL DE LA JORNADA: ${title.toUpperCase()}*
 📅 *Fecha:* ${date}
 
@@ -341,9 +403,11 @@ ${matches.map((m: any, idx: number) => {
 // 4. Recordatorio Amigable de Cobro
 router.post("/recordatorio-cobro", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { debtorName, amount, concept = "Cancha y pelotas", bankDetails, lang = "es" } = req.body;
+    const { debtorName, amount, concept = "Cancha y pelotas", bankDetails, sportName, sportSlug, lang = "es" } = req.body;
+    const sport = await resolveSportForContext(req, sportSlug || sportName, req.body.clubContext);
 
-    const prompt = `Redacta un mensaje cordial, respetuoso y amigable para WhatsApp recordando el pago pendiente de una cuota de juego.
+    const prompt = `Redacta un mensaje cordial, respetuoso y amigable para WhatsApp recordando el pago pendiente de una cuota de ${sport.name}.
+- Deporte: ${sport.name}
 - Jugador: ${debtorName}
 - Concepto: ${concept}
 - Monto: ${amount}
@@ -361,7 +425,7 @@ Reglas:
           model: "gemini-3.8-flash",
           contents: prompt,
           config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
+            systemInstruction: getSystemInstruction(sport.name, sport.slug),
             temperature: 0.6,
           },
         });
@@ -375,7 +439,7 @@ Reglas:
       }
     }
 
-    const fallback = `¡Hola ${debtorName}! 👋 Espero que estés excelente. Te escribo un breve recordatorio de la cuota de *${concept}* por *$${amount}*. Cuando tengas un momento, puedes subir tu comprobante directo en la app o transferir a: ${bankDetails || "los datos bancarios habituales del club"}. ¡Muchas gracias y nos vemos en la cancha! 🎾`;
+    const fallback = `¡Hola ${debtorName}! 👋 Espero que estés excelente. Te escribo un breve recordatorio de la cuota de *${concept}* por *$${amount}*. Cuando tengas un momento, puedes subir tu comprobante directo en la app o transferir a: ${bankDetails || "los datos bancarios habituales del club"}. ¡Muchas gracias y nos vemos en ${sport.name === "Tenis" ? "la cancha de tenis" : sport.name === "Fútbol" ? "la cancha" : "la pista"}! ${sport.emoji}`;
     res.json({ text: fallback, aiPowered: false });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -479,13 +543,31 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
     const { query, clubContext = {} } = req.body;
     const targetLang = (clubContext as any)?.lang || "es";
     const langName = targetLang === "en" ? "English" : targetLang === "pt" ? "Português" : "Español";
-    const sport = await resolveSportForContext(req, undefined, clubContext);
-    const isFutbol = sport.slug === "futbol";
+    const defaultSport = await resolveSportForContext(req, undefined, clubContext);
+    const requestedSport = await resolveSportForContext(
+      req,
+      (clubContext as any)?.sportSlug || (clubContext as any)?.sportName,
+      clubContext,
+    );
+    const isDefaultSportFutbol = defaultSport.slug === "futbol";
 
     // --- ACCIÓN DIRECTA: PARPAL / TEXT-TO-ACTION (CREAR ENCUENTRO EN BASE DE DATOS) ---
     if (isCreateEventQuery(query)) {
+      if (requestedSport.slug === "tenis" || requestedSport.slug !== defaultSport.slug) {
+        const creationUnavailableMessage = targetLang === "en"
+          ? `No event was created. Automatic event creation does not yet support ${requestedSport.name} or switching sports; use manual creation to avoid saving the wrong format.`
+          : targetLang === "pt"
+          ? `Nenhum evento foi criado. A criação automática ainda não oferece suporte a ${requestedSport.name} nem à troca de esporte; use a criação manual para evitar salvar o formato errado.`
+          : `No se creó ningún encuentro. La creación automática todavía no admite ${requestedSport.name} ni cambia entre deportes; para evitar guardar un formato equivocado, usa la creación manual por ahora.`;
+        res.json({
+          answer: creationUnavailableMessage,
+          aiPowered: false,
+        });
+        return;
+      }
+
       const userClubId = (req.user as any)?.clubId || (clubContext as any)?.clubId || 1;
-      let clubName = (clubContext as any)?.clubName || (isFutbol ? "Liga Fútbol 5 & 7" : "Club Deportivo");
+      let clubName = (clubContext as any)?.clubName || (isDefaultSportFutbol ? "Liga Fútbol 5 & 7" : "Club Deportivo");
       try {
         const [clubRow] = await db.select().from(clubsTable).where(eq(clubsTable.id, userClubId));
         if (clubRow?.name) clubName = clubRow.name;
@@ -497,18 +579,18 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
       // Pistas / Canchas
       const courtMatch = query.match(/(\w+|\d+)\s*(?:canchas?|pistas?)/i);
       const parsedCourts = courtMatch ? parseNum(courtMatch[1]) : null;
-      const courtsAvailable = parsedCourts && parsedCourts > 0 ? parsedCourts : (isFutbol ? 1 : 3);
+      const courtsAvailable = parsedCourts && parsedCourts > 0 ? parsedCourts : (isDefaultSportFutbol ? 1 : 3);
 
       // Jugadores / Cupos
       const spotsMatch = query.match(/(\w+|\d+)\s*(?:jugadores?|personas?|cupos?|plazas?)/i);
       const parsedSpots = spotsMatch ? parseNum(spotsMatch[1]) : null;
-      const defaultSpots = isFutbol ? (courtsAvailable * 10) : (courtsAvailable * 4);
+      const defaultSpots = isDefaultSportFutbol ? (courtsAvailable * 10) : (courtsAvailable * 4);
       const maxSpots = parsedSpots && parsedSpots > 0 ? parsedSpots : defaultSpots;
 
       // Fecha y Hora
       const targetDateTime = parseTargetDateTime(query);
-      const formato = isFutbol ? "futbol5" : "americano";
-      const title = isFutbol ? `Pichanga de Fútbol - ${location}` : `Torneo Americano - ${location}`;
+      const formato = isDefaultSportFutbol ? "futbol5" : "americano";
+      const title = isDefaultSportFutbol ? `Pichanga de Fútbol - ${location}` : `Torneo Americano - ${location}`;
 
       // Crear encuentro en Neon PostgreSQL
       const [newEncuentro] = await db
@@ -519,9 +601,9 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
           location,
           maxSpots,
           courtsAvailable,
-          durationMinutes: isFutbol ? 60 : 90,
+          durationMinutes: isDefaultSportFutbol ? 60 : 90,
           formato,
-          notes: isFutbol
+          notes: isDefaultSportFutbol
             ? `Convocatoria oficial de Fútbol para ${maxSpots} jugadores en ${courtsAvailable} cancha(s). Dos equipos equilibrados.`
             : `Convocatoria oficial para ${maxSpots} jugadores en ${courtsAvailable} pistas. Formato Torneo Americano con Punto de Oro.`,
           clubId: userClubId,
@@ -545,7 +627,7 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
         hour12: false,
       });
 
-      const whatsappMessage = isFutbol
+      const whatsappMessage = isDefaultSportFutbol
         ? `⚽ *CONVOCATORIA: ${title.toUpperCase()}*
 📍 *Lugar:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "cancha sintética" : "canchas"})
 ⏰ *Horario:* ${dateStr} a las ${timeStr} hrs
@@ -569,7 +651,7 @@ ${eventUrl}
 
 _Organizado con Parryn Sport Hub IA_`;
 
-      const answer = isFutbol
+      const answer = isDefaultSportFutbol
         ? `⚽ **¡Listo! Partido de fútbol creado con éxito en el sistema.**
 
 He programado el encuentro para el **${dateStr} a las ${timeStr} hrs** con **${maxSpots} cupos** en **${courtsAvailable} cancha(s)** en **${location}**.
@@ -597,6 +679,10 @@ A continuación tienes la ficha del torneo y el mensaje listo para compartir al 
       });
       return;
     }
+
+    const sport = requestedSport;
+    const isFutbol = sport.slug === "futbol";
+    const isTenis = sport.slug === "tenis";
 
     const prompt = `Un usuario del club deportivo (${sport.name}) te consulta lo siguiente:
 "${query}"
@@ -640,29 +726,43 @@ Instrucciones para Parryn:
     if (q.includes("recordatorio") || q.includes("cobro") || q.includes("cuota")) {
       dynamicAnswer = isFutbol
         ? `⚽ *Recordatorio Amable de Cobro para WhatsApp (Fútbol):*\n\n"¡Hola equipo! 👋 Esperamos que hayan disfrutado el partido. Les dejamos el recordatorio para transferir la cuota de arriendo de la cancha sintética y las pelotas.\n\nPueden adjuntar su comprobante directo en la app del club para dejarlo confirmado. ¡Muchas gracias a todos por la puntualidad!"`
-        : `🎾 *Recordatorio Amable de Cobro para WhatsApp:*\n\n"¡Hola a todos! 👋 Espero que hayan disfrutado los partidos de la semana. Les dejamos el recordatorio para regularizar la cuota de arriendo de pistas y pelotas.\n\nPueden adjuntar su comprobante directo en la app del club o enviárnoslo por aquí para dejarlo confirmado. ¡Muchas gracias por el apoyo de siempre!"`;
+        : isTenis
+        ? `🎾 *Recordatorio de tenis para WhatsApp:*\n\n"¡Hola! 👋 Te recordamos con cariño el pago pendiente de la reserva de la cancha de tenis. Cuando puedas, sube el comprobante en la app o consulta los datos de transferencia al club. ¡Gracias!"`
+        : `🎾 *Recordatorio Amable de Cobro para WhatsApp (Pádel):*\n\n"¡Hola a todos! 👋 Espero que hayan disfrutado los partidos de la semana. Les dejamos el recordatorio para regularizar la cuota de arriendo de pistas y pelotas.\n\nPueden adjuntar su comprobante directo en la app del club o enviárnoslo por aquí para dejarlo confirmado. ¡Muchas gracias por el apoyo de siempre!"`;
     } else if (q.includes("prorrateo") || q.includes("justo") || q.includes("dividir") || q.includes("costo")) {
       dynamicAnswer = isFutbol
         ? `💰 *División de Costos de Fútbol según Parryn:*\nEl arriendo de la cancha se divide habitualmente entre los 10 o 14 jugadores que juegan (ej: $40.000 / 10 = $4.000 por jugador). Si alguien jugó solo medio tiempo, puede aportar la mitad y la diferencia se cubre con el fondo comunitario del club.`
+        : isTenis
+        ? `💰 *Reparto de costos de tenis:*\nDivide el costo real de la reserva entre quienes la usaron. Si alguien jugó menos tiempo, acuerden una proporción antes de cobrar y expliquen el cálculo; no inventes minutos ni tarifas que no estén registrados.`
         : `💰 *Prorrateo Justo según Parryn:*\nSi un jugador participó en menos partidos o llegó más tarde, la mejor fórmula comunitaria es dividir el valor total de la cancha por minuto/turno jugado, o cobrarle solo la fracción correspondiente a su partido y repartir el arriendo base entre los jugadores de tiempo completo.`;
     } else if (q.includes("convocatoria") || q.includes("invit") || q.includes("cupo")) {
       dynamicAnswer = isFutbol
         ? `📢 *Convocatoria de Fútbol para WhatsApp:*\n\n"¡Buenas muchachos! ⚽ Se abren los cupos para la próxima pichanga. Inscríbete directo en la app oficial para asegurar si juegas en Equipo A o Equipo B y dejar los turnos listos. ¡Asegura tu cupo antes de que se llenen!"`
+        : isTenis
+        ? `🎾 *Convocatoria de tenis para WhatsApp:*\n\n"¡Hola! Se abren los cupos para la próxima jornada de tenis. Confirma tu asistencia e indica si prefieres individuales o dobles para organizar los partidos y horarios. ¡Nos vemos en la cancha!"`
         : `📢 *Convocatoria de Partidos para WhatsApp:*\n\n"¡Buenas a todos! 🎾 Se abren los cupos para la próxima jornada deportiva del club. Confirmaciones directas por la app oficial para armar el fixture equilibrado y asignar pistas. ¡Asegura tu cupo antes de que se completen!"`;
     } else if (q.includes("lluvia") || q.includes("clima") || q.includes("techad") || q.includes("suspender")) {
       dynamicAnswer = isFutbol
         ? `🌧️ *Plan de Contingencia Climática (Fútbol):*\n1. Si la cancha sintética cuenta con buen drenaje o techo, se juega sin problemas con calzado adecuado.\n2. Si hay tormenta o relámpagos, se suspende por seguridad de los jugadores.\n3. Comunica la confirmación al grupo con 2 horas de anticipación.`
+        : isTenis
+        ? `🌧️ *Seguridad climática para tenis:*\n1. Esta respuesta no consulta un pronóstico en tiempo real: confirma el clima con una fuente local y con el recinto.\n2. No juegues sobre una superficie mojada o insegura; con tormentas eléctricas, suspende y sigue las instrucciones del recinto.\n3. Con viento fuerte, confirma con los jugadores antes de cerrar horarios.`
         : `🌧️ *Plan de Contingencia Climática de Parryn:*\n1. Asigna primero los partidos de campeonato o con asistencia completa a las pistas techadas.\n2. Si hay menos canchas cubiertas que partidos, reduce los turnos a 60 minutos con rotación rápida tipo americana para que nadie se quede sin jugar.\n3. Avisa al grupo con al menos 2 horas de anticipación para evitar traslados en vano.`;
     } else if (q.includes("fair play") || q.includes("cruzada") || q.includes("aprobar") || q.includes("marcador")) {
-      dynamicAnswer = `⚖️ *Validación Cruzada Fair Play:*\nPara cuidar la transparencia de los resultados, cuando un jugador o delegado anota el marcador, este queda en estado *Pendiente de Aprobación*. Solo cuando un rival del equipo contrario o el administrador lo confirma, el resultado es oficial y se actualizan los puntos en la tabla.`;
+      dynamicAnswer = isTenis
+        ? `⚖️ *Fair Play en tenis:*\nRegistra el resultado acordado por ambos jugadores y solicita la validación prevista por el club. Incluye sets o tie-break solo cuando estén disponibles; no completes marcadores faltantes por suposición.`
+        : `⚖️ *Validación Cruzada Fair Play:*\nPara cuidar la transparencia de los resultados, cuando un jugador o delegado anota el marcador, este queda en estado *Pendiente de Aprobación*. Solo cuando un rival del equipo contrario o el administrador lo confirma, el resultado es oficial y se actualizan los puntos en la tabla.`;
     } else if (q.includes("elo") || q.includes("ranking") || q.includes("puntos")) {
       dynamicAnswer = isFutbol
         ? `📈 *Sistema de Puntuación de Liga (Fútbol):*\nEn fútbol se compite por puntos oficiales: 3 puntos por victoria y 1 punto por empate. La tabla clasifica por Puntos totales, Partidos Jugados (PJ), Ganados (PG), Empatados (PE) y Perdidos (PP), premiando la regularidad y compromiso en cada fecha.`
-        : `📈 *Cómo Funciona el Elo:*\nCada jugador inicia con 1200 puntos. Si vences a una pareja con mayor ranking, sumas muchos más puntos que si vences a un rival de menor nivel. Si pierdes contra un favorito, la penalización es menor. El sistema premia la consistencia y la paridad.`;
+        : isTenis
+        ? `📈 *ELO de tenis:*\nEl ELO representa el nivel relativo del jugador según los resultados registrados. Úsalo para proponer cruces individuales equilibrados; no lo confundas con puntos por games, sets o tie-break ni con una tabla de fútbol.`
+        : `📈 *ELO de pádel:*\nEl ELO refleja el nivel de cada jugador según los resultados registrados. Úsalo para equilibrar parejas y, cuando estén disponibles, considera Drive/Revés sin inventar posiciones.`;
     } else {
       dynamicAnswer = isFutbol
         ? `🤖 *Respuesta de Parryn (Fútbol):*\nHe analizado tu consulta sobre "${query}". Te recomiendo coordinar los turnos en bloques de 60 minutos con dos tiempos y registrar la asistencia de los 10 o 14 jugadores en la app para balancear los equipos con anticipación. ¿Deseas que redacte algún comunicado para el grupo de WhatsApp?`
-        : `🤖 *Respuesta de Parryn:*\nHe analizado tu consulta sobre "${query}". Te recomiendo estructurar los horarios en bloques de 90 minutos con rotación en americana y confirmar a todos los asistentes en la aplicación para evitar canchas vacías. ¿Deseas que redacte algún comunicado para el grupo?`;
+        : isTenis
+        ? `🎾 *Respuesta de Parryn (Tenis):*\nSobre "${query}": confirma primero modalidad (individuales o dobles), disponibilidad de canchas y duración de los turnos. No aplicaré reglas de americana ni posiciones de pádel a una jornada de tenis.`
+        : `🤖 *Respuesta de Parryn (Pádel):*\nHe analizado tu consulta sobre "${query}". Confirma la disponibilidad de pistas, asistencia y modalidad antes de asignar turnos; si corresponde, organiza rotaciones de americana sin asumir que todos los encuentros usan ese formato. ¿Deseas que redacte algún comunicado para el grupo?`;
     }
 
     res.json({

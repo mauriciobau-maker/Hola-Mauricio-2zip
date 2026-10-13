@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
+import { useParrynSport } from "../context/ParrynSportContext";
+import { ParrynSportSelector } from "../components/ParrynSportSelector";
 
 interface ChatMessage {
   sender: "user" | "parryn";
@@ -27,6 +29,7 @@ export function SecretarioParryn() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { language, t } = useLanguage();
+  const { activeSport } = useParrynSport();
 
   const [activeTab, setActiveTab] = useState<"chat" | "canchas" | "clima">("chat");
   const [query, setQuery] = useState("");
@@ -69,13 +72,8 @@ export function SecretarioParryn() {
       .catch(() => {});
   }, []);
 
-  const isFutbolClub =
-    club?.isFootball ||
-    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
-    club?.name?.toLowerCase().includes("fútbol") ||
-    club?.name?.toLowerCase().includes("futbol") ||
-    (user as any)?.clubId === 3 ||
-    (user as any)?.email?.includes("futbol");
+  const isFutbolClub = activeSport.slug === "futbol";
+  const isTennisClub = activeSport.slug === "tenis";
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -99,6 +97,8 @@ export function SecretarioParryn() {
             lang: language,
             clubId: club?.id || (user as any)?.clubId,
             isFootball: isFutbolClub,
+            sportName: activeSport.name,
+            sportSlug: activeSport.slug,
           },
         }),
       });
@@ -124,7 +124,9 @@ export function SecretarioParryn() {
             ? "Houve uma breve oscilação de conexão, mas estou aqui! Sugiro confirmar os times e a presença dos atletas no WhatsApp."
             : isFutbolClub
             ? "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero confirmar los equipos y la asistencia de los jugadores para la pichanga por WhatsApp."
-            : "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero priorizar canchas techadas y confirmar la asistencia de tus jugadores por WhatsApp.",
+            : isTennisClub
+            ? "Hubo una breve interrupción de conexión. Confirma la disponibilidad de las canchas y si la jornada será de individuales o dobles antes de cerrar los horarios."
+            : "Hubo una breve interrupción de conexión, pero aquí estoy. Te sugiero revisar las condiciones de las pistas y confirmar la asistencia de tus jugadores por WhatsApp.",
         },
       ]);
     } finally {
@@ -139,6 +141,10 @@ export function SecretarioParryn() {
         ? `Diseña un plan de contingencia y distribución de turnos para partidos de fútbol 5 o 7. Disponemos de ${coveredCourts} canchas techadas y ${openCourts} al aire libre. Condición climática prevista: ${
             weatherCondition === "rain_risk" ? "Riesgo de lluvia / viento" : "Clima despejado"
           }.`
+        : isTennisClub
+        ? `Propón un plan de horarios para tenis con ${coveredCourts} canchas cubiertas y ${openCourts} al aire libre. Condición indicada manualmente: ${
+            weatherCondition === "rain_risk" ? "riesgo de lluvia o viento" : "cielo despejado"
+          }. No inventes un pronóstico; recomienda revisar seguridad y estado de la superficie, y pregunta si faltan datos sobre individuales o dobles.`
         : `Diseña un plan de contingencia y distribución de turnos. Disponemos de ${coveredCourts} canchas techadas y ${openCourts} descubiertas. Condición climática prevista: ${
             weatherCondition === "rain_risk" ? "Riesgo de lluvia / viento" : "Clima despejado"
           }.`;
@@ -149,7 +155,14 @@ export function SecretarioParryn() {
         credentials: "include",
         body: JSON.stringify({
           query: promptQuery,
-          clubContext: { clubName, lang: language, clubId: club?.id || (user as any)?.clubId, isFootball: isFutbolClub },
+          clubContext: {
+            clubName,
+            lang: language,
+            clubId: club?.id || (user as any)?.clubId,
+            isFootball: isFutbolClub,
+            sportName: activeSport.name,
+            sportSlug: activeSport.slug,
+          },
         }),
       });
       const data = await res.json();
@@ -159,14 +172,20 @@ export function SecretarioParryn() {
         language === "en"
           ? isFutbolClub
             ? "Parryn's Plan: Assign official soccer matches to covered turf with 60-minute match slots and 15-min warmups."
-            : "Parryn's Plan: Assign official ranking matches to indoor courts with 75-minute rotation blocks."
+            : isTennisClub
+            ? "Parryn's Plan: Confirm indoor/outdoor tennis court availability and singles/doubles format. Do not treat this as a live weather forecast."
+            : "Parryn's Plan: Review padel court conditions and attendance before assigning court rotations."
           : language === "pt"
           ? isFutbolClub
             ? "Plano do Parryn: Alocar partidas oficiais de futebol em quadras cobertas com blocos de 60 min."
-            : "Plano do Parryn: Alocar partidas oficiais em quadras cobertas com blocos de rotação de 75 min."
+            : isTennisClub
+            ? "Plano do Parryn: Confirme as quadras cobertas/abertas e se a jornada será simples ou duplas. Isto não é uma previsão do tempo em tempo real."
+            : "Plano do Parryn: Revise as condições das quadras de padel e a presença antes de definir as rotações."
           : isFutbolClub
           ? "Plan de Parryn: Asignar partidos oficiales de fútbol a canchas techadas con bloques de 60 min y 15 min de descanso entre turnos."
-          : "Plan de Parryn: Asignar partidos oficiales a pistas techadas con rotación en bloques de 75 min."
+          : isTennisClub
+          ? "Plan de Parryn: Confirma disponibilidad de canchas cubiertas/abiertas y si la jornada será de individuales o dobles. Esto no es un pronóstico en tiempo real."
+          : "Plan de Parryn: Revisa las condiciones de las pistas de pádel y la asistencia antes de asignar rotaciones."
       );
     } finally {
       setLoading(false);
@@ -201,10 +220,12 @@ export function SecretarioParryn() {
             </div>
           </div>
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/15 backdrop-blur-lg border border-white/20 flex items-center justify-center text-4xl shadow-inner shrink-0">
-            {isFutbolClub ? "🤖⚽" : "🤖🎾"}
+            {`🤖${activeSport.emoji}`}
           </div>
         </div>
       </div>
+
+      <ParrynSportSelector className="max-w-xs" />
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-border pb-2 overflow-x-auto">
@@ -271,7 +292,7 @@ export function SecretarioParryn() {
                   >
                     {msg.sender === "parryn" && (
                       <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
-                        <span>🤖 Parryn</span>
+                        <span>{activeSport.emoji} Parryn • {activeSport.name}</span>
                       </div>
                     )}
                     {msg.text}
@@ -281,14 +302,14 @@ export function SecretarioParryn() {
                         <div className="flex items-center justify-between border-b border-border/50 pb-2">
                           <div className="flex items-center gap-2">
                             <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs">
-                              {isFutbolClub ? "⚽" : "🎾"}
+                              {activeSport.emoji}
                             </span>
                             <div>
                               <h4 className="font-bold text-sm text-foreground">
                                 {msg.createdEncuentro.title}
                               </h4>
                               <span className="text-[11px] text-muted-foreground">
-                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} {isFutbolClub ? "cancha sintética" : "canchas"})
+                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} {isFutbolClub ? "cancha sintética" : isTennisClub ? "canchas de tenis" : "pistas de pádel"})
                               </span>
                             </div>
                           </div>
@@ -372,6 +393,8 @@ export function SecretarioParryn() {
                 placeholder={
                   isFutbolClub
                     ? "Escribe a Parryn (ej: 'Convoca para fútbol 7 este viernes con 14 cupos')..."
+                    : isTennisClub
+                    ? "Escribe a Parryn sobre tenis, individuales, dobles, sets u horarios..."
                     : t("parryn.chatPlaceholder")
                 }
                 className="flex-1"
@@ -385,7 +408,7 @@ export function SecretarioParryn() {
 
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
               <span className="text-[11px] text-muted-foreground font-semibold">
-                {isFutbolClub ? "Ejemplos rápidos (Fútbol):" : "Ejemplos rápidos:"}
+                {isFutbolClub ? "Ejemplos rápidos (Fútbol):" : isTennisClub ? "Ejemplos rápidos (Tenis):" : "Ejemplos rápidos (Pádel):"}
               </span>
               {isFutbolClub ? (
                 <>
@@ -402,6 +425,23 @@ export function SecretarioParryn() {
                     className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
                   >
                     🥅 "Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5"
+                  </button>
+                </>
+              ) : isTennisClub ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("Ayúdame a organizar una jornada de tenis individual este viernes a las 19:00")}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    🎾 "Ayúdame a organizar una jornada de tenis individual este viernes a las 19:00"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("¿Cómo reparto los horarios y las canchas entre partidos individuales y dobles?")}
+                    className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
+                  >
+                    ⚖️ "¿Cómo reparto horarios entre individuales y dobles?"
                   </button>
                 </>
               ) : (
@@ -438,6 +478,8 @@ export function SecretarioParryn() {
             <CardDescription>
               {isFutbolClub
                 ? "Optimiza la distribución de canchas de fútbol, horarios de pichangas y contingencia climática."
+                : isTennisClub
+                ? "Organiza la disponibilidad de canchas de tenis y horarios de individuales o dobles."
                 : t("parryn.courtDesc")}
             </CardDescription>
           </CardHeader>
@@ -445,7 +487,7 @@ export function SecretarioParryn() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">
-                  {isFutbolClub ? "Canchas Techadas / Sintéticas" : t("parryn.coveredCourts")}
+                  {isFutbolClub ? "Canchas Techadas / Sintéticas" : isTennisClub ? "Canchas de tenis cubiertas" : t("parryn.coveredCourts")}
                 </label>
                 <Input
                   type="number"
@@ -456,7 +498,7 @@ export function SecretarioParryn() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">
-                  {isFutbolClub ? "Canchas al Aire Libre" : t("parryn.openCourts")}
+                  {isFutbolClub ? "Canchas al Aire Libre" : isTennisClub ? "Canchas de tenis al aire libre" : t("parryn.openCourts")}
                 </label>
                 <Input
                   type="number"
@@ -505,7 +547,9 @@ export function SecretarioParryn() {
               {t("parryn.weatherTitle")}
             </CardTitle>
             <CardDescription>
-              {t("parryn.weatherDesc")}
+              {isTennisClub
+                ? "Recomendaciones de seguridad para tenis según la condición que indiques manualmente."
+                : t("parryn.weatherDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -513,11 +557,20 @@ export function SecretarioParryn() {
               <h4 className="font-bold flex items-center gap-1.5">
                 {t("parryn.goldenRuleTitle")}
               </h4>
+              {isTennisClub && (
+                <p>
+                  El clima se indica manualmente; Parryn no consulta un pronóstico en tiempo real. Sigue las reglas del recinto y suspende si hay tormentas o la superficie no es segura.
+                </p>
+              )}
               <p>
-                {t("parryn.rule1")}
+                {isTennisClub
+                  ? "Con lluvia o agua en la cancha, no juegues hasta que el recinto confirme que la superficie está seca y segura."
+                  : t("parryn.rule1")}
               </p>
               <p>
-                {t("parryn.rule2")}
+                {isTennisClub
+                  ? "Con viento fuerte, considera su efecto en el juego y consulta a los jugadores antes de confirmar los partidos."
+                  : t("parryn.rule2")}
               </p>
               <p>
                 {t("parryn.rule3")}

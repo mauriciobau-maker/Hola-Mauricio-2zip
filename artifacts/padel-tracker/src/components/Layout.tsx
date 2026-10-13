@@ -7,14 +7,18 @@ import { ParrynFloatingWidget } from "@/components/ParrynFloatingWidget";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslationKey } from "../lib/translations";
+import { ParrynSportProvider } from "../context/ParrynSportContext";
 
 interface ClubBranding {
+  id?: number;
   name: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   address?: string | null;
   defaultLanguage?: string | null;
+  isFootball?: boolean;
+  sports?: Array<{ id?: number; name: string; slug: string; active?: boolean }>;
 }
 
 interface NavItem {
@@ -105,9 +109,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     (club as any)?.name?.toLowerCase().includes("futbol") ||
     (user as any)?.clubId === 3;
 
-  const activeNavItems = navItems.filter((item) => !(isFutbolClub && item.href === "/parejas"));
+const hasMultipleSports = ((club as any)?.sports?.length ?? 0) >= 2;
+const activeNavItems = navItems.filter((item) => !(isFutbolClub && !hasMultipleSports && item.href === "/parejas"));
 
   return (
+    <ParrynSportProvider club={club} user={user}>
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full overflow-x-hidden">
         {/* Fila 1: Marca del Club y Perfil de Usuario */}
@@ -303,5 +309,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </>
       )}
     </div>
+    </ParrynSportProvider>
   );
 }

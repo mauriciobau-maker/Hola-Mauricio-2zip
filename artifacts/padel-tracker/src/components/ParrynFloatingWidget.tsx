@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
+import { useParrynSport } from "../context/ParrynSportContext";
+import { ParrynSportSelector } from "./ParrynSportSelector";
 
 const WIDGET_TEXTS = {
   es: {
@@ -223,10 +225,92 @@ const FOOTBALL_HINTS = {
   },
 };
 
+const TENNIS_HINTS: Record<"es" | "en" | "pt", Record<string, { label: string; query: string }[]>> = {
+  es: {
+    encuentros: [
+      { label: "📢 Convocatoria de tenis", query: "Redacta una convocatoria para la próxima jornada de tenis y pide confirmar si jugarán individuales o dobles." },
+      { label: "🌧️ Lluvia y cancha", query: "¿Qué debo revisar para decidir si se puede jugar tenis con lluvia o viento fuerte?" },
+    ],
+    cobros: [
+      { label: "💳 Recordatorio de pago", query: "Redacta un recordatorio amable para pagar el arriendo de la cancha de tenis." },
+      { label: "💰 Repartir costos", query: "¿Cómo repartir de forma justa el costo de la cancha de tenis entre quienes jugaron?" },
+    ],
+    partidos: [
+      { label: "🏆 Crónica de tenis", query: "Redacta una crónica de la jornada de tenis usando solo los resultados registrados, sin inventar sets." },
+      { label: "🎾 Registrar resultados", query: "¿Qué datos conviene confirmar al registrar un partido de tenis, incluidos sets y tie-break cuando corresponda?" },
+    ],
+    ranking: [
+      { label: "📈 ELO en tenis", query: "Explica cómo interpretar el ELO de jugadores de tenis sin confundirlo con la tabla de una liga de fútbol." },
+      { label: "🎾 Singles y dobles", query: "¿Qué información necesito para equilibrar partidos de tenis individuales o dobles?" },
+    ],
+    admin: [
+      { label: "📲 Invitar al club", query: "Redacta una invitación de WhatsApp para sumar jugadores de tenis al club." },
+      { label: "🛡️ Buenas prácticas", query: "Dame tres ideas para mantener activa una comunidad de tenis durante la semana." },
+    ],
+    general: [
+      { label: "🎾 Organizar tenis", query: "Dame consejos para organizar una jornada de tenis con partidos individuales o dobles y horarios claros." },
+      { label: "⚡ Consejos al organizador", query: "Dame tres consejos para que la jornada de tenis empiece a tiempo y con buena coordinación." },
+    ],
+  },
+  en: {
+    encuentros: [
+      { label: "📢 Tennis invitation", query: "Draft an invitation for the next tennis session and ask players to confirm singles or doubles." },
+      { label: "🌧️ Weather and courts", query: "What should I check before deciding whether tennis can be played in rain or strong wind?" },
+    ],
+    cobros: [
+      { label: "💳 Payment reminder", query: "Draft a friendly reminder to pay the tennis court fee." },
+      { label: "💰 Split court costs", query: "How can we fairly split the tennis court cost among the players?" },
+    ],
+    partidos: [
+      { label: "🏆 Tennis recap", query: "Draft a tennis session recap using only recorded results; do not invent set scores." },
+      { label: "🎾 Match results", query: "Which details should we confirm when recording a tennis match, including sets and tiebreaks when applicable?" },
+    ],
+    ranking: [
+      { label: "📈 Tennis ELO", query: "Explain tennis player ELO without confusing it with a football league table." },
+      { label: "🎾 Singles and doubles", query: "What information do I need to balance tennis singles or doubles matches?" },
+    ],
+    admin: [
+      { label: "📲 Invite players", query: "Draft a WhatsApp invitation to welcome tennis players to the club." },
+      { label: "🛡️ Best practices", query: "Give me three ideas for keeping a tennis community active during the week." },
+    ],
+    general: [
+      { label: "🎾 Organize tennis", query: "Give me tips for organizing a tennis session with clear singles or doubles formats and schedules." },
+      { label: "⚡ Organizer tips", query: "Give me three tips to keep a tennis session on time and well coordinated." },
+    ],
+  },
+  pt: {
+    encuentros: [
+      { label: "📢 Convite para tênis", query: "Redija um convite para a próxima jornada de tênis e peça que confirmem se jogarão simples ou duplas." },
+      { label: "🌧️ Clima e quadra", query: "O que devo verificar antes de decidir se é possível jogar tênis com chuva ou vento forte?" },
+    ],
+    cobros: [
+      { label: "💳 Lembrete de pagamento", query: "Redija um lembrete amigável para pagar o aluguel da quadra de tênis." },
+      { label: "💰 Dividir custos", query: "Como dividir de forma justa o custo da quadra de tênis entre quem jogou?" },
+    ],
+    partidos: [
+      { label: "🏆 Resumo do tênis", query: "Redija um resumo da jornada de tênis usando apenas os resultados registrados, sem inventar sets." },
+      { label: "🎾 Registrar resultados", query: "Quais dados devemos confirmar ao registrar uma partida de tênis, incluindo sets e tie-break quando aplicável?" },
+    ],
+    ranking: [
+      { label: "📈 ELO no tênis", query: "Explique o ELO de jogadores de tênis sem confundi-lo com a tabela de uma liga de futebol." },
+      { label: "🎾 Simples e duplas", query: "Quais informações preciso para equilibrar partidas de tênis simples ou duplas?" },
+    ],
+    admin: [
+      { label: "📲 Convidar jogadores", query: "Redija um convite de WhatsApp para receber jogadores de tênis no clube." },
+      { label: "🛡️ Boas práticas", query: "Dê três ideias para manter ativa a comunidade de tênis durante a semana." },
+    ],
+    general: [
+      { label: "🎾 Organizar tênis", query: "Dê dicas para organizar uma jornada de tênis com formatos e horários claros para simples ou duplas." },
+      { label: "⚡ Dicas para o organizador", query: "Dê três dicas para que a jornada de tênis comece no horário e seja bem coordenada." },
+    ],
+  },
+};
+
 export function ParrynFloatingWidget({ club }: { club?: any }) {
   const [location] = useLocation();
   const { language } = useLanguage();
   const { user } = useAuth();
+  const { activeSport } = useParrynSport();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -252,15 +336,9 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
   const langKey = (language as "es" | "en" | "pt") || "es";
   const texts = WIDGET_TEXTS[langKey] || WIDGET_TEXTS.es;
 
-  const isFutbolClub =
-    club?.isFootball ||
-    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
-    club?.name?.toLowerCase().includes("fútbol") ||
-    club?.name?.toLowerCase().includes("futbol") ||
-    (user as any)?.clubId === 3 ||
-    (user as any)?.email?.includes("futbol");
-
-  const widgetEmoji = isFutbolClub ? "⚽" : "🎾";
+  const isFootball = activeSport.slug === "futbol";
+  const isTennis = activeSport.slug === "tenis";
+  const widgetEmoji = activeSport.emoji;
 
   // Detección contextual de la pantalla actual
   const getScreenCategory = (): keyof typeof texts.screenHints => {
@@ -273,10 +351,12 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
   };
 
   const currentCategory = getScreenCategory();
-  const activeHintsSource = isFutbolClub
+  const activeHintsSource = isFootball
     ? (FOOTBALL_HINTS[langKey] || FOOTBALL_HINTS.es)
     : texts.screenHints;
-  const hints = activeHintsSource[currentCategory] || activeHintsSource.general;
+  const hints = isTennis
+    ? (TENNIS_HINTS[langKey]?.[currentCategory] || TENNIS_HINTS.es.general)
+    : activeHintsSource[currentCategory] || activeHintsSource.general;
 
   const handleAsk = async (textToAsk: string) => {
     if (!textToAsk.trim() || loading) return;
@@ -295,7 +375,10 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
             screen: location,
             userRole: (user as any)?.isAdmin === 1 ? "Admin" : "Jugador",
             lang: language,
-            clubId: (user as any)?.clubId,
+            clubId: club?.id || (user as any)?.clubId,
+            clubName: club?.name,
+            sportName: activeSport.name,
+            sportSlug: activeSport.slug,
           },
         }),
       });
@@ -365,6 +448,8 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
               </button>
             </div>
 
+            <ParrynSportSelector compact className="border-b border-border/50 pb-3" />
+
             {/* Acciones Rápidas Contextuales según la pantalla */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-medium text-muted-foreground">
@@ -412,7 +497,7 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
                   <div className="p-2.5 rounded-lg bg-background border border-emerald-500/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-foreground">
-                        🎾 {createdEncuentro.title}
+                        {widgetEmoji} {createdEncuentro.title}
                       </span>
                       <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
                         Creado en BBDD
@@ -470,12 +555,18 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
-                  isFutbolClub
+                  isFootball
                     ? langKey === "en"
                       ? "Ask Parryn (e.g. 'How to balance teams for 5v5?')..."
                       : langKey === "pt"
                       ? "Pergunte ao Parryn (ex: 'Como dividir os times para 5v5?')..."
                       : "Escribe a Parryn (ej: '¿Cómo armo los equipos para 5v5?')..."
+                    : isTennis
+                    ? langKey === "en"
+                      ? "Ask Parryn about tennis matches, courts, or schedules..."
+                      : langKey === "pt"
+                      ? "Pergunte ao Parryn sobre partidas, quadras ou horários de tênis..."
+                      : "Escribe a Parryn sobre partidos, canchas u horarios de tenis..."
                     : texts.inputPlaceholder
                 }
                 className="flex-1 bg-background border border-border text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-foreground"

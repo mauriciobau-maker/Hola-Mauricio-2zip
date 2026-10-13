@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Bot, Sparkles, Send, Copy, Check, MessageSquare, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "../context/LanguageContext";
+import { useParrynSport } from "../context/ParrynSportContext";
 
 interface ParrynAssistantProps {
   mode: "convocatoria" | "matchmaking" | "cierre" | "recordatorio-cobro" | "general";
@@ -12,6 +13,9 @@ interface ParrynAssistantProps {
 
 export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "" }: ParrynAssistantProps) {
   const { language, t } = useLanguage();
+  const { activeSport } = useParrynSport();
+  const sportName = payload.sportName || payload.clubContext?.sportName || activeSport.name;
+  const sportSlug = payload.sportSlug || payload.clubContext?.sportSlug || activeSport.slug;
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -44,7 +48,17 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...payload, lang: language }),
+        body: JSON.stringify({
+          ...payload,
+          sportName,
+          sportSlug,
+          clubContext: {
+            ...(payload.clubContext || {}),
+            sportName,
+            sportSlug,
+          },
+          lang: language,
+        }),
       });
 
       const data = await res.json();
@@ -87,7 +101,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
           <div className="flex items-center justify-between border-b border-border/50 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold text-xs">
-                🎾
+                {activeSport.emoji}
               </div>
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
