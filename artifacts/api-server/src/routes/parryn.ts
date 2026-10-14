@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { GoogleGenAI } from "@google/genai";
-import { isSuperAdminUser, requireAuth, resolveEffectiveClubId } from "../middlewares/requireCommunity";
+import { requireAuth, resolveEffectiveClubId } from "../middlewares/requireCommunity";
 import { db, encuentrosTable, clubsTable, sportsTable, clubSportsTable, sportModalitiesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
@@ -449,56 +449,87 @@ Reglas:
 const WORD_NUMS: Record<string, number> = {
   un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6,
   siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13,
-  catorce: 14, quince: 15, dieciseis: 16, veinte: 20, veinticuatro: 24, treinta: 30
+  catorce: 14, quince: 15, dieciseis: 16, veinte: 20, veinticuatro: 24, treinta: 30,
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+  nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+  um: 1, uma: 1, dois: 2, duas: 2, quatro: 4, oito: 8, dez: 10,
+  onze: 11, doze: 12, treze: 13,
 };
 
 function parseNum(raw?: string): number | null {
   if (!raw) return null;
-  const trimmed = raw.trim().toLowerCase();
+  const trimmed = normalizeIntentText(raw);
   const direct = parseInt(trimmed, 10);
   if (!isNaN(direct) && direct > 0) return direct;
   return WORD_NUMS[trimmed] || null;
 }
 
-function parseTargetDateTime(query: string): Date {
+function parseTargetDateTime(query: string): Date | null {
   const now = new Date();
-  const q = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
+  const q = normalizeIntentText(query);
   const targetDate = new Date(now);
-  if (q.includes("pasado manana")) {
-    targetDate.setDate(now.getDate() + 2);
-  } else if (q.includes("manana")) {
-    targetDate.setDate(now.getDate() + 1);
-  } else if (q.includes("hoy")) {
-    targetDate.setDate(now.getDate());
+  let hasDate = false;
+
+  const relativeDays = [
+    { phrases: ["pasado manana", "day after tomorrow", "depois de amanha"], offset: 2 },
+    { phrases: ["manana", "tomorrow", "amanha"], offset: 1 },
+    { phrases: ["hoy", "today", "hoje"], offset: 0 },
+  ];
+  const relativeDate = relativeDays.find(({ phrases }) => phrases.some((phrase) => q.includes(phrase)));
+  if (relativeDate) {
+    targetDate.setDate(now.getDate() + relativeDate.offset);
+    hasDate = true;
   } else {
-    const days: Record<string, number> = {
-      domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6
-    };
-    for (const [dayName, dayIndex] of Object.entries(days)) {
-      if (q.includes(dayName)) {
-        const diff = (dayIndex - now.getDay() + 7) % 7 || 7;
-        targetDate.setDate(now.getDate() + diff);
-        break;
+    const isoDate = q.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+    const localDate = q.match(/\b([0-3]?\d)[/.]([01]?\d)[/.](20\d{2})\b/);
+    if (isoDate || localDate) {
+      const year = Number(isoDate?.[1] || localDate?.[3]);
+      const month = Number(isoDate?.[2] || localDate?.[2]);
+      const day = Number(isoDate?.[3] || localDate?.[1]);
+      targetDate.setFullYear(year, month - 1, day);
+      hasDate =
+        targetDate.getFullYear() === year &&
+        targetDate.getMonth() === month - 1 &&
+        targetDate.getDate() === day;
+    } else {
+      const weekdays = [
+        { names: ["domingo", "sunday"], day: 0 },
+        { names: ["lunes", "monday"], day: 1 },
+        { names: ["martes", "tuesday"], day: 2 },
+        { names: ["miercoles", "wednesday"], day: 3 },
+        { names: ["jueves", "thursday"], day: 4 },
+        { names: ["viernes", "friday"], day: 5 },
+        { names: ["sabado", "saturday"], day: 6 },
+      ];
+      const weekday = weekdays.find(({ names }) => names.some((name) => q.includes(name)));
+      if (weekday) {
+        const offset = (weekday.day - now.getDay() + 7) % 7 || 7;
+        targetDate.setDate(now.getDate() + offset);
+        hasDate = true;
       }
     }
   }
 
-  let hour = 19;
-  let minute = 0;
-  const timeMatch = query.match(/(?:a\s+las|las)?\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:hrs?|horas?|hs|am|pm)?/i);
-  if (timeMatch) {
-    const rawH = parseInt(timeMatch[1], 10);
-    const rawM = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-    if (rawH >= 0 && rawH <= 23) {
-      hour = rawH;
-      minute = !isNaN(rawM) ? rawM : 0;
-      if (query.toLowerCase().includes("pm") && hour < 12) hour += 12;
-    }
-  }
+  if (!hasDate) return null;
+
+  const prefixedTime = q.match(/\b(?:a\s+las?|at|as)\s+(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\b/);
+  const twentyFourHourTime = q.match(/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?\b/);
+  const meridiemTime = q.match(/\b(\d{1,2})\s*(am|pm)\b/);
+  const timeMatch = prefixedTime || twentyFourHourTime || meridiemTime;
+  if (!timeMatch) return null;
+
+  const prefixed = Boolean(prefixedTime && timeMatch === prefixedTime);
+  const colonFormat = Boolean(!prefixed && twentyFourHourTime && timeMatch === twentyFourHourTime);
+  let hour = Number(timeMatch[1]);
+  const minute = Number((prefixed ? timeMatch[2] : colonFormat ? timeMatch[2] : undefined) || 0);
+  const meridiem = (prefixed ? timeMatch[3] : colonFormat ? timeMatch[3] : timeMatch[2]) || "";
+  if (hour > 23 || minute > 59 || (meridiem && (hour < 1 || hour > 12))) return null;
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (!meridiem && hour > 0 && hour < 12) return null;
 
   targetDate.setHours(hour, minute, 0, 0);
-  return targetDate;
+  return targetDate > now ? targetDate : null;
 }
 
 function formatClubName(name: string): string {
@@ -531,10 +562,10 @@ function extractLocation(query: string, defaultName: string): string {
 }
 
 function isCreateEventQuery(text: string): boolean {
-  const norm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const hasAction = norm.includes("haz") || norm.includes("hqz") || norm.includes("arma") || norm.includes("crea") || norm.includes("organiza") || norm.includes("monta") || norm.includes("programa") || norm.includes("genera");
-  const hasEvent = norm.includes("convocatoria") || norm.includes("encuentro") || norm.includes("torneo") || norm.includes("partido") || norm.includes("pichanga") || norm.includes("americano");
-  return (hasAction && hasEvent) || norm.includes("convocatoria para") || norm.includes("torneo para") || norm.includes("partido para");
+  const norm = normalizeIntentText(text);
+  const hasAction = /\b(haz|hazme|arma|armar|crea|organiza|organizar|monta|programa|genera|create|make|organize|schedule|set up|crie|agende|marque)\b/.test(norm);
+  const hasEvent = /\b(convocatoria|encuentro|torneo|partido|pichanga|americano|jornada|evento|event|session|match|game|partida|jogo|torneio)\b/.test(norm);
+  return (hasAction && hasEvent) || /\b(convocatoria|torneo|partido|event|match)\s+(?:para|for|on)\b/.test(norm);
 }
 
 function normalizeIntentText(value: string): string {
@@ -549,19 +580,35 @@ function normalizeSportIdentifier(value: string): string {
   return normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function resolveEventClubId(req: Request, clubContext: any): number | null {
+async function resolveEventClubId(req: Request, clubContext: any): Promise<number | null> {
   const user = req.user as any;
-  const userClubId = Number(user?.clubId);
-  const hasUserClub = Number.isSafeInteger(userClubId) && userClubId > 0;
-  const isPlatformAdmin = isSuperAdminUser(user) && user?.isClubAdmin !== 1 && user?.isClubAdmin !== true;
+  const isClubAdmin = user?.isClubAdmin === 1 || user?.isClubAdmin === true || user?.isClubAdmin === "1" || user?.isClubAdmin === "true";
+  const isPlatformAdmin =
+    !isClubAdmin &&
+    (user?.isAdmin === 1 ||
+      user?.isAdmin === true ||
+      user?.role === "superadmin" ||
+      user?.role === "SUPER_ADMIN" ||
+      user?.role === "admin");
 
   if (isPlatformAdmin) {
     const selectedClubId = Number(clubContext?.clubId);
     if (Number.isSafeInteger(selectedClubId) && selectedClubId > 0) return selectedClubId;
-    if (req.query.clubId || req.query.club) return null;
+    const queryClubId = Number(req.query.clubId);
+    if (Number.isSafeInteger(queryClubId) && queryClubId > 0) return queryClubId;
+    if (typeof req.query.club === "string" && req.query.club.trim()) {
+      const [club] = await db
+        .select({ id: clubsTable.id })
+        .from(clubsTable)
+        .where(and(eq(clubsTable.slug, req.query.club.trim()), eq(clubsTable.active, true)))
+        .limit(1);
+      return club?.id ?? null;
+    }
+    return null;
   }
 
-  return hasUserClub ? userClubId : null;
+  const userClubId = Number(user?.clubId);
+  return Number.isSafeInteger(userClubId) && userClubId > 0 ? userClubId : null;
 }
 
 type EventCreationModality = {
@@ -637,56 +684,245 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
     const { query, clubContext = {} } = req.body;
     const targetLang = (clubContext as any)?.lang || "es";
     const langName = targetLang === "en" ? "English" : targetLang === "pt" ? "Português" : "Español";
-    const defaultSport = await resolveSportForContext(req, undefined, clubContext);
-    const requestedSport = await resolveSportForContext(
-      req,
-      (clubContext as any)?.sportSlug || (clubContext as any)?.sportName,
-      clubContext,
-    );
-    const isDefaultSportFutbol = defaultSport.slug === "futbol";
+    const localized = (es: string, en: string, pt: string) =>
+      targetLang === "en" ? en : targetLang === "pt" ? pt : es;
+
+    if (typeof query !== "string" || !query.trim()) {
+      res.status(400).json({ error: localized("Escribe una consulta para Parryn.", "Enter a request for Parryn.", "Escreva uma solicitação para o Parryn.") });
+      return;
+    }
 
     // --- ACCIÓN DIRECTA: PARPAL / TEXT-TO-ACTION (CREAR ENCUENTRO EN BASE DE DATOS) ---
     if (isCreateEventQuery(query)) {
-      if (requestedSport.slug === "tenis" || requestedSport.slug !== defaultSport.slug) {
-        const creationUnavailableMessage = targetLang === "en"
-          ? `No event was created. Automatic event creation does not yet support ${requestedSport.name} or switching sports; use manual creation to avoid saving the wrong format.`
-          : targetLang === "pt"
-          ? `Nenhum evento foi criado. A criação automática ainda não oferece suporte a ${requestedSport.name} nem à troca de esporte; use a criação manual para evitar salvar o formato errado.`
-          : `No se creó ningún encuentro. La creación automática todavía no admite ${requestedSport.name} ni cambia entre deportes; para evitar guardar un formato equivocado, usa la creación manual por ahora.`;
+      const userClubId = await resolveEventClubId(req, clubContext);
+      if (!userClubId) {
         res.json({
-          answer: creationUnavailableMessage,
+          answer: localized(
+            "No se creó el encuentro: tu cuenta no tiene un club activo asociado.",
+            "No event was created: your account is not associated with an active club.",
+            "O encontro não foi criado: sua conta não está vinculada a um clube ativo.",
+          ),
           aiPowered: false,
         });
         return;
       }
 
-      const userClubId = (req.user as any)?.clubId || (clubContext as any)?.clubId || 1;
-      let clubName = (clubContext as any)?.clubName || (isDefaultSportFutbol ? "Liga Fútbol 5 & 7" : "Club Deportivo");
-      try {
-        const [clubRow] = await db.select().from(clubsTable).where(eq(clubsTable.id, userClubId));
-        if (clubRow?.name) clubName = clubRow.name;
-      } catch {}
+      const [clubRow] = await db
+        .select({ id: clubsTable.id, name: clubsTable.name })
+        .from(clubsTable)
+        .where(and(eq(clubsTable.id, userClubId), eq(clubsTable.active, true)))
+        .limit(1);
+      if (!clubRow) {
+        res.json({
+          answer: localized(
+            "No se creó el encuentro: no pude validar el club seleccionado.",
+            "No event was created: the selected club could not be verified.",
+            "O encontro não foi criado: não foi possível validar o clube selecionado.",
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
 
-      // Ubicación o club específico indicado en la petición
-      const location = extractLocation(query, clubName);
+      const activeClubSports = await db
+        .select({ id: sportsTable.id, name: sportsTable.name, slug: sportsTable.slug })
+        .from(clubSportsTable)
+        .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+        .where(and(
+          eq(clubSportsTable.clubId, userClubId),
+          eq(clubSportsTable.active, true),
+          eq(sportsTable.active, true),
+        ))
+        .orderBy(clubSportsTable.id);
 
-      // Pistas / Canchas
-      const courtMatch = query.match(/(\w+|\d+)\s*(?:canchas?|pistas?)/i);
-      const parsedCourts = courtMatch ? parseNum(courtMatch[1]) : null;
-      const courtsAvailable = parsedCourts && parsedCourts > 0 ? parsedCourts : (isDefaultSportFutbol ? 1 : 3);
+      if (activeClubSports.length === 0) {
+        res.json({
+          answer: localized(
+            "No se creó el encuentro: el club no tiene deportes activos configurados.",
+            "No event was created: this club has no active sports configured.",
+            "O encontro não foi criado: este clube não tem esportes ativos configurados.",
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
 
-      // Jugadores / Cupos
-      const spotsMatch = query.match(/(\w+|\d+)\s*(?:jugadores?|personas?|cupos?|plazas?)/i);
-      const parsedSpots = spotsMatch ? parseNum(spotsMatch[1]) : null;
-      const defaultSpots = isDefaultSportFutbol ? (courtsAvailable * 10) : (courtsAvailable * 4);
-      const maxSpots = parsedSpots && parsedSpots > 0 ? parsedSpots : defaultSpots;
+      const selectedSportValue =
+        typeof (clubContext as any)?.sportSlug === "string" && (clubContext as any).sportSlug.trim()
+          ? (clubContext as any).sportSlug
+          : typeof (clubContext as any)?.sportName === "string"
+          ? (clubContext as any).sportName
+          : "";
+      const requestedSportKey = normalizeSportIdentifier(selectedSportValue);
+      const selectedSport = requestedSportKey
+        ? activeClubSports.find((sport) =>
+            normalizeSportIdentifier(sport.slug) === requestedSportKey ||
+            normalizeSportIdentifier(sport.name) === requestedSportKey)
+        : activeClubSports.length === 1 ? activeClubSports[0] : undefined;
 
-      // Fecha y Hora
+      if (!selectedSport) {
+        const names = activeClubSports.map((sport) => sport.name).join(", ");
+        res.json({
+          answer: selectedSportValue
+            ? localized(
+                `No se creó el encuentro: ${selectedSportValue} no está activo en ${clubRow.name}. Deportes activos: ${names}.`,
+                `No event was created: ${selectedSportValue} is not active at ${clubRow.name}. Active sports: ${names}.`,
+                `O encontro não foi criado: ${selectedSportValue} não está ativo em ${clubRow.name}. Esportes ativos: ${names}.`,
+              )
+            : localized(
+                `No se creó el encuentro. Elige el deporte en el selector de Parryn (${names}) y vuelve a enviar la solicitud.`,
+                `No event was created. Choose a sport in Parryn's selector (${names}) and send the request again.`,
+                `O encontro não foi criado. Escolha um esporte no seletor do Parryn (${names}) e envie a solicitação novamente.`,
+              ),
+          aiPowered: false,
+        });
+        return;
+      }
+
+      const modalities = await db
+        .select({
+          id: sportModalitiesTable.id,
+          name: sportModalitiesTable.name,
+          slug: sportModalitiesTable.slug,
+          teamSize: sportModalitiesTable.teamSize,
+          useSets: sportModalitiesTable.useSets,
+        })
+        .from(sportModalitiesTable)
+        .where(and(
+          eq(sportModalitiesTable.sportId, selectedSport.id),
+          eq(sportModalitiesTable.active, true),
+        ));
+      if (modalities.length === 0) {
+        res.json({
+          answer: localized(
+            `No se creó el encuentro: ${selectedSport.name} no tiene modalidades activas configuradas.`,
+            `No event was created: ${selectedSport.name} has no active formats configured.`,
+            `O encontro não foi criado: ${selectedSport.name} não tem modalidades ativas configuradas.`,
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
+
+      const modalityChoice = chooseEventModality(selectedSport.slug, query, modalities);
       const targetDateTime = parseTargetDateTime(query);
-      const formato = isDefaultSportFutbol ? "futbol5" : "americano";
-      const title = isDefaultSportFutbol ? `Pichanga de Fútbol - ${location}` : `Torneo Americano - ${location}`;
+      const missingDetails: string[] = [];
+      if (!modalityChoice) {
+        missingDetails.push(
+          selectedSport.slug === "padel"
+            ? localized(
+                "indica Americana o Parejas fijas; para Desafío, indica además individual o dobles",
+                "specify Americana or fixed pairs; for a challenge, also specify singles or doubles",
+                "indique Americana ou duplas fixas; para Desafio, informe também simples ou duplas",
+              )
+            : selectedSport.slug === "tenis"
+            ? localized("indica individual o dobles", "specify singles or doubles", "informe simples ou duplas")
+            : selectedSport.slug === "futbol"
+            ? localized("indica fútbol 5, 7, 8 u 11", "specify football 5, 7, 8, or 11", "informe futebol 5, 7, 8 ou 11")
+            : localized("indica una modalidad activa del deporte", "specify an active format for this sport", "informe uma modalidade ativa deste esporte"),
+        );
+      }
+      if (!targetDateTime) {
+        missingDetails.push(
+          localized(
+            "indica un día futuro y la hora en formato 24 horas (por ejemplo: viernes a las 20:00)",
+            "include a future day and time in 24-hour format (for example: Friday at 20:00)",
+            "informe um dia futuro e horário de 24 horas (por exemplo: sexta-feira às 20:00)",
+          ),
+        );
+      }
+      if (missingDetails.length > 0) {
+        res.json({
+          answer: localized(
+            `No se creó el encuentro. Para guardarlo sin asumir datos, ${missingDetails.join(" y ")}.`,
+            `No event was created. To avoid guessing, ${missingDetails.join(" and ")}.`,
+            `O encontro não foi criado. Para não presumir dados, ${missingDetails.join(" e ")}.`,
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
+      if (!modalityChoice || !targetDateTime) {
+        res.json({
+          answer: localized(
+            "No se creó el encuentro: faltan una modalidad válida o una fecha y hora futuras.",
+            "No event was created: a valid format or future date and time is missing.",
+            "O encontro não foi criado: falta uma modalidade válida ou data e horário futuros.",
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
 
-      // Crear encuentro en Neon PostgreSQL
+      const normalizedQuery = normalizeIntentText(query);
+      const courtMatch = normalizedQuery.match(/\b([a-z0-9]+)\s*(?:canchas?|pistas?|courts?|quadras?)\b/);
+      const parsedCourts = courtMatch ? parseNum(courtMatch[1]) : null;
+      if (courtMatch && !parsedCourts) {
+        res.json({
+          answer: localized("No se creó el encuentro: no pude interpretar la cantidad de canchas.", "No event was created: I could not interpret the number of courts.", "O encontro não foi criado: não consegui interpretar a quantidade de quadras."),
+          aiPowered: false,
+        });
+        return;
+      }
+      const courtsAvailable = parsedCourts ?? 1;
+      if (courtsAvailable > 20) {
+        res.json({
+          answer: localized("No se creó el encuentro: indica un máximo de 20 canchas.", "No event was created: enter no more than 20 courts.", "O encontro não foi criado: informe no máximo 20 quadras."),
+          aiPowered: false,
+        });
+        return;
+      }
+
+      const spotsMatch = normalizedQuery.match(/\b([a-z0-9]+)\s*(?:jugadores?|players?|personas?|pessoas?|cupos?|plazas?|spots?|vagas?)\b/);
+      const parsedSpots = spotsMatch ? parseNum(spotsMatch[1]) : null;
+      if (spotsMatch && !parsedSpots) {
+        res.json({
+          answer: localized("No se creó el encuentro: no pude interpretar la cantidad de cupos.", "No event was created: I could not interpret the number of spots.", "O encontro não foi criado: não consegui interpretar a quantidade de vagas."),
+          aiPowered: false,
+        });
+        return;
+      }
+      const minimumPlayers = modalityChoice.modality.teamSize * 2;
+      const maxSpots = parsedSpots ?? minimumPlayers * courtsAvailable;
+      if (maxSpots < minimumPlayers || maxSpots > 200) {
+        res.json({
+          answer: localized(
+            `No se creó el encuentro: esta modalidad requiere al menos ${minimumPlayers} cupos y admite como máximo 200.`,
+            `No event was created: this format requires at least ${minimumPlayers} spots and allows at most 200.`,
+            `O encontro não foi criado: esta modalidade exige pelo menos ${minimumPlayers} vagas e permite no máximo 200.`,
+          ),
+          aiPowered: false,
+        });
+        return;
+      }
+
+      const location = extractLocation(query, clubRow.name);
+      const sportLabel = selectedSport.slug === "tenis"
+        ? localized("Tenis", "Tennis", "Tênis")
+        : selectedSport.slug === "futbol"
+        ? localized("Fútbol", "Football", "Futebol")
+        : selectedSport.slug === "padel"
+        ? "Pádel"
+        : selectedSport.name;
+      const formatLabel = selectedSport.slug === "tenis"
+        ? modalityChoice.modality.slug === "individual"
+          ? localized("Individual", "Singles", "Simples")
+          : localized("Dobles", "Doubles", "Duplas")
+        : selectedSport.slug === "futbol"
+        ? `${localized("Fútbol", "Football", "Futebol")} ${modalityChoice.modality.teamSize}`
+        : selectedSport.slug === "padel"
+        ? modalityChoice.format === "parejas_fijas"
+          ? localized("Parejas fijas", "Fixed pairs", "Duplas fixas")
+          : modalityChoice.format === "desafio"
+          ? localized("Desafío", "Challenge", "Desafio")
+          : "Americana"
+        : modalityChoice.formatLabel;
+      const sportEmoji = selectedSport.slug === "futbol" ? "⚽" : selectedSport.slug === "padel" || selectedSport.slug === "tenis" ? "🎾" : "🏅";
+      const format = modalityChoice.format;
+      const title = `${sportLabel} — ${formatLabel} — ${location}`;
+      const durationMinutes = modalityChoice.modality.useSets ? 90 : 60;
+
+      // El deporte, club y formato se derivan de catálogos activos del servidor.
       const [newEncuentro] = await db
         .insert(encuentrosTable)
         .values({
@@ -695,12 +931,15 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
           location,
           maxSpots,
           courtsAvailable,
-          durationMinutes: isDefaultSportFutbol ? 60 : 90,
-          formato,
-          notes: isDefaultSportFutbol
-            ? `Convocatoria oficial de Fútbol para ${maxSpots} jugadores en ${courtsAvailable} cancha(s). Dos equipos equilibrados.`
-            : `Convocatoria oficial para ${maxSpots} jugadores en ${courtsAvailable} pistas. Formato Torneo Americano con Punto de Oro.`,
+          durationMinutes,
+          formato: format,
+          notes: localized(
+            `Encuentro de ${sportLabel}; modalidad ${formatLabel}; ${maxSpots} cupos en ${courtsAvailable} cancha(s).`,
+            `${sportLabel} event; ${formatLabel} format; ${maxSpots} spots across ${courtsAvailable} court(s).`,
+            `Encontro de ${sportLabel}; modalidade ${formatLabel}; ${maxSpots} vagas em ${courtsAvailable} quadra(s).`,
+          ),
           clubId: userClubId,
+          sportId: selectedSport.id,
           organizerId: (req.user as any)?.id ? String((req.user as any).id) : null,
           estado: "abierto",
         })
@@ -721,41 +960,16 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
         hour12: false,
       });
 
-      const whatsappMessage = isDefaultSportFutbol
-        ? `⚽ *CONVOCATORIA: ${title.toUpperCase()}*
-📍 *Lugar:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "cancha sintética" : "canchas"})
-⏰ *Horario:* ${dateStr} a las ${timeStr} hrs
-👥 *Cupos:* Máximo ${maxSpots} jugadores (2 equipos de ${Math.floor(maxSpots / 2)})
-
-⚡ *Modalidad:* Pichanga Fútbol sin esperas
-
-👉 *Inscríbete y asegura tu cupo aquí:*
-${eventUrl}
-
-_Organizado con Parryn Sport Hub IA_`
-        : `🎾 *CONVOCATORIA: ${title.toUpperCase()}*
-📍 *Lugar:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "cancha" : "canchas"})
-⏰ *Horario:* ${dateStr} a las ${timeStr} hrs
-👥 *Cupos:* Máximo ${maxSpots} jugadores
-
-⚡ *Formato:* Torneo Americano (${courtsAvailable} pistas x 4 jugadores = rotación continua sin esperas)
-
-👉 *Inscríbete y asegura tu cupo aquí:*
-${eventUrl}
-
-_Organizado con Parryn Sport Hub IA_`;
-
-      const answer = isDefaultSportFutbol
-        ? `⚽ **¡Listo! Partido de fútbol creado con éxito en el sistema.**
-
-He programado el encuentro para el **${dateStr} a las ${timeStr} hrs** con **${maxSpots} cupos** en **${courtsAvailable} cancha(s)** en **${location}**.
-
-A continuación tienes el mensaje listo para compartir al grupo de WhatsApp:`
-        : `🎾 **¡Listo! Convocatoria creada con éxito en el sistema.**
-
-He programado el encuentro para el **${dateStr} a las ${timeStr} hrs** con **${maxSpots} cupos** en **${courtsAvailable} canchas** en **${location}**.
-
-A continuación tienes la ficha del torneo y el mensaje listo para compartir al grupo de WhatsApp:`;
+      const whatsappMessage = localized(
+        `${sportEmoji} *CONVOCATORIA: ${title.toUpperCase()}*\n📍 *Lugar:* ${location}\n⏰ *Horario:* ${dateStr} a las ${timeStr}\n👥 *Cupos:* ${maxSpots} jugadores\n⚡ *Modalidad:* ${formatLabel}\n\n👉 Inscríbete aquí: ${eventUrl}\n\n_Organizado con Parryn Sport Hub IA_`,
+        `${sportEmoji} *INVITATION: ${title.toUpperCase()}*\n📍 *Location:* ${location}\n⏰ *Time:* ${dateStr} at ${timeStr}\n👥 *Spots:* ${maxSpots} players\n⚡ *Format:* ${formatLabel}\n\n👉 Register here: ${eventUrl}\n\n_Organized with Parryn Sport Hub IA_`,
+        `${sportEmoji} *CONVITE: ${title.toUpperCase()}*\n📍 *Local:* ${location}\n⏰ *Horário:* ${dateStr} às ${timeStr}\n👥 *Vagas:* ${maxSpots} jogadores\n⚡ *Modalidade:* ${formatLabel}\n\n👉 Inscreva-se aqui: ${eventUrl}\n\n_Organizado com Parryn Sport Hub IA_`,
+      );
+      const answer = localized(
+        `✅ Encuentro de ${sportLabel} creado para el ${dateStr} a las ${timeStr}, con ${maxSpots} cupos. La modalidad quedó registrada como ${formatLabel}.`,
+        `✅ ${sportLabel} event created for ${dateStr} at ${timeStr}, with ${maxSpots} spots. The format is ${formatLabel}.`,
+        `✅ Encontro de ${sportLabel} criado para ${dateStr} às ${timeStr}, com ${maxSpots} vagas. A modalidade registrada é ${formatLabel}.`,
+      );
 
       res.json({
         answer,
@@ -766,15 +980,22 @@ A continuación tienes la ficha del torneo y el mensaje listo para compartir al 
           location: newEncuentro.location,
           maxSpots: newEncuentro.maxSpots,
           courtsAvailable: newEncuentro.courtsAvailable,
+          sportName: selectedSport.name,
+          sportSlug: selectedSport.slug,
+          formatLabel,
           url: `/encuentros/${newEncuentro.id}`,
         },
         whatsappMessage,
-        aiPowered: true,
+        aiPowered: false,
       });
       return;
     }
 
-    const sport = requestedSport;
+    const sport = await resolveSportForContext(
+      req,
+      (clubContext as any)?.sportSlug || (clubContext as any)?.sportName,
+      clubContext,
+    );
     const isFutbol = sport.slug === "futbol";
     const isTenis = sport.slug === "tenis";
 

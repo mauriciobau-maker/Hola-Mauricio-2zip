@@ -20,6 +20,9 @@ interface ChatMessage {
     location: string;
     maxSpots?: number | null;
     courtsAvailable?: number | null;
+    sportName?: string;
+    sportSlug?: string;
+    formatLabel?: string;
     url: string;
   };
   whatsappMessage?: string;
@@ -302,14 +305,19 @@ export function SecretarioParryn() {
                         <div className="flex items-center justify-between border-b border-border/50 pb-2">
                           <div className="flex items-center gap-2">
                             <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs">
-                              {activeSport.emoji}
+                              {msg.createdEncuentro.sportSlug === "futbol"
+                                ? "⚽"
+                                : msg.createdEncuentro.sportSlug === "tenis" || msg.createdEncuentro.sportSlug === "padel"
+                                ? "🎾"
+                                : activeSport.emoji}
                             </span>
                             <div>
                               <h4 className="font-bold text-sm text-foreground">
                                 {msg.createdEncuentro.title}
                               </h4>
                               <span className="text-[11px] text-muted-foreground">
-                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} {isFutbolClub ? "cancha sintética" : isTennisClub ? "canchas de tenis" : "pistas de pádel"})
+                                📍 {msg.createdEncuentro.location} • 👥 {msg.createdEncuentro.maxSpots} cupos ({msg.createdEncuentro.courtsAvailable} {msg.createdEncuentro.sportSlug === "futbol" ? "canchas de fútbol" : msg.createdEncuentro.sportSlug === "tenis" ? "canchas de tenis" : msg.createdEncuentro.sportSlug === "padel" ? "pistas de pádel" : "canchas"})
+                                {msg.createdEncuentro.formatLabel ? ` • ${msg.createdEncuentro.formatLabel}` : ""}
                               </span>
                             </div>
                           </div>
@@ -414,10 +422,10 @@ export function SecretarioParryn() {
                 <>
                   <button
                     type="button"
-                    onClick={() => setQuery("Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética")}
+                    onClick={() => setQuery("Hazme una convocatoria de fútbol 7 para este viernes a las 20:00 para 14 jugadores en una cancha")}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
                   >
-                    ⚽ "Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética"
+                    ⚽ "Hazme una convocatoria de fútbol 7 para este viernes a las 20:00 para 14 jugadores en una cancha"
                   </button>
                   <button
                     type="button"
@@ -431,10 +439,10 @@ export function SecretarioParryn() {
                 <>
                   <button
                     type="button"
-                    onClick={() => setQuery("Ayúdame a organizar una jornada de tenis individual este viernes a las 19:00")}
+                    onClick={() => setQuery("Crea una convocatoria de tenis individual este viernes a las 19:00")}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
                   >
-                    🎾 "Ayúdame a organizar una jornada de tenis individual este viernes a las 19:00"
+                    🎾 "Crea una convocatoria de tenis individual este viernes a las 19:00"
                   </button>
                   <button
                     type="button"
@@ -448,10 +456,10 @@ export function SecretarioParryn() {
                 <>
                   <button
                     type="button"
-                    onClick={() => setQuery("Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel")}
+                    onClick={() => setQuery("Hazme una convocatoria para un torneo americano mañana a las 19:00 horas para 12 jugadores en tres pistas en el club starpadel")}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
                   >
-                    🎾 "Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"
+                    🎾 "Hazme una convocatoria para un torneo americano mañana a las 19:00 horas para 12 jugadores en tres pistas en el club starpadel"
                   </button>
                   <button
                     type="button"

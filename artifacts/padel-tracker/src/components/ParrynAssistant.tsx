@@ -13,7 +13,7 @@ interface ParrynAssistantProps {
 
 export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "" }: ParrynAssistantProps) {
   const { language, t } = useLanguage();
-  const { activeSport } = useParrynSport();
+  const { activeSport, activeClubId } = useParrynSport();
   const sportName = payload.sportName || payload.clubContext?.sportName || activeSport.name;
   const sportSlug = payload.sportSlug || payload.clubContext?.sportSlug || activeSport.slug;
   const [isOpen, setIsOpen] = useState(false);
@@ -54,6 +54,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
           sportSlug,
           clubContext: {
             ...(payload.clubContext || {}),
+            clubId: payload.clubContext?.clubId ?? activeClubId,
             sportName,
             sportSlug,
           },

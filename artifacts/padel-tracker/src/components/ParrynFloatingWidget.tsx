@@ -322,6 +322,9 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
     location: string;
     maxSpots?: number | null;
     courtsAvailable?: number | null;
+    sportName?: string;
+    sportSlug?: string;
+    formatLabel?: string;
     url: string;
   } | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
@@ -497,7 +500,11 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
                   <div className="p-2.5 rounded-lg bg-background border border-emerald-500/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-foreground">
-                        {widgetEmoji} {createdEncuentro.title}
+                        {createdEncuentro.sportSlug === "futbol"
+                          ? "⚽"
+                          : createdEncuentro.sportSlug === "tenis" || createdEncuentro.sportSlug === "padel"
+                          ? "🎾"
+                          : widgetEmoji} {createdEncuentro.title}
                       </span>
                       <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
                         Creado en BBDD
@@ -505,6 +512,11 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
                     </div>
 
                     <div className="flex items-center gap-1.5 pt-1">
+                      {createdEncuentro.formatLabel && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {createdEncuentro.sportName}: {createdEncuentro.formatLabel}
+                        </span>
+                      )}
                       <Link
                         href={createdEncuentro.url}
                         onClick={() => setIsOpen(false)}

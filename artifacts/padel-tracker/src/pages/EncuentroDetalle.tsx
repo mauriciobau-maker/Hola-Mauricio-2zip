@@ -321,6 +321,7 @@ interface EncuentroDetailsData {
     estado?: "abierto" | "en_curso" | "finalizado";
     maxSpots?: number;
     organizerId?: number;
+    sportId?: number | null;
   };
   asistencia: AsistenciaEntry[];
 }
@@ -442,6 +443,12 @@ export function EncuentroDetalle() {
       })
       .catch((err) => console.error("Error al cargar deportes:", err));
   }, [id]);
+
+  useEffect(() => {
+    const encounterSportId = data?.encuentro?.sportId;
+    if (!encounterSportId || !sports.some((sport) => sport.id === encounterSportId)) return;
+    setSelectedSportId(encounterSportId);
+  }, [data?.encuentro?.sportId, sports]);
 
   const reloadMatches = () => {
     fetch(`/api/encuentros/${id}/partidos`, { credentials: "include" })

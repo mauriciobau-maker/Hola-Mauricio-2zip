@@ -10,6 +10,7 @@ export interface ParrynSportOption {
 interface ParrynSportContextValue {
   sports: ParrynSportOption[];
   activeSport: ParrynSportOption;
+  activeClubId: number | null;
   selectSport: (slug: string) => void;
   showSportSelector: boolean;
 }
@@ -29,6 +30,7 @@ const PADEL_DEFAULT: ParrynSportOption = {
 const defaultValue: ParrynSportContextValue = {
   sports: [PADEL_DEFAULT],
   activeSport: PADEL_DEFAULT,
+  activeClubId: null,
   selectSport: () => undefined,
   showSportSelector: false,
 };
@@ -99,6 +101,8 @@ export function ParrynSportProvider({ club, user, children }: ParrynSportProvide
   const sports = useMemo(() => getClubSports(club), [club]);
   const optionsKey = sports.map((sport) => sport.slug).join("|");
   const clubId = club?.id ?? user?.clubId ?? "default";
+  const parsedClubId = Number(clubId);
+  const activeClubId = Number.isSafeInteger(parsedClubId) && parsedClubId > 0 ? parsedClubId : null;
   const storageKey = `parryn:active-sport:${clubId}`;
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
@@ -136,9 +140,10 @@ export function ParrynSportProvider({ club, user, children }: ParrynSportProvide
   const value = useMemo<ParrynSportContextValue>(() => ({
     sports,
     activeSport,
+    activeClubId,
     selectSport,
     showSportSelector: sports.length >= 2,
-  }), [sports, activeSport, selectSport]);
+  }), [sports, activeSport, activeClubId, selectSport]);
 
   return <ParrynSportContext.Provider value={value}>{children}</ParrynSportContext.Provider>;
 }
