@@ -7,14 +7,18 @@ import { ParrynFloatingWidget } from "@/components/ParrynFloatingWidget";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslationKey } from "../lib/translations";
+import { ParrynSportProvider } from "../context/ParrynSportContext";
 
 interface ClubBranding {
+  id?: number;
   name: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   address?: string | null;
   defaultLanguage?: string | null;
+  isFootball?: boolean;
+  sports?: Array<{ id?: number; name: string; slug: string; active?: boolean }>;
 }
 
 interface NavItem {
@@ -105,203 +109,128 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     (club as any)?.name?.toLowerCase().includes("futbol") ||
     (user as any)?.clubId === 3;
 
-  const activeNavItems = navItems.filter((item) => !(isFutbolClub && item.href === "/parejas"));
+  const hasMultipleSports = ((club as any)?.sports?.length ?? 0) >= 2;
+  const activeNavItems = navItems.filter((item) => !(isFutbolClub && !hasMultipleSports && item.href === "/parejas"));
 
   return (
-    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full overflow-x-hidden">
-        {/* Fila 1: Marca del Club y Perfil de Usuario */}
-        <div className="max-w-7xl mx-auto px-2.5 sm:px-4 h-13 sm:h-14 flex items-center justify-between gap-1.5 sm:gap-3 w-full">
-          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 tracking-tight shrink min-w-0 whitespace-nowrap overflow-hidden">
-            {club?.logoUrl ? (
-              <img
-                src={club.logoUrl}
-                alt={club.name}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-background/80 border border-border/60 p-0.5 shadow-sm shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/40 flex items-center justify-center text-primary font-black text-xs sm:text-sm shadow-sm shrink-0">
-                {(club?.name ? club.name.trim().slice(0, 2).toUpperCase() : "CP")}
+    <ParrynSportProvider club={club} user={user}>
+      <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
+        <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full overflow-x-hidden">
+          <div className="max-w-7xl mx-auto px-2.5 sm:px-4 h-13 sm:h-14 flex items-center justify-between gap-1.5 sm:gap-3 w-full">
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 tracking-tight shrink min-w-0 whitespace-nowrap overflow-hidden">
+              {club?.logoUrl ? (
+                <img src={club.logoUrl} alt={club.name} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-background/80 border border-border/60 p-0.5 shadow-sm shrink-0" />
+              ) : (
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/40 flex items-center justify-center text-primary font-black text-[11px] sm:text-sm shrink-0">
+                  {(club?.name ? club.name.trim().slice(0, 2).toUpperCase() : "CP")}
+                </div>
+              )}
+              <div className="flex flex-col leading-tight min-w-0">
+                <span className="text-foreground font-black text-xs sm:text-sm md:text-base tracking-tight truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]">
+                  {club?.name || "Club Pádel"}
+                </span>
+                <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                  <span className="opacity-75">powered by</span>
+                  <span className="font-semibold text-foreground/80">Parryn Sport Hub</span>
+                  <span className="text-[9px] font-bold bg-primary/20 text-primary px-1 py-0.2 rounded border border-primary/30">IA</span>
+                </div>
               </div>
-            )}
-            <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-foreground font-black text-xs sm:text-sm md:text-base tracking-tight truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]">
-                {club?.name || "Club Pádel"}
-              </span>
-              <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
-                <span className="opacity-75">powered by</span>
-                <span className="font-semibold text-foreground/80">Parryn Sport Hub</span>
-                <span className="text-[9px] font-bold bg-primary/20 text-primary px-1 py-0.2 rounded border border-primary/30">IA</span>
+            </Link>
+
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <LanguageSelector />
+              <AuthButton />
+              {!isPublicClubRoute && (
+                <button className="md:hidden p-1.5 sm:p-2 rounded-md hover:bg-muted/50 text-foreground cursor-pointer" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
+                  {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!isPublicClubRoute && (
+            <div className="hidden md:block border-t border-border/60 bg-muted/20">
+              <div className="max-w-7xl mx-auto px-4 flex items-center gap-1.5 py-1.5 overflow-x-auto">
+                {activeNavItems.map((item) => (
+                  <Link key={item.href} href={item.href} className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0",
+                    location === item.href ? "bg-primary/15 text-primary font-bold shadow-xs border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  )}>
+                    <item.icon size={14} />
+                    {t(item.key)}
+                  </Link>
+                ))}
+                {isAdmin && (
+                  <Link href="/admin" className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ml-auto",
+                    location === "/admin" ? "bg-purple-500/25 text-purple-300 border border-purple-500/40" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                  )}>
+                    <Shield size={14} className="text-purple-400" />
+                    {t("adminPanel")}
+                  </Link>
+                )}
               </div>
             </div>
-          </Link>
+          )}
 
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <LanguageSelector />
-            <AuthButton />
-            {!isPublicClubRoute && (
-              <button
-                className="md:hidden p-1.5 sm:p-2 rounded-md hover:bg-muted/50 text-foreground cursor-pointer"
-                onClick={() => setMobileOpen((v) => !v)}
-                aria-label="Toggle menu"
-              >
-                {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Fila 2: Barra de Navegación Principal */}
-        {!isPublicClubRoute && (
-          <div className="hidden md:block border-t border-border/60 bg-muted/20">
-            <div className="max-w-7xl mx-auto px-4 flex items-center gap-1.5 py-1.5 overflow-x-auto">
+          {mobileOpen && !isPublicClubRoute && (
+            <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
               {activeNavItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0",
-                    location === item.href
-                      ? "bg-primary/15 text-primary font-bold shadow-xs border border-primary/30"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  )}
-                >
-                  <item.icon size={14} />
+                <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  location === item.href ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}>
+                  <item.icon size={16} />
                   {t(item.key)}
                 </Link>
               ))}
               {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ml-auto",
-                    location === "/admin"
-                      ? "bg-purple-500/25 text-purple-300 border border-purple-500/40"
-                      : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
-                  )}
-                >
-                  <Shield size={14} className="text-purple-400" />
+                <Link href="/admin" onClick={() => setMobileOpen(false)} className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  location === "/admin" ? "bg-primary/15 text-primary font-semibold" : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                )}>
+                  <Shield size={16} className="text-purple-400" />
                   {t("adminPanel")}
                 </Link>
               )}
             </div>
+          )}
+        </header>
+
+        <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">{children}</main>
+
+        <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Powered by Parryn Sport Hub IA.</p>
+            {club?.address && <span className="flex items-center gap-1 font-medium bg-background border border-border px-2 py-1 rounded-md shadow-sm"><MapPin size={12} className="text-primary" /> {club.address}</span>}
           </div>
-        )}
+        </footer>
 
-        {/* Menú Desplegable Móvil */}
-        {mobileOpen && !isPublicClubRoute && (
-          <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
-            {activeNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  location === item.href
-                    ? "bg-primary/15 text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                <item.icon size={16} />
-                {t(item.key)}
-              </Link>
-            ))}
-            {isAdmin && (
-              <Link
-                href="/admin"
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  location === "/admin"
-                    ? "bg-primary/15 text-primary font-semibold"
-                    : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                )}
-              >
-                <Shield size={16} className="text-purple-400" />
-                {t("adminPanel")}
-              </Link>
-            )}
-          </div>
-        )}
-      </header>
-
-      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">{children}</main>
-
-      <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Powered by Parryn Sport Hub IA.</p>
-          {club?.address && <span className="flex items-center gap-1 font-medium bg-background border border-border px-2 py-1 rounded-md shadow-sm"><MapPin size={12} className="text-primary" /> {club.address}</span>}
-        </div>
-      </footer>
-
-      {!isPublicClubRoute && (
-        <>
-          <ParrynFloatingWidget club={club} />
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex items-center justify-around z-40 h-14 px-1 shadow-lg">
-            <Link
-              href="/"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
-                location === "/" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <LayoutDashboard size={18} />
-              <span className="text-[10px] leading-tight truncate">{t("dashboard")}</span>
-            </Link>
-
-            <Link
-              href="/ranking"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
-                location === "/ranking" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Trophy size={18} />
-              <span className="text-[10px] leading-tight truncate">{t("ranking")}</span>
-            </Link>
-
-            <Link
-              href="/encuentros"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
-                location === "/encuentros" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Calendar size={18} />
-              <span className="text-[10px] leading-tight truncate">{t("encuentros")}</span>
-            </Link>
-
-            <Link
-              href="/jugadores"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
-                location === "/jugadores" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Users size={18} />
-              <span className="text-[10px] leading-tight truncate">{t("players")}</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setMobileOpen((v) => !v)}
-              className={cn(
+        {!isPublicClubRoute && (
+          <>
+            <ParrynFloatingWidget club={club} />
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex items-center justify-around z-40 h-14 px-1 shadow-lg">
+              {navItems.slice(0, 5).map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={cn(
+                  "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors",
+                  location === item.href ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+                )}>
+                  <item.icon size={18} />
+                  <span className="text-[10px] leading-tight truncate">{t(item.key)}</span>
+                </Link>
+              ))}
+              <button type="button" onClick={() => setMobileOpen((v) => !v)} className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-xs font-medium transition-colors cursor-pointer",
                 mobileOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-              <span className="text-[10px] leading-tight truncate">{mobileOpen ? "Cerrar" : "Más"}</span>
-            </button>
-          </nav>
-          <div className="md:hidden h-16" />
-        </>
-      )}
-    </div>
+              )}>
+                {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+                <span className="text-[10px] leading-tight truncate">{mobileOpen ? "Cerrar" : "Más"}</span>
+              </button>
+            </nav>
+            <div className="md:hidden h-16" />
+          </>
+        )}
+      </div>
+    </ParrynSportProvider>
   );
 }
