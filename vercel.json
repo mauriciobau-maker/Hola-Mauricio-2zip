@@ -1,7 +1,13 @@
 {
-  "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install",
-  "rootDirectory": "scripts",
-  "outputDirectory": ".next",
-  "framework": "nextjs"
+  "version": 2,
+  "builds": [
+    {
+      "src": "artifacts/padel-tracker/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" }
+  ]
 }

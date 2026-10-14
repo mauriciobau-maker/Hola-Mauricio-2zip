@@ -1,20 +1,25 @@
 services:
   - type: web
-    name: padel-tracker-api
+    name: padel-tracker-v1
     env: node
-    plan: starter
-    buildCommand: npm install && npm run build
-    startCommand: npx tsx server.ts
+    plan: free
+    repo: https://github.com/mauriciobau-maker/Hola-Mauricio-2zip
+    branch: release/v1-production
+    root: artifacts/padel-tracker
+    buildCommand: npm ci && npm run build --workspace=@workspace/padel-tracker
+    startCommand: npm run serve --workspace=@workspace/padel-tracker
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3000
       - key: DATABASE_URL
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: CLERK_SECRET_KEY
-        sync: false
-      - key: FRONTEND_URL
-        sync: false
+        value: ${DATABASE_URL}
+  - type: web
+    name: api-server-v1
+    env: node
+    plan: free
+    repo: https://github.com/mauriciobau-maker/Hola-Mauricio-2zip
+    branch: release/v1-production
+    root: artifacts/api-server
+    buildCommand: npm ci && npm run build --workspace=@workspace/api-server
+    startCommand: npm run start --workspace=@workspace/api-server
+    envVars:
+      - key: DATABASE_URL
+        value: ${DATABASE_URL}
