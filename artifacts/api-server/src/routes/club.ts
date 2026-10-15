@@ -207,12 +207,22 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
         );
     } catch {}
 
+    // Priorizar orden de deportes: Pádel primero, Tenis segundo, Fútbol tercero
+    sports.sort((a, b) => {
+      const order: Record<string, number> = { padel: 1, tenis: 2, futbol: 3 };
+      return (order[a.slug] || 99) - (order[b.slug] || 99);
+    });
+
+    const hasFootball = sports.some((s) => s.slug === "futbol" || s.name.toLowerCase().includes("fútbol"));
+    const hasRacketSports = sports.some((s) => s.slug === "padel" || s.slug === "tenis" || s.useSets);
+
+    // Solo se considera club 100% fútbol si NO tiene deportes de raqueta
     const isFootball =
-      sports.some((s) => s.slug === "futbol" || s.name.toLowerCase().includes("fútbol")) ||
-      targetClub.name.toLowerCase().includes("fútbol") ||
+      (hasFootball && !hasRacketSports) ||
+      (targetClub.name.toLowerCase().includes("fútbol") && !hasRacketSports) ||
       targetClub.id === 3;
 
-    res.json({ ...targetClub, sports, isFootball });
+    res.json({ ...targetClub, sports, isFootball, hasRacketSports, hasFootball });
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
     res.json(null);

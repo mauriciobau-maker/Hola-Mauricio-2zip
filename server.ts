@@ -2,6 +2,7 @@ try {
   process.loadEnvFile?.();
 } catch {}
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -12,7 +13,7 @@ import { logger } from "./artifacts/api-server/src/lib/logger";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const isProduction = process.env.NODE_ENV === "production";
 
 async function startServer() {
@@ -30,6 +31,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         host: "0.0.0.0",
+        hmr: false,
       },
       appType: "spa",
       root: path.resolve(__dirname, "artifacts/padel-tracker"),
@@ -37,7 +39,12 @@ async function startServer() {
 
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, "artifacts/padel-tracker/dist/public");
+    const distPath = fs.existsSync(path.resolve(__dirname, "artifacts/padel-tracker/dist/public"))
+      ? path.resolve(__dirname, "artifacts/padel-tracker/dist/public")
+      : fs.existsSync(path.resolve(__dirname, "dist"))
+        ? path.resolve(__dirname, "dist")
+        : path.resolve(__dirname, "public");
+
     app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
       if (req.path.startsWith("/api")) return next();

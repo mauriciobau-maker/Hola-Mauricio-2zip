@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { matchesTable } from "./matches";
@@ -9,6 +9,8 @@ export const matchPlayersTable = pgTable("match_players", {
   matchId: integer("match_id").notNull().references(() => matchesTable.id, { onDelete: "cascade" }),
   playerId: integer("player_id").notNull().references(() => playersTable.id, { onDelete: "restrict" }),
   team: text("team").notNull(),
+  isSubstitute: boolean("is_substitute").notNull().default(false),
+  role: text("role").notNull().default("starter"),
 });
 
 export const insertMatchPlayerSchema = createInsertSchema(matchPlayersTable).omit({ id: true });

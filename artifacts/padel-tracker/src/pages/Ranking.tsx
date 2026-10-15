@@ -11,32 +11,101 @@ function initials(name: string) {
 
 export default function Ranking() {
   const { t } = useLanguage();
-  const { data: ranking, isLoading } = useGetRanking();
   const [club, setClub] = useState<any>(null);
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
+  const [ranking, setRanking] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/clubs/current")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setClub(d))
+      .then((d) => {
+        setClub(d);
+        if (d?.sports && d.sports.length > 0) {
+          const savedSportId = localStorage.getItem("selected_sport_id");
+          const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+          if (found) {
+            setSelectedSportId(found.id);
+          } else {
+            const defaultSport =
+              d.sports.find((s: any) => s.slug === "padel") ||
+              d.sports.find((s: any) => s.slug === "tenis" || s.useSets) ||
+              d.sports[0];
+            setSelectedSportId(defaultSport.id);
+          }
+        }
+      })
       .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      if (id) setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
   }, []);
 
+  useEffect(() => {
+    setIsLoading(true);
+    const url = selectedSportId ? `/api/ranking?sportId=${selectedSportId}` : "/api/ranking";
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        setRanking(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setRanking([]))
+      .finally(() => setIsLoading(false));
+  }, [selectedSportId]);
+
+  const activeSport = club?.sports?.find((s: any) => s.id === selectedSportId) || club?.sports?.[0];
   const isFootball =
-    club?.isFootball ||
-    club?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
-    (ranking as any)?.[0]?.isFootball ||
-    (ranking as any)?.[0]?.sportSlug === "futbol" ||
-    (ranking as any)?.[0]?.sportName?.toLowerCase().includes("fútbol");
+    activeSport?.slug === "futbol" ||
+    activeSport?.name?.toLowerCase().includes("fútbol");
+
+  const handleSelectSport = (id: number) => {
+    setSelectedSportId(id);
+    localStorage.setItem("selected_sport_id", String(id));
+    window.dispatchEvent(new CustomEvent("sport_changed", { detail: id }));
+  };
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {isFootball ? "Tabla de Posiciones" : t("ranking.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {isFootball ? "Clasificación oficial de la liga por puntos, partidos y efectividad." : t("ranking.subtitle")}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isFootball ? "Tabla de Posiciones" : t("ranking.title")}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isFootball
+              ? "Clasificación oficial de fútbol: 3 pts victoria, 1 pto empate, 0 pts derrota."
+              : t("ranking.subtitle")}
+          </p>
+        </div>
+
+        {club?.sports && club.sports.length > 1 && (
+          <div className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-xl self-start sm:self-auto">
+            {club.sports.map((s: any) => {
+              const active = s.id === selectedSportId;
+              const isFut = s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol");
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelectSport(s.id)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  )}
+                >
+                  <span>{isFut ? "⚽" : s.slug === "tenis" ? "🎾" : "🎾"}</span>
+                  <span>{s.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -46,14 +115,26 @@ export default function Ranking() {
           ))}
         </div>
       ) : !ranking?.length ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <Trophy size={28} className="text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center bg-card border border-border rounded-xl">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-3xl">
+            {isFootball ? "⚽" : <Trophy size={28} className="text-muted-foreground" />}
           </div>
           <div>
-            <p className="font-semibold">{t("ranking.noData")}</p>
-            <p className="text-sm text-muted-foreground">{t("ranking.noDataDesc")}</p>
+            <p className="font-semibold text-foreground">
+              {isFootball ? "Sin partidos de fútbol registrados aún" : t("ranking.noData")}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              {isFootball
+                ? "Registra partidos internos o contra rivales externos en Nuevo Partido para sumar puntos a la tabla de posiciones."
+                : t("ranking.noDataDesc")}
+            </p>
           </div>
+          <Link
+            href="/partidos/nuevo"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
+          >
+            Registrar Primer Partido
+          </Link>
         </div>
       ) : (
         <>
@@ -69,14 +150,79 @@ export default function Ranking() {
           {/* Full table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             {isFootball ? (
-              <div className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-1">{t("ranking.pos")}</div>
-                <div className="col-span-4">{t("ranking.player")}</div>
-                <div className="col-span-2 text-center text-primary">PTS</div>
-                <div className="col-span-1 text-center">PJ</div>
-                <div className="col-span-1 text-center text-green-400">PG</div>
-                <div className="col-span-1 text-center text-yellow-400">PE</div>
-                <div className="col-span-2 text-center">% Efic.</div>
+              <div className="overflow-x-auto">
+                <div className="min-w-[700px]">
+                  <div className="grid grid-cols-12 gap-1 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider items-center">
+                    <div className="col-span-1 text-center">{t("ranking.pos")}</div>
+                    <div className="col-span-3">{t("ranking.player")}</div>
+                    <div className="col-span-1 text-center text-primary font-bold">PTS</div>
+                    <div className="col-span-1 text-center">PJ</div>
+                    <div className="col-span-1 text-center text-green-400">PG</div>
+                    <div className="col-span-1 text-center text-yellow-400">PE</div>
+                    <div className="col-span-1 text-center text-red-400">PP</div>
+                    <div className="col-span-1 text-center font-mono">GF</div>
+                    <div className="col-span-1 text-center font-mono">GC</div>
+                    <div className="col-span-1 text-center font-mono">DG</div>
+                    <div className="col-span-1 text-center">% Ef.</div>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {ranking.map((entry: any) => {
+                      const totalMatches = entry.totalMatches ?? (entry.wins + entry.losses + (entry.draws || 0));
+                      const dg = entry.goalDiff ?? ((entry.goalsFor ?? 0) - (entry.goalsAgainst ?? 0));
+                      return (
+                        <Link
+                          key={entry.playerId}
+                          href={`/jugadores/${entry.playerId}`}
+                          className="grid grid-cols-12 gap-1 px-4 py-3 items-center hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="col-span-1 text-center">
+                            <RankBadge rank={entry.rank} />
+                          </div>
+                          <div className="col-span-3 flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                              {initials(entry.playerName)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{entry.playerName}</p>
+                              {entry.nickname && (
+                                <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <PointsDisplay points={entry.points ?? 0} />
+                          </div>
+                          <div className="col-span-1 text-center text-sm font-medium text-foreground/90">
+                            {totalMatches}
+                          </div>
+                          <div className="col-span-1 text-center text-sm text-green-400 font-semibold">
+                            {entry.wins}
+                          </div>
+                          <div className="col-span-1 text-center text-sm text-yellow-400 font-semibold">
+                            {entry.draws ?? 0}
+                          </div>
+                          <div className="col-span-1 text-center text-sm text-red-400 font-medium">
+                            {entry.losses}
+                          </div>
+                          <div className="col-span-1 text-center text-sm font-mono text-muted-foreground">
+                            {entry.goalsFor ?? 0}
+                          </div>
+                          <div className="col-span-1 text-center text-sm font-mono text-muted-foreground">
+                            {entry.goalsAgainst ?? 0}
+                          </div>
+                          <div className="col-span-1 text-center text-sm font-mono font-bold">
+                            <span className={dg > 0 ? "text-green-400" : dg < 0 ? "text-red-400" : "text-muted-foreground"}>
+                              {dg > 0 ? `+${dg}` : dg}
+                            </span>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <span className="text-xs font-medium text-muted-foreground">{entry.winRate}%</span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -88,83 +234,89 @@ export default function Ranking() {
                 <div className="col-span-2 text-center">{t("ranking.winRate")}</div>
               </div>
             )}
-            <div className="divide-y divide-border">
-              {ranking.map((entry: any) => (
-                <Link
-                  key={entry.playerId}
-                  href={`/jugadores/${entry.playerId}`}
-                  className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-3 items-center hover:bg-muted/20 transition-colors"
-                >
-                  <div className="col-span-1">
-                    <RankBadge rank={entry.rank} />
-                  </div>
-                  <div className="col-span-4 flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                      {initials(entry.playerName)}
+            {!isFootball && (
+              <div className="divide-y divide-border">
+                {ranking.map((entry: any) => (
+                  <Link
+                    key={entry.playerId}
+                    href={`/jugadores/${entry.playerId}`}
+                    className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-3 items-center hover:bg-muted/20 transition-colors"
+                  >
+                    <div className="col-span-1">
+                      <RankBadge rank={entry.rank} />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{entry.playerName}</p>
-                      {entry.nickname && (
-                        <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
-                      )}
+                    <div className="col-span-4 flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                        {initials(entry.playerName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{entry.playerName}</p>
+                        {entry.nickname && (
+                          <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  {isFootball ? (
-                    <>
-                      <div className="col-span-2 text-center">
-                        <PointsDisplay points={entry.points ?? 0} />
-                      </div>
-                      <div className="col-span-1 text-center text-sm font-medium text-foreground/80">
-                        {entry.totalMatches ?? (entry.wins + entry.losses + (entry.draws || 0))}
-                      </div>
-                      <div className="col-span-1 text-center text-sm text-green-400 font-medium">
-                        {entry.wins}
-                      </div>
-                      <div className="col-span-1 text-center text-sm text-yellow-400 font-medium">
-                        {entry.draws ?? 0}
-                      </div>
-                      <div className="col-span-2 text-center">
-                        <WinRateBar rate={entry.winRate} />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="col-span-3 text-center">
-                        <EloDisplay elo={entry.elo} />
-                      </div>
-                      <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
-                      <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
-                      <div className="col-span-2 text-center">
-                        <WinRateBar rate={entry.winRate} />
-                      </div>
-                    </>
-                  )}
-                </Link>
-              ))}
-            </div>
+                    <div className="col-span-3 text-center">
+                      <EloDisplay elo={entry.elo} />
+                    </div>
+                    <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
+                    <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
+                    <div className="col-span-2 text-center">
+                      <WinRateBar rate={entry.winRate} />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Rules / Explanation */}
           {isFootball ? (
-            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-3.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">⚽</span>
-                <h3 className="text-sm font-semibold">Sistema de Puntuación de Liga (Fútbol)</h3>
+                <span className="text-lg">⚽</span>
+                <div>
+                  <h3 className="text-sm font-semibold">Sistema Tradicional de Puntuación de Fútbol (3-1-0)</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Cálculo oficial de puntos y posiciones para la nómina del club en partidos internos y contra rivales externos.
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs text-muted-foreground">
-                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-400 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-foreground">3 Puntos:</strong> Por cada victoria en partido oficial o pichanga.</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-400 mt-1 flex-shrink-0" />
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Victoria (+3 PTS)</strong>
+                    <span>
+                      Otorga 3 puntos a los jugadores convocados tanto en triunfos ante rivales externos como al equipo ganador en partidos internos.
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
-                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-foreground">1 Punto:</strong> Por empate oficial entre ambos equipos.</span>
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 mt-1 flex-shrink-0" />
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Empate (+1 PTO)</strong>
+                    <span>
+                      Otorga 1 punto en empates oficiales, premiando la paridad deportiva en partidos internos y contra rivales externos.
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2 bg-muted/20 p-2.5 rounded-lg border border-border/40">
-                  <span className="w-2.5 h-2.5 rounded-full bg-primary/70 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-foreground">Efectividad:</strong> Porcentaje de rendimiento acumulado por jugador.</span>
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 mt-1 flex-shrink-0" />
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Derrota (0 PTS)</strong>
+                    <span>
+                      0 puntos. Se contabilizan los goles a favor (GF), en contra (GC) y la diferencia de goles (DG) para el desempate.
+                    </span>
+                  </div>
                 </div>
+              </div>
+              <div className="pt-2 text-xs text-muted-foreground border-t border-border/40 flex flex-wrap gap-x-5 gap-y-1.5">
+                <span><strong className="text-foreground">Criterios de Desempate:</strong> 1° Puntos (PTS)</span>
+                <span>2° Diferencia de Goles (DG = GF - GC)</span>
+                <span>3° Goles a Favor (GF)</span>
+                <span>4° Partidos Ganados (PG)</span>
+                <span>5° % Efectividad</span>
               </div>
             </div>
           ) : (

@@ -49,8 +49,8 @@ const WIDGET_TEXTS = {
         { label: "🏆 Crónica de la Jornada", query: "Redacta la crónica oficial de cierre de la jornada para WhatsApp felicitando a los ganadores y destacando el Fair Play." },
       ],
       ranking: [
-        { label: "📈 Sistema ELO", query: "Explica cómo sube o baja el ELO tras una victoria o derrota contra rivales de distinto nivel." },
-        { label: "🎾 Equilibrio Drive/Revés", query: "¿Por qué es clave no juntar dos jugadores exclusivos de drive en la misma pareja de pádel?" },
+        { label: "⚽ Sistema de Puntos y Posiciones", query: "Explica cómo se calculan y otorgan los puntos (3 por victoria, 1 por empate) en partidos internos y contra rivales externos." },
+        { label: "⚽ Criterios de Desempate", query: "¿Cuáles son los criterios de desempate en la tabla de posiciones (Diferencia de Goles, Goles a Favor, etc.)?" },
       ],
       admin: [
         { label: "📲 Invitación WhatsApp al Club", query: "Redacta la invitación oficial de bienvenida con el enlace y código del club para sumar socios por WhatsApp." },
@@ -88,8 +88,8 @@ const WIDGET_TEXTS = {
         { label: "🏆 Matchday Chronicle", query: "Draft an official matchday recap for WhatsApp praising winners and fair play." },
       ],
       ranking: [
-        { label: "📈 ELO System", query: "How does the ELO rating change after wins/losses against different level players?" },
-        { label: "🎾 Drive / Backhand Balance", query: "Why is it important to balance Drive and Backhand court sides in padel?" },
+        { label: "⚽ Points & Standings", query: "Explain how points (3 for win, 1 for draw) are awarded in internal and external matches." },
+        { label: "⚽ Tiebreaker Criteria", query: "What are the tiebreaker criteria in the standings table (Goal Difference, Goals For, etc.)?" },
       ],
       admin: [
         { label: "📲 Club WhatsApp Invite", query: "Draft an official WhatsApp welcome invitation with the club link and code for members." },
@@ -127,8 +127,8 @@ const WIDGET_TEXTS = {
         { label: "🏆 Resumo da Rodada", query: "Redija uma crônica oficial para o WhatsApp parabenizando os vencedores e destacando o Fair Play." },
       ],
       ranking: [
-        { label: "📈 Sistema ELO", query: "Como funciona a variação de ELO após vitórias e derrotas contra adversários de níveis diferentes?" },
-        { label: "🎾 Lado Direito / Esquerdo", query: "Por que é fundamental equilibrar jogadores de Drive e Revés no padel?" },
+        { label: "⚽ Sistema de Pontos e Tabela", query: "Explique como os pontos (3 por vitória, 1 por empate) são atribuídos em partidas internas e contra rivais externos." },
+        { label: "⚽ Critérios de Desempate", query: "Quais são os critérios de desempate na classificação (Saldo de Gols, Gols Pró, etc.)?" },
       ],
       admin: [
         { label: "📲 Convite WhatsApp para o Clube", query: "Redija o convite oficial para o WhatsApp com o link e código do clube para novos sócios." },
@@ -325,13 +325,19 @@ export function ParrynFloatingWidget({ club }: { club?: any }) {
         {!isOpen ? (
           <button
             onClick={() => setIsOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs md:text-sm shadow-xl shadow-emerald-950/30 border border-emerald-400/40 transition-all transform hover:scale-105 active:scale-95 group"
+            className="flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-950/40 border border-emerald-400/50 transition-all transform hover:scale-105 active:scale-95 group cursor-pointer"
             title="Abrir Secretario Parryn IA"
           >
-            <span className="text-base group-hover:rotate-12 transition-transform">{widgetEmoji}</span>
-            <Sparkles className="w-4 h-4 text-emerald-200 animate-pulse" />
-            <span className="font-bold tracking-tight">{texts.floatingButton}</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping ml-0.5" />
+            <div className="w-8 h-8 rounded-full bg-white text-emerald-800 flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+              P
+            </div>
+            <div className="flex flex-col text-left leading-tight pr-1">
+              <div className="flex items-center gap-1 font-black text-xs tracking-wide text-white">
+                <span>PARRYN</span>
+                <Sparkles size={11} className="text-emerald-200" />
+              </div>
+              <span className="text-[10px] text-emerald-100 font-medium">Secretario del Club</span>
+            </div>
           </button>
         ) : null}
 

@@ -61,6 +61,14 @@ Tu personalidad:
 }
 
 async function resolveSportForContext(req: Request, explicitSport?: string, clubContext?: any): Promise<{ id: number; name: string; slug: string; emoji: string }> {
+  const requestedSportId = req.body?.sportId || req.query?.sportId;
+  if (requestedSportId) {
+    const sId = Number(requestedSportId);
+    if (sId === 3) return { id: 3, name: "Fútbol", slug: "futbol", emoji: "⚽" };
+    if (sId === 2) return { id: 2, name: "Tenis", slug: "tenis", emoji: "🎾" };
+    if (sId === 1) return { id: 1, name: "Pádel", slug: "padel", emoji: "🎾" };
+  }
+
   if (explicitSport) {
     const norm = explicitSport.toLowerCase();
     if (norm.includes("fútbol") || norm.includes("futbol") || norm.includes("soccer")) {
@@ -655,9 +663,9 @@ Instrucciones para Parryn:
         : `🌧️ *Plan de Contingencia Climática de Parryn:*\n1. Asigna primero los partidos de campeonato o con asistencia completa a las pistas techadas.\n2. Si hay menos canchas cubiertas que partidos, reduce los turnos a 60 minutos con rotación rápida tipo americana para que nadie se quede sin jugar.\n3. Avisa al grupo con al menos 2 horas de anticipación para evitar traslados en vano.`;
     } else if (q.includes("fair play") || q.includes("cruzada") || q.includes("aprobar") || q.includes("marcador")) {
       dynamicAnswer = `⚖️ *Validación Cruzada Fair Play:*\nPara cuidar la transparencia de los resultados, cuando un jugador o delegado anota el marcador, este queda en estado *Pendiente de Aprobación*. Solo cuando un rival del equipo contrario o el administrador lo confirma, el resultado es oficial y se actualizan los puntos en la tabla.`;
-    } else if (q.includes("elo") || q.includes("ranking") || q.includes("puntos")) {
+    } else if (q.includes("elo") || q.includes("ranking") || q.includes("puntos") || q.includes("desempate") || q.includes("tabla")) {
       dynamicAnswer = isFutbol
-        ? `📈 *Sistema de Puntuación de Liga (Fútbol):*\nEn fútbol se compite por puntos oficiales: 3 puntos por victoria y 1 punto por empate. La tabla clasifica por Puntos totales, Partidos Jugados (PJ), Ganados (PG), Empatados (PE) y Perdidos (PP), premiando la regularidad y compromiso en cada fecha.`
+        ? `⚽ *Sistema Tradicional de Puntuación de Fútbol (3-1-0):*\nEn fútbol se compite mediante la tabla tradicional de posiciones:\n• *Victoria (+3 PTS):* Otorga 3 puntos a los jugadores convocados tanto en partidos internos del club como en triunfos oficiales contra rivales externos.\n• *Empate (+1 PTO):* Otorga 1 punto a cada jugador cuando el marcador finaliza igualado.\n• *Derrota (0 PTS):* 0 puntos.\n\n*Criterios Oficiales de Desempate:*\n1° Puntos (PTS)\n2° Diferencia de Goles (DG = GF - GC)\n3° Goles a Favor (GF)\n4° Partidos Ganados (PG)\n5° % Efectividad.`
         : `📈 *Cómo Funciona el Elo:*\nCada jugador inicia con 1200 puntos. Si vences a una pareja con mayor ranking, sumas muchos más puntos que si vences a un rival de menor nivel. Si pierdes contra un favorito, la penalización es menor. El sistema premia la consistencia y la paridad.`;
     } else {
       dynamicAnswer = isFutbol

@@ -51,7 +51,8 @@ function formatName(input: string): string {
  * no están disponibles, el jugador igualmente se devuelve.
  */
 async function enrichPlayer(
-  player: typeof playersTable.$inferSelect
+  player: typeof playersTable.$inferSelect,
+  requestedSportId?: number | null
 ) {
   let categories: any[] = [];
 
@@ -87,7 +88,27 @@ async function enrichPlayer(
   let sportName = "Pádel";
   let sportSlug = "padel";
 
-  if (player.clubId) {
+  if (requestedSportId && Number.isInteger(Number(requestedSportId)) && Number(requestedSportId) > 0) {
+    try {
+      const [sport] = await db
+        .select({
+          id: sportsTable.id,
+          name: sportsTable.name,
+          slug: sportsTable.slug,
+          useSets: sportsTable.useSets,
+        })
+        .from(sportsTable)
+        .where(eq(sportsTable.id, Number(requestedSportId)))
+        .limit(1);
+
+      if (sport) {
+        sportName = sport.name;
+        sportSlug = sport.slug;
+        useSets = sport.useSets;
+        isFootball = sport.slug === "futbol" || sport.name.toLowerCase().includes("fútbol") || sport.id === 3;
+      }
+    } catch {}
+  } else if (player.clubId) {
     try {
       const [clubSport] = await db
         .select({
@@ -121,6 +142,8 @@ async function enrichPlayer(
   let wins = 0;
   let draws = 0;
   let losses = 0;
+  let goalsFor = 0;
+  let goalsAgainst = 0;
 
   if (isFootball) {
     try {
@@ -144,13 +167,18 @@ async function enrichPlayer(
 
       for (const m of matchRows) {
         let effResult = m.result;
+        const t1 = Number(m.team1Score ?? 0);
+        const t2 = Number(m.team2Score ?? 0);
         if (!["team1", "team2", "draw"].includes(effResult)) {
-          const t1 = Number(m.team1Score ?? 0);
-          const t2 = Number(m.team2Score ?? 0);
           if (t1 > t2) effResult = "team1";
           else if (t2 > t1) effResult = "team2";
           else effResult = "draw";
         }
+        const myGoals = m.team === "team1" ? t1 : t2;
+        const oppGoals = m.team === "team1" ? t2 : t1;
+        goalsFor += myGoals;
+        goalsAgainst += oppGoals;
+
         if (effResult === "draw") {
           draws++;
           points += 1;
@@ -169,7 +197,7 @@ async function enrichPlayer(
     name: player.name,
     nickname:
       player.nickname ?? null,
-    elo: player.elo,
+    elo: isFootball ? points : player.elo,
     phone:
       player.phone ?? null,
     waId:
@@ -188,6 +216,9 @@ async function enrichPlayer(
     wins,
     draws,
     losses,
+    goalsFor,
+    goalsAgainst,
+    goalDiff: goalsFor - goalsAgainst,
     avatarInitials:
       player.name
         .split(" ")
@@ -210,6 +241,9 @@ router.get(
   async (req, res): Promise<void> => {
     try {
       const clubId = await resolveEffectiveClubId(req);
+      const rawSportId = req.query.sportId;
+      const sportId =
+        rawSportId !== undefined && rawSportId !== "" ? Number(rawSportId) : null;
 
       const players = clubId
         ? await db
@@ -233,7 +267,7 @@ router.get(
 
       const enriched =
         await Promise.all(
-          players.map(enrichPlayer)
+          players.map((p) => enrichPlayer(p, sportId))
         );
 
       res.json(enriched);
@@ -529,9 +563,14 @@ router.get(
       return;
     }
 
+    const rawSportId = req.query.sportId;
+    const sportId =
+      rawSportId !== undefined && rawSportId !== "" ? Number(rawSportId) : null;
+
     const responseObj =
       await enrichPlayer(
-        player
+        player,
+        sportId
       );
 
     res.json(responseObj);
@@ -877,34 +916,86 @@ router.get(
       return;
     }
 
+    const rawSportId = req.query.sportId;
+    const sportId =
+      rawSportId !== undefined && rawSportId !== "" ? Number(rawSportId) : null;
+
+    let targetSportId = sportId;
+    let isFootball = false;
+    let useSets = true;
+    let sportName = "Pádel";
+    let sportSlug = "padel";
+
+    if (targetSportId && Number.isInteger(Number(targetSportId)) && Number(targetSportId) > 0) {
+      try {
+        const [sport] = await db
+          .select({
+            id: sportsTable.id,
+            name: sportsTable.name,
+            slug: sportsTable.slug,
+            useSets: sportsTable.useSets,
+          })
+          .from(sportsTable)
+          .where(eq(sportsTable.id, Number(targetSportId)))
+          .limit(1);
+
+        if (sport) {
+          sportName = sport.name;
+          sportSlug = sport.slug;
+          useSets = sport.useSets;
+          isFootball = sport.slug === "futbol" || sport.name.toLowerCase().includes("fútbol") || sport.id === 3;
+        }
+      } catch {}
+    } else if (player.clubId) {
+      try {
+        const [clubSport] = await db
+          .select({
+            id: sportsTable.id,
+            name: sportsTable.name,
+            slug: sportsTable.slug,
+            useSets: sportsTable.useSets,
+          })
+          .from(clubSportsTable)
+          .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
+          .where(
+            and(
+              eq(clubSportsTable.clubId, player.clubId),
+              eq(clubSportsTable.active, true),
+              eq(sportsTable.active, true)
+            )
+          )
+          .orderBy(clubSportsTable.id)
+          .limit(1);
+
+        if (clubSport) {
+          targetSportId = clubSport.id;
+          sportName = clubSport.name;
+          sportSlug = clubSport.slug;
+          useSets = clubSport.useSets;
+          isFootball = clubSport.slug === "futbol" || clubSport.name.toLowerCase().includes("fútbol") || clubSport.id === 3;
+        }
+      } catch {}
+    }
+
+    const matchWhereClause = and(
+      userClubId ? eq(matchesTable.clubId, userClubId) : undefined,
+      targetSportId ? eq(matchesTable.sportId, targetSportId) : undefined
+    );
+
     const [
       allMatches,
       allMatchPlayers,
       allPlayersList,
     ] = await Promise.all([
-      userClubId
-        ? db
-            .select()
-            .from(matchesTable)
-            .where(
-              eq(
-                matchesTable.clubId,
-                userClubId
-              )
-            )
-            .orderBy(
-              desc(
-                matchesTable.playedAt
-              )
-            )
-        : db
-            .select()
-            .from(matchesTable)
-            .orderBy(
-              desc(
-                matchesTable.playedAt
-              )
-            ),
+      db
+        .select()
+        .from(matchesTable)
+        .where(matchWhereClause)
+        .orderBy(
+          desc(
+            matchesTable.playedAt
+          )
+        ),
 
       db
         .select()
@@ -981,41 +1072,6 @@ router.get(
           );
         }
       );
-
-    let isFootball = false;
-    let useSets = true;
-    let sportName = "Pádel";
-    let sportSlug = "padel";
-
-    if (player.clubId) {
-      try {
-        const [clubSport] = await db
-          .select({
-            id: sportsTable.id,
-            name: sportsTable.name,
-            slug: sportsTable.slug,
-            useSets: sportsTable.useSets,
-          })
-          .from(clubSportsTable)
-          .innerJoin(sportsTable, eq(clubSportsTable.sportId, sportsTable.id))
-          .where(
-            and(
-              eq(clubSportsTable.clubId, player.clubId),
-              eq(clubSportsTable.active, true),
-              eq(sportsTable.active, true)
-            )
-          )
-          .orderBy(clubSportsTable.id)
-          .limit(1);
-
-        if (clubSport) {
-          sportName = clubSport.name;
-          sportSlug = clubSport.slug;
-          useSets = clubSport.useSets;
-          isFootball = clubSport.slug === "futbol" || clubSport.name.toLowerCase().includes("fútbol");
-        }
-      } catch {}
-    }
 
     if (
       playerMatches.length ===
@@ -1258,6 +1314,9 @@ router.get(
       points,
       setsWon,
       setsLost,
+      goalsFor: setsWon,
+      goalsAgainst: setsLost,
+      goalDiff: setsWon - setsLost,
       currentStreak,
       recentMatches,
       isFootball,

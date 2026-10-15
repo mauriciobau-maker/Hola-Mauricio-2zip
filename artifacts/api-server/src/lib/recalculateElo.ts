@@ -46,14 +46,23 @@ export async function recalculateSportElo(): Promise<void> {
           id: player.playerId,
           elo: ratingMap.get(`${player.playerId}:${match.sportId}`) ?? STARTING_ELO,
         }));
-      if (team1.length === 0 || team2.length === 0) continue;
+      if (team1.length === 0) continue;
+
+      let effectiveTeam2 = team2;
+      const isRivalMatch = (match as any).matchType === "rival" || Boolean((match as any).rivalTeamName);
+      if (team2.length === 0 && isRivalMatch) {
+        effectiveTeam2 = [{ id: -1, elo: STARTING_ELO }];
+      } else if (team2.length === 0) {
+        continue;
+      }
 
       const changes = calculateMatchEloChanges(
         team1,
-        team2,
+        effectiveTeam2,
         match.result === "team1",
         match.result === "draw",
-      );
+      ).filter((change) => change.playerId > 0);
+
       await tx.insert(eloHistoryTable).values(
         changes.map((change) => ({
           playerId: change.playerId,

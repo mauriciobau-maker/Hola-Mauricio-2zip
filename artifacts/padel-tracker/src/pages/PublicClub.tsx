@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { MapPin, MessageSquare, Trophy, Users, LogIn, UserPlus, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -29,6 +29,7 @@ interface PublicClubData {
 
 export default function PublicClub() {
   const [location] = useLocation();
+  const params = useParams<{ slug?: string }>();
   const { user, login } = useAuth();
   const { t } = useLanguage();
   const [club, setClub] = useState<PublicClubData | null>(null);
@@ -36,7 +37,8 @@ export default function PublicClub() {
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const slug = location.replace(/^\//, "").split("/")[0] || "";
+  const segments = location.replace(/^\//, "").split("/").filter(Boolean);
+  const slug = params.slug || (segments[0] === "club" || segments[0] === "c" ? segments[1] : segments[0]) || "";
 
   useEffect(() => {
     if (!slug) {

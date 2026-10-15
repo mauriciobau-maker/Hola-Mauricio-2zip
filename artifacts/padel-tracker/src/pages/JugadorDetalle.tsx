@@ -25,17 +25,52 @@ export default function JugadorDetalle() {
   const params = useParams();
   const id = parseInt(params.id ?? "0", 10);
 
-  const { data: player, isLoading: loadingPlayer } = useGetPlayer(id, {
-    query: { enabled: !!id, queryKey: getGetPlayerQueryKey(id) },
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      return saved ? Number(saved) : null;
+    }
+    return null;
   });
-  const { data: stats, isLoading: loadingStats } = useGetPlayerStats(id, {
-    query: { enabled: !!id, queryKey: getGetPlayerStatsQueryKey(id) },
-  });
+
+  const [playerData, setPlayerData] = useState<any>(null);
+  const [statsData, setStatsData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   const { data: eloHistory } = useGetPlayerEloHistory(id, {
     query: { enabled: !!id, queryKey: getGetPlayerEloHistoryQueryKey(id) },
   });
 
-  if (loadingPlayer || loadingStats) {
+  useEffect(() => {
+    const handleSportChange = (e?: any) => {
+      const sId = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      if (sId) setSelectedSportId(sId);
+    };
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    const pUrl = selectedSportId ? `/api/players/${id}?sportId=${selectedSportId}` : `/api/players/${id}`;
+    const sUrl = selectedSportId ? `/api/players/${id}/stats?sportId=${selectedSportId}` : `/api/players/${id}/stats`;
+
+    Promise.all([
+      fetch(pUrl).then((r) => (r.ok ? r.json() : null)),
+      fetch(sUrl).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([p, s]) => {
+        setPlayerData(p);
+        setStatsData(s);
+      })
+      .finally(() => setLoading(false));
+  }, [id, selectedSportId]);
+
+  const player = playerData;
+  const stats = statsData;
+
+  if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-8 w-32 bg-muted rounded" />
@@ -61,13 +96,14 @@ export default function JugadorDetalle() {
   }
 
   const isFootball =
+    selectedSportId === 3 ||
     (player as any)?.isFootball ||
     (stats as any)?.isFootball ||
     (player as any)?.sportSlug === "futbol" ||
     (player as any)?.sportName?.toLowerCase().includes("fútbol");
 
   const winRate = stats?.winRate ?? 0;
-  const eloDiff = player.elo - 1500;
+  const eloDiff = (player.elo ?? 1500) - 1500;
 
   return (
     <div className="space-y-5">
@@ -198,22 +234,45 @@ export default function JugadorDetalle() {
             {isFootball ? "Rendimiento en Cancha (Fútbol)" : t("jugadores.setStats")}
           </h3>
           {isFootball ? (
-            <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold">{stats.totalMatches}</p>
-                <p className="text-xs text-muted-foreground">Partidos (PJ)</p>
+            <div className="grid grid-cols-4 md:grid-cols-7 gap-2 md:gap-3 text-center">
+              <div className="bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                <p className="text-xl font-bold">{stats.totalMatches}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">PJ</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-green-400">{stats.wins}</p>
-                <p className="text-xs text-muted-foreground">Ganados (PG)</p>
+              <div className="bg-green-500/10 p-2.5 rounded-lg border border-green-500/20">
+                <p className="text-xl font-bold text-green-400">{stats.wins}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">PG</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-yellow-400">{(stats as any).draws ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Empatados (PE)</p>
+              <div className="bg-yellow-500/10 p-2.5 rounded-lg border border-yellow-500/20">
+                <p className="text-xl font-bold text-yellow-400">{(stats as any).draws ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">PE</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-red-400">{stats.losses}</p>
-                <p className="text-xs text-muted-foreground">Perdidos (PP)</p>
+              <div className="bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+                <p className="text-xl font-bold text-red-400">{stats.losses}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">PP</p>
+              </div>
+              <div className="bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                <p className="text-xl font-bold text-foreground">{(stats as any).goalsFor ?? (stats as any).setsWon ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">GF</p>
+              </div>
+              <div className="bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                <p className="text-xl font-bold text-foreground">{(stats as any).goalsAgainst ?? (stats as any).setsLost ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">GC</p>
+              </div>
+              <div className="bg-muted/20 p-2.5 rounded-lg border border-border/40 col-span-2 md:col-span-1">
+                {(() => {
+                  const gf = (stats as any).goalsFor ?? (stats as any).setsWon ?? 0;
+                  const gc = (stats as any).goalsAgainst ?? (stats as any).setsLost ?? 0;
+                  const diff = gf - gc;
+                  return (
+                    <>
+                      <p className={cn("text-xl font-bold", diff > 0 ? "text-green-400" : diff < 0 ? "text-red-400" : "text-muted-foreground")}>
+                        {diff > 0 ? `+${diff}` : diff}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-semibold">DG</p>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -235,13 +294,13 @@ export default function JugadorDetalle() {
         </div>
       )}
 
-      {/* Elo history / Match history */}
+      {/* Match history */}
       {eloHistory && eloHistory.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-            <Zap size={13} className="text-primary" />
+            <Trophy size={14} className="text-primary" />
             <h3 className="font-semibold text-sm">
-              {isFootball ? "Historial de Partidos Registrados" : t("jugadores.eloHistory")}
+              {isFootball ? "Historial de Puntos y Resultados" : t("jugadores.eloHistory")}
             </h3>
             <span className="text-xs text-muted-foreground ml-auto">
               {t("jugadores.eloMatchesCount", { count: eloHistory.length })}
@@ -253,16 +312,19 @@ export default function JugadorDetalle() {
           <div className="divide-y divide-border">
             {[...eloHistory].reverse().slice(0, 8).map((entry) => {
               const positive = entry.eloChange > 0;
+              const isDraw = entry.eloChange === 0;
               return (
                 <div key={entry.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div
                     className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
-                      positive ? "bg-green-500/15" : "bg-red-500/15",
+                      positive ? "bg-green-500/15" : isDraw ? "bg-yellow-500/15" : "bg-red-500/15",
                     )}
                   >
                     {positive ? (
                       <TrendingUp size={11} className="text-green-400" />
+                    ) : isDraw ? (
+                      <span className="text-[10px] font-bold text-yellow-400">=</span>
                     ) : (
                       <TrendingDown size={11} className="text-red-400" />
                     )}
@@ -270,19 +332,36 @@ export default function JugadorDetalle() {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground">{formatDate(entry.matchPlayedAt, language)}</p>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground tabular-nums">{entry.eloBefore}</span>
-                    <span className="text-muted-foreground">→</span>
-                    <span className="font-semibold tabular-nums">{entry.eloAfter}</span>
-                    <span
-                      className={cn(
-                        "font-bold tabular-nums w-10 text-right",
-                        positive ? "text-green-400" : "text-red-400",
-                      )}
-                    >
-                      {positive ? "+" : ""}{entry.eloChange}
-                    </span>
-                  </div>
+                  {isFootball ? (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className={cn(
+                          "font-bold tabular-nums px-2 py-0.5 rounded text-[11px]",
+                          positive
+                            ? "bg-green-500/15 text-green-400"
+                            : isDraw
+                            ? "bg-yellow-500/15 text-yellow-400"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {positive ? "+3 pts Victoria" : isDraw ? "+1 pto Empate" : "0 pts Derrota"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground tabular-nums">{entry.eloBefore}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-semibold tabular-nums">{entry.eloAfter}</span>
+                      <span
+                        className={cn(
+                          "font-bold tabular-nums w-10 text-right",
+                          positive ? "text-green-400" : "text-red-400",
+                        )}
+                      >
+                        {positive ? "+" : ""}{entry.eloChange}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}

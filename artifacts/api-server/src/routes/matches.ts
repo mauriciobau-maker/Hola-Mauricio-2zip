@@ -134,6 +134,11 @@ async function legacyRecalculateAllElo(): Promise<void> {
       continue;
     }
 
+    // El fútbol se rige por tabla tradicional de puntos (3-1-0), goles y DG, no por sistema Elo
+    if (match.sportId === 3) {
+      continue;
+    }
+
     if (!eloByClub[clubId]) {
       eloByClub[clubId] = {};
     }
@@ -176,11 +181,15 @@ async function legacyRecalculateAllElo(): Promise<void> {
           STARTING_ELO,
       }));
 
-    // Partido incompleto.
-    if (
-      team1.length === 0 ||
-      team2.length === 0
-    ) {
+    if (team1.length === 0) {
+      continue;
+    }
+
+    let effectiveTeam2 = team2;
+    const isRivalMatch = (match as any).matchType === "rival" || Boolean((match as any).rivalTeamName);
+    if (team2.length === 0 && isRivalMatch) {
+      effectiveTeam2 = [{ id: -1, elo: STARTING_ELO }];
+    } else if (team2.length === 0) {
       continue;
     }
 
@@ -201,15 +210,15 @@ async function legacyRecalculateAllElo(): Promise<void> {
     const changes = isDraw
       ? calculateMatchEloChanges(
           team1,
-          team2,
+          effectiveTeam2,
           false,
           true
-        )
+        ).filter((change) => change.playerId > 0)
       : calculateMatchEloChanges(
           team1,
-          team2,
+          effectiveTeam2,
           team1Won
-        );
+        ).filter((change) => change.playerId > 0);
 
     // ----------------------------------------------------------
     // Guardar historial
@@ -333,54 +342,49 @@ async function enrichMatch(
       )
     );
 
-  const eloChanges = history.map(
-    (historyItem) => ({
-      playerId:
-        historyItem.playerId,
+  const isFootballMatch = sport?.slug === "futbol" || sport?.name?.toLowerCase().includes("fútbol") || m.sportId === 3;
 
-      playerName:
-        playerMap[
-          historyItem.playerId
-        ] ?? "Desconocido",
-
-      eloBefore:
-        historyItem.eloBefore,
-
-      eloAfter:
-        historyItem.eloAfter,
-
-      eloChange:
-        historyItem.eloChange,
-    })
-  );
-
-  const team1Players =
-    matchPlayers
-      .filter(
-        (player) =>
-          player.team === "team1"
-      )
-      .map((player) => ({
-        id: player.playerId,
-        name:
-          playerMap[
-            player.playerId
-          ] ?? "Desconocido",
+  const eloChanges = isFootballMatch
+    ? []
+    : history.map((historyItem) => ({
+        playerId: historyItem.playerId,
+        playerName: playerMap[historyItem.playerId] ?? "Desconocido",
+        eloBefore: historyItem.eloBefore,
+        eloAfter: historyItem.eloAfter,
+        eloChange: historyItem.eloChange,
       }));
 
-  const team2Players =
-    matchPlayers
-      .filter(
-        (player) =>
-          player.team === "team2"
-      )
-      .map((player) => ({
-        id: player.playerId,
-        name:
-          playerMap[
-            player.playerId
-          ] ?? "Desconocido",
-      }));
+  const team1Players = matchPlayers
+    .filter((player) => player.team === "team1" && !player.isSubstitute)
+    .map((player) => ({
+      id: player.playerId,
+      name: playerMap[player.playerId] ?? "Desconocido",
+      isSubstitute: false,
+    }));
+
+  const team1Substitutes = matchPlayers
+    .filter((player) => player.team === "team1" && player.isSubstitute)
+    .map((player) => ({
+      id: player.playerId,
+      name: playerMap[player.playerId] ?? "Desconocido",
+      isSubstitute: true,
+    }));
+
+  const team2Players = matchPlayers
+    .filter((player) => player.team === "team2" && !player.isSubstitute)
+    .map((player) => ({
+      id: player.playerId,
+      name: playerMap[player.playerId] ?? "Desconocido",
+      isSubstitute: false,
+    }));
+
+  const team2Substitutes = matchPlayers
+    .filter((player) => player.team === "team2" && player.isSubstitute)
+    .map((player) => ({
+      id: player.playerId,
+      name: playerMap[player.playerId] ?? "Desconocido",
+      isSubstitute: true,
+    }));
 
   return {
     id: m.id,
@@ -391,6 +395,9 @@ async function enrichMatch(
 
     modalityName:
       modality?.name ?? "Desconocida",
+
+    modalitySlug:
+      modality?.slug ?? "",
 
     teamSize:
       modality?.teamSize ?? 0,
@@ -405,9 +412,19 @@ async function enrichMatch(
     sportSlug:
       sport?.slug ?? "",
 
+    matchType:
+      (m as any).matchType ?? "internal",
+
+    rivalTeamName:
+      (m as any).rivalTeamName ?? null,
+
     team1Players,
 
+    team1Substitutes,
+
     team2Players,
+
+    team2Substitutes,
 
     team1Score:
       m.team1Score,
@@ -483,15 +500,18 @@ router.get(
       return;
     }
 
+    const rawSportId = req.query.sportId;
+    const sportId = rawSportId !== undefined && rawSportId !== "" ? Number(rawSportId) : null;
+
+    const whereClause =
+      sportId && Number.isInteger(sportId) && sportId > 0
+        ? and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId))
+        : eq(matchesTable.clubId, clubId);
+
     const matches = await db
       .select()
       .from(matchesTable)
-      .where(
-        eq(
-          matchesTable.clubId,
-          clubId
-        )
-      )
+      .where(whereClause)
       .orderBy(
         desc(
           matchesTable.playedAt
@@ -522,8 +542,12 @@ router.post(
     const {
       sportId,
       modalityId,
+      matchType = "internal",
+      rivalTeamName,
       team1PlayerIds,
-      team2PlayerIds,
+      team1SubstituteIds = [],
+      team2PlayerIds = [],
+      team2SubstituteIds = [],
       team1Score,
       team2Score,
       sets,
@@ -532,159 +556,136 @@ router.post(
       autoConfirm,
     } = req.body;
 
-    if (
-      !sportId ||
-      !team1PlayerIds ||
-      !team2PlayerIds ||
-      !playedAt
-    ) {
+    if (!sportId || !playedAt) {
       res.status(400).json({
-        error:
-          "Faltan campos requeridos: sportId, modalityId, team1PlayerIds, team2PlayerIds, playedAt",
+        error: "Faltan campos requeridos: sportId, playedAt",
       });
-
       return;
     }
 
-    if (
-      !Array.isArray(team1PlayerIds) ||
-      !Array.isArray(team2PlayerIds)
-    ) {
+    if (!Array.isArray(team1PlayerIds) || team1PlayerIds.length === 0) {
       res.status(400).json({
-        error:
-          "team1PlayerIds y team2PlayerIds deben ser arrays",
+        error: "team1PlayerIds debe ser un array con al menos un jugador titular",
       });
-
       return;
     }
 
-    if (
-      team1PlayerIds.length === 0 ||
-      team2PlayerIds.length === 0
-    ) {
-      res.status(400).json({
-        error:
-          "Cada equipo debe tener al menos un jugador",
-      });
+    const isRival = matchType === "rival" || Boolean(rivalTeamName && String(rivalTeamName).trim());
+    const normalizedRivalName = rivalTeamName ? String(rivalTeamName).trim() : null;
 
+    if (isRival && !normalizedRivalName) {
+      res.status(400).json({
+        error: "Debes ingresar el nombre del equipo rival",
+      });
+      return;
+    }
+
+    if (!isRival && (!Array.isArray(team2PlayerIds) || team2PlayerIds.length === 0)) {
+      res.status(400).json({
+        error: "team2PlayerIds debe ser un array con al menos un jugador titular para partidos internos",
+      });
+      return;
+    }
+
+    let modality = modalityId ? await getSportModality(Number(sportId), Number(modalityId)) : null;
+    if (!modality) {
+      const [firstModality] = await db
+        .select()
+        .from(sportModalitiesTable)
+        .where(
+          and(
+            eq(sportModalitiesTable.sportId, Number(sportId)),
+            eq(sportModalitiesTable.active, true),
+          ),
+        )
+        .limit(1);
+      modality = firstModality ?? null;
+    }
+
+    if (!modality) {
+      res.status(400).json({ error: "No se encontró una modalidad válida para el deporte seleccionado" });
       return;
     }
 
     const normalizedTeam1Ids = team1PlayerIds.map(Number);
-    const normalizedTeam2Ids = team2PlayerIds.map(Number);
-    const modality = await getSportModality(Number(sportId), Number(modalityId));
-    if (!modality) {
-      res.status(400).json({ error: "La modalidad no pertenece al deporte seleccionado" });
-      return;
-    }
-    if (
-      normalizedTeam1Ids.length !== modality.teamSize ||
-      normalizedTeam2Ids.length !== modality.teamSize
-    ) {
-      res.status(400).json({
-        error: `Cada equipo debe tener exactamente ${modality.teamSize} jugador(es)`,
-      });
-      return;
-    }
+    const normalizedTeam1SubIds = Array.isArray(team1SubstituteIds) ? team1SubstituteIds.map(Number) : [];
+    const normalizedTeam2Ids = isRival ? [] : team2PlayerIds.map(Number);
+    const normalizedTeam2SubIds = isRival || !Array.isArray(team2SubstituteIds) ? [] : team2SubstituteIds.map(Number);
 
-    const allIds = [
-      ...normalizedTeam1Ids,
-      ...normalizedTeam2Ids,
-    ];
+    const minTeam = modality.minTeamSize ?? modality.teamSize;
+    const maxTeam = modality.maxTeamSize ?? modality.teamSize;
 
-    if (
-      new Set(allIds).size !==
-      allIds.length
-    ) {
+    if (normalizedTeam1Ids.length < minTeam || normalizedTeam1Ids.length > maxTeam) {
       res.status(400).json({
         error:
-          "Un jugador no puede estar en ambos equipos",
+          minTeam === maxTeam
+            ? `El equipo titular debe tener exactamente ${modality.teamSize} jugador(es)`
+            : `El equipo titular debe tener entre ${minTeam} y ${maxTeam} jugadores`,
       });
-
       return;
+    }
+
+    if (!isRival) {
+      if (normalizedTeam2Ids.length < minTeam || normalizedTeam2Ids.length > maxTeam) {
+        res.status(400).json({
+          error:
+            minTeam === maxTeam
+              ? `El equipo 2 titular debe tener exactamente ${modality.teamSize} jugador(es)`
+              : `El equipo 2 titular debe tener entre ${minTeam} y ${maxTeam} jugadores`,
+        });
+        return;
+      }
+    }
+
+    // Comprobar que no haya duplicados
+    const allT1 = [...normalizedTeam1Ids, ...normalizedTeam1SubIds];
+    if (new Set(allT1).size !== allT1.length) {
+      res.status(400).json({
+        error: "Un jugador no puede estar duplicado en el equipo 1 (titulares y suplentes deben ser únicos)",
+      });
+      return;
+    }
+
+    if (!isRival) {
+      const allT2 = [...normalizedTeam2Ids, ...normalizedTeam2SubIds];
+      if (new Set(allT2).size !== allT2.length) {
+        res.status(400).json({
+          error: "Un jugador no puede estar duplicado en el equipo 2 (titulares y suplentes deben ser únicos)",
+        });
+        return;
+      }
+
+      const allMatchPlayers = [...allT1, ...allT2];
+      if (new Set(allMatchPlayers).size !== allMatchPlayers.length) {
+        res.status(400).json({
+          error: "Un jugador no puede estar en ambos equipos a la vez",
+        });
+        return;
+      }
     }
 
     // ----------------------------------------------------------
     // Verificar deporte
     // ----------------------------------------------------------
-
     const [sport] = await db
       .select()
       .from(sportsTable)
-      .where(
-        eq(
-          sportsTable.id,
-          sportId
-        )
-      );
+      .where(eq(sportsTable.id, Number(sportId)));
 
     if (!sport) {
       res.status(404).json({
-        error:
-          "Deporte no encontrado",
+        error: "Deporte no encontrado",
       });
-
       return;
     }
 
     // ----------------------------------------------------------
-    // Club actual
+    // Club actual y verificación de jugadores
     // ----------------------------------------------------------
+    const clubId = (req.user as { clubId: number }).clubId;
+    const allClubPlayerIdsToCheck = isRival ? allT1 : [...allT1, ...normalizedTeam2Ids, ...normalizedTeam2SubIds];
 
-    const clubId =
-      (
-        req.user as {
-          clubId: number;
-        }
-      ).clubId;
-
-    // ----------------------------------------------------------
-    // Verificar jugadores del club
-    // ----------------------------------------------------------
-
-    const clubPlayers =
-      await db
-        .select({
-          id:
-            playersTable.id,
-        })
-        .from(playersTable)
-        .where(
-          eq(
-            playersTable.clubId,
-            clubId
-          )
-        );
-
-    const clubPlayerIds =
-      new Set(
-        clubPlayers.map(
-          (player) =>
-            player.id
-        )
-      );
-
-    const invalidPlayers =
-      allIds.filter(
-        (playerId: number) =>
-          !clubPlayerIds.has(
-            playerId
-          )
-      );
-
-    if (
-      invalidPlayers.length > 0
-    ) {
-      res.status(400).json({
-        error:
-          "Uno o más jugadores no pertenecen al club actual",
-        playerIds:
-          invalidPlayers,
-      });
-
-      return;
-    }
-    if (!(await validatePlayersForClub(allIds, clubId))) {
+    if (!(await validatePlayersForClub(allClubPlayerIdsToCheck, clubId))) {
       res.status(400).json({ error: "Uno o más jugadores no pertenecen al club actual" });
       return;
     }
@@ -692,87 +693,46 @@ router.post(
     // ----------------------------------------------------------
     // Resultado
     // ----------------------------------------------------------
-
-    const t1Score =
-      team1Score ?? 0;
-
-    const t2Score =
-      team2Score ?? 0;
-
-    let result =
-      "draw";
-
-    if (
-      t1Score >
-      t2Score
-    ) {
-      result =
-        "team1";
-    } else if (
-      t2Score >
-      t1Score
-    ) {
-      result =
-        "team2";
+    const t1Score = team1Score ?? 0;
+    const t2Score = team2Score ?? 0;
+    let result = "draw";
+    if (t1Score > t2Score) {
+      result = "team1";
+    } else if (t2Score > t1Score) {
+      result = "team2";
     }
 
-    // ----------------------------------------------------------
-    // Estado
-    // ----------------------------------------------------------
-
-    const status =
-      autoConfirm
-        ? "confirmed"
-        : "pending_confirmation";
+    const status = autoConfirm ? "confirmed" : "pending_confirmation";
 
     // ----------------------------------------------------------
     // Crear partido
     // ----------------------------------------------------------
-
-    const [match] =
-      await db
-        .insert(matchesTable)
-        .values({
-          sportId,
-          modalityId: modality.id,
-
-          clubId,
-
-          team1Score:
-            t1Score,
-
-          team2Score:
-            t2Score,
-
-          sets:
-            sets ?? null,
-
-          result,
-
-          status,
-
-          submittedByPlayerId:
-            (req.user as any)?.playerId ?? null,
-
-          encuentroId:
-            encuentroId ??
-            null,
-
-          playedAt:
-            new Date(
-              playedAt
-            ),
-        } as any)
-        .returning();
+    const [match] = await db
+      .insert(matchesTable)
+      .values({
+        sportId: Number(sportId),
+        modalityId: modality.id,
+        matchType: isRival ? "rival" : "internal",
+        rivalTeamName: isRival ? normalizedRivalName : null,
+        clubId,
+        team1Score: t1Score,
+        team2Score: t2Score,
+        sets: sets ?? null,
+        result,
+        status,
+        submittedByPlayerId: (req.user as any)?.playerId ?? null,
+        encuentroId: encuentroId ?? null,
+        playedAt: new Date(playedAt),
+      } as any)
+      .returning();
 
     // ----------------------------------------------------------
-    // Crear relación jugadores-partido
+    // Crear relación jugadores-partido (titulares y suplentes)
     // ----------------------------------------------------------
-
     await db
       .insert(playerSportRatingsTable)
       .values(
-        allIds.map((playerId: number) => ({
+        allClubPlayerIdsToCheck.map((playerId: number) => ({
           playerId,
           sportId: Number(sportId),
           elo: STARTING_ELO,
@@ -783,55 +743,46 @@ router.post(
       });
 
     const matchPlayerValues = [
-      ...normalizedTeam1Ids.map(
-        (playerId: number) => ({
-          matchId:
-            match.id,
-
-          playerId,
-
-          team:
-            "team1",
-        })
-      ),
-
-      ...normalizedTeam2Ids.map(
-        (playerId: number) => ({
-          matchId:
-            match.id,
-
-          playerId,
-
-          team:
-            "team2",
-        })
-      ),
+      ...normalizedTeam1Ids.map((playerId: number) => ({
+        matchId: match.id,
+        playerId,
+        team: "team1",
+        isSubstitute: false,
+        role: "starter",
+      })),
+      ...normalizedTeam1SubIds.map((playerId: number) => ({
+        matchId: match.id,
+        playerId,
+        team: "team1",
+        isSubstitute: true,
+        role: "substitute",
+      })),
+      ...normalizedTeam2Ids.map((playerId: number) => ({
+        matchId: match.id,
+        playerId,
+        team: "team2",
+        isSubstitute: false,
+        role: "starter",
+      })),
+      ...normalizedTeam2SubIds.map((playerId: number) => ({
+        matchId: match.id,
+        playerId,
+        team: "team2",
+        isSubstitute: true,
+        role: "substitute",
+      })),
     ];
 
-    await db
-      .insert(
-        matchPlayersTable
-      )
-      .values(
-        matchPlayerValues
-      );
+    await db.insert(matchPlayersTable).values(matchPlayerValues);
 
     // ----------------------------------------------------------
     // Elo únicamente si nace confirmado
     // ----------------------------------------------------------
-
-    if (
-      status ===
-      "confirmed"
-    ) {
+    if (status === "confirmed") {
       await recalculateAllElo();
     }
 
-    res.status(201).json(
-      await enrichMatch(
-        match
-      )
-    );
+    res.status(201).json(await enrichMatch(match));
   }
 );
 
@@ -946,13 +897,13 @@ router.post(
           "team2"
       );
 
-    if (
-      team1.length === 0 ||
-      team2.length === 0
-    ) {
+    const isRivalMatch = (existing as any).matchType === "rival" || Boolean((existing as any).rivalTeamName);
+
+    if (team1.length === 0 || (!isRivalMatch && team2.length === 0)) {
       res.status(400).json({
-        error:
-          "No se puede confirmar un partido sin jugadores en ambos equipos",
+        error: isRivalMatch
+          ? "No se puede confirmar un partido sin jugadores en nuestro equipo"
+          : "No se puede confirmar un partido sin jugadores en ambos equipos",
       });
 
       return;
@@ -999,15 +950,17 @@ router.post(
         return;
       }
 
-      // Si el partido registra quién cargó el marcador, verificar que el aprobador NO sea de su mismo equipo
-      const submitterId = (existing as any).submittedByPlayerId;
-      if (submitterId) {
-        const submitterInMatch = matchPlayers.find((p) => p.playerId === submitterId);
-        if (submitterInMatch && submitterInMatch.team === playerInMatch.team) {
-          res.status(400).json({
-            error: "No puedes auto-aprobar el marcador cargado por tu propio equipo. La confirmación debe ser realizada por un contrincante o por el administrador del club.",
-          });
-          return;
+      // En partidos internos entre miembros del club: validación cruzada obligatoria
+      if (!isRivalMatch) {
+        const submitterId = (existing as any).submittedByPlayerId;
+        if (submitterId) {
+          const submitterInMatch = matchPlayers.find((p) => p.playerId === submitterId);
+          if (submitterInMatch && submitterInMatch.team === playerInMatch.team) {
+            res.status(400).json({
+              error: "No puedes auto-aprobar el marcador cargado por tu propio equipo. La confirmación debe ser realizada por un contrincante o por el administrador del club.",
+            });
+            return;
+          }
         }
       }
     }
@@ -1465,6 +1418,14 @@ router.patch(
 
     if (modalityId !== undefined) {
       updates.modalityId = resultingModalityId;
+    }
+
+    if (req.body.rivalTeamName !== undefined) {
+      updates.rivalTeamName = req.body.rivalTeamName ? String(req.body.rivalTeamName).trim() : null;
+    }
+
+    if (req.body.matchType !== undefined) {
+      updates.matchType = req.body.matchType;
     }
 
     updates.result =

@@ -98,6 +98,9 @@ export default function EditarPartido() {
   const [team2P1, setTeam2P1] = useState<number | null>(null);
   const [team2P2, setTeam2P2] = useState<number | null>(null);
   const [sets, setSets] = useState<SetData[]>([{ setNumber: 1, team1Games: 0, team2Games: 0 }]);
+  const [team1Score, setTeam1Score] = useState(0);
+  const [team2Score, setTeam2Score] = useState(0);
+  const [rivalTeamName, setRivalTeamName] = useState("");
   const [playedAt, setPlayedAt] = useState("");
   const [error, setError] = useState("");
   const [initialized, setInitialized] = useState(false);
@@ -112,6 +115,10 @@ export default function EditarPartido() {
       setTeam1P2(t1[1]?.id ?? null);
       setTeam2P1(t2[0]?.id ?? null);
       setTeam2P2(t2[1]?.id ?? null);
+
+      setTeam1Score(matchAny.team1Score ?? 0);
+      setTeam2Score(matchAny.team2Score ?? 0);
+      setRivalTeamName(matchAny.rivalTeamName ?? "");
 
       const setsData = matchAny.sets as SetData[];
       setSets(setsData && setsData.length > 0 ? setsData : [{ setNumber: 1, team1Games: 0, team2Games: 0 }]);
@@ -161,7 +168,10 @@ export default function EditarPartido() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (isStaff) {
+    const isRival = (match as any)?.matchType === "rival" || Boolean((match as any)?.rivalTeamName);
+    const useSets = (match as any)?.useSets ?? true;
+
+    if (isStaff && !isRival && (match as any)?.teamSize === 2) {
       if (!team1P1 || !team1P2 || !team2P1 || !team2P2) {
         setError(t.errorSelect4);
         return;
@@ -173,11 +183,24 @@ export default function EditarPartido() {
     }
 
     const payload: any = {
-      sets,
       playedAt: new Date(playedAt).toISOString(),
     };
 
-    if (isStaff) {
+    if (useSets) {
+      payload.sets = sets;
+      payload.team1Score = team1Wins;
+      payload.team2Score = team2Wins;
+    } else {
+      payload.sets = null;
+      payload.team1Score = team1Score;
+      payload.team2Score = team2Score;
+    }
+
+    if (isRival) {
+      payload.rivalTeamName = rivalTeamName;
+    }
+
+    if (isStaff && !isRival && (match as any)?.teamSize === 2) {
       payload.team1PlayerIds = [team1P1, team1P2];
       payload.team2PlayerIds = [team2P1, team2P2];
     }
@@ -240,6 +263,8 @@ export default function EditarPartido() {
 
   const team1Wins = sets.filter((s) => s.team1Games > s.team2Games).length;
   const team2Wins = sets.filter((s) => s.team2Games > s.team1Games).length;
+  const isRival = matchAny.matchType === "rival" || Boolean(matchAny.rivalTeamName);
+  const useSets = matchAny.useSets ?? true;
 
   const playerOptions = (exclude: number[]) =>
     (players ?? []).filter((p) => !exclude.includes(p.id));
@@ -255,7 +280,9 @@ export default function EditarPartido() {
         </Link>
         <div>
           <h1 className="text-xl font-bold">{t.title}</h1>
-          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {matchAny.sportName} {matchAny.modalityName ? `· ${matchAny.modalityName}` : ""} {isRival ? "· vs Rival" : ""}
+          </p>
         </div>
       </div>
 
@@ -263,16 +290,19 @@ export default function EditarPartido() {
         <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex items-start gap-2.5 text-xs text-amber-600 dark:text-amber-400">
           <Info size={16} className="shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <span className="font-semibold">Modo Jugador (Fair Play):</span> Estás editando el resultado como participante. Al guardar los cambios, el nuevo marcador quedará pendiente de aprobación por el equipo contrincante antes de actualizar los puntos de Elo.
+            <span className="font-semibold">Modo Jugador (Fair Play):</span> Estás editando el resultado como participante. Al guardar los cambios, el nuevo marcador quedará pendiente de aprobación por el equipo contrincante antes de actualizar los puntos en la tabla de posiciones.
           </p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Teams presentation */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-center text-primary">{t.team1}</h3>
-            {isStaff ? (
+            <h3 className="text-sm font-semibold text-center text-primary">
+              {isRival ? "Nuestro Club" : t.team1}
+            </h3>
+            {isStaff && !isRival && matchAny.teamSize === 2 ? (
               <>
                 <PlayerSelect
                   label="Jugador 1"
@@ -288,19 +318,37 @@ export default function EditarPartido() {
                 />
               </>
             ) : (
-              <div className="space-y-2 py-1">
-                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
-                  {players?.find((p) => p.id === team1P1)?.name || "Jugador 1"}
-                </div>
-                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
-                  {players?.find((p) => p.id === team1P2)?.name || "Jugador 2"}
-                </div>
+              <div className="space-y-1.5 py-1">
+                {t1.map((p: any) => (
+                  <div key={p.id} className="p-2 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                    {p.name}
+                  </div>
+                ))}
               </div>
             )}
           </div>
+
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-center text-accent">{t.team2}</h3>
-            {isStaff ? (
+            <h3 className="text-sm font-semibold text-center text-accent">
+              {isRival ? "Equipo Rival" : t.team2}
+            </h3>
+            {isRival ? (
+              <div className="space-y-2 py-1">
+                {isStaff ? (
+                  <input
+                    type="text"
+                    value={rivalTeamName}
+                    onChange={(e) => setRivalTeamName(e.target.value)}
+                    className="w-full bg-background border border-input rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-1 focus:ring-ring"
+                    placeholder="Nombre del rival"
+                  />
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-bold text-foreground">
+                    🛡️ {rivalTeamName || "Rival"}
+                  </div>
+                )}
+              </div>
+            ) : isStaff && matchAny.teamSize === 2 ? (
               <>
                 <PlayerSelect
                   label="Jugador 1"
@@ -316,70 +364,91 @@ export default function EditarPartido() {
                 />
               </>
             ) : (
-              <div className="space-y-2 py-1">
-                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
-                  {players?.find((p) => p.id === team2P1)?.name || "Jugador 1"}
-                </div>
-                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
-                  {players?.find((p) => p.id === team2P2)?.name || "Jugador 2"}
-                </div>
+              <div className="space-y-1.5 py-1">
+                {t2.map((p: any) => (
+                  <div key={p.id} className="p-2 rounded-lg bg-muted/40 border border-border/60 text-xs font-medium">
+                    {p.name}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">{t.sets}</h3>
-            {sets.length < 5 && (
-              <button
-                type="button"
-                onClick={addSet}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <Plus size={12} /> {t.addSet}
-              </button>
-            )}
-          </div>
+        {/* Score section (Sets or Goals) */}
+        {useSets ? (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">{t.sets}</h3>
+              {sets.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addSet}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Plus size={12} /> {t.addSet}
+                </button>
+              )}
+            </div>
 
-          <div className="flex items-center justify-center gap-3 py-2 bg-muted/30 rounded-lg">
-            <span className="text-3xl font-bold text-primary tabular-nums">{team1Wins}</span>
-            <span className="text-muted-foreground font-medium">-</span>
-            <span className="text-3xl font-bold text-accent tabular-nums">{team2Wins}</span>
-          </div>
+            <div className="flex items-center justify-center gap-3 py-2 bg-muted/30 rounded-lg">
+              <span className="text-3xl font-bold text-primary tabular-nums">{team1Wins}</span>
+              <span className="text-muted-foreground font-medium">-</span>
+              <span className="text-3xl font-bold text-accent tabular-nums">{team2Wins}</span>
+            </div>
 
-          <div className="space-y-2">
-            {sets.map((s, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground w-10 flex-shrink-0">
-                  Set {s.setNumber}
+            <div className="space-y-2">
+              {sets.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-10 flex-shrink-0">
+                    Set {s.setNumber}
+                  </span>
+                  <div className="flex items-center gap-2 flex-1">
+                    <GamesInput
+                      value={s.team1Games}
+                      onChange={(v) => updateSet(idx, "team1Games", v)}
+                      color="primary"
+                    />
+                    <span className="text-muted-foreground text-xs">-</span>
+                    <GamesInput
+                      value={s.team2Games}
+                      onChange={(v) => updateSet(idx, "team2Games", v)}
+                      color="accent"
+                    />
+                  </div>
+                  {sets.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeSet(idx)}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Marcador Final (Goles)</h3>
+            <div className="flex items-center justify-center gap-6 py-2">
+              <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[160px]">
+                <span className="text-xs font-semibold text-primary truncate">
+                  {isRival ? "Nuestro Club" : t.team1}
                 </span>
-                <div className="flex items-center gap-2 flex-1">
-                  <GamesInput
-                    value={s.team1Games}
-                    onChange={(v) => updateSet(idx, "team1Games", v)}
-                    color="primary"
-                  />
-                  <span className="text-muted-foreground text-xs">-</span>
-                  <GamesInput
-                    value={s.team2Games}
-                    onChange={(v) => updateSet(idx, "team2Games", v)}
-                    color="accent"
-                  />
-                </div>
-                {sets.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeSet(idx)}
-                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+                <GamesInput value={team1Score} onChange={setTeam1Score} color="primary" />
               </div>
-            ))}
+              <span className="text-2xl font-bold text-muted-foreground pb-2">-</span>
+              <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[160px]">
+                <span className="text-xs font-semibold text-accent truncate">
+                  {isRival ? rivalTeamName || "Rival" : t.team2}
+                </span>
+                <GamesInput value={team2Score} onChange={setTeam2Score} color="accent" />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="bg-card border border-border rounded-xl p-4 space-y-1.5">
           <label className="text-sm font-medium">{t.matchDate}</label>

@@ -89,7 +89,7 @@ router.get("/ranking", async (req, res): Promise<void> => {
   const grouped = groupMatchPlayers(participants);
   const stats = new Map(players.map((player) => [
     player.id,
-    { wins: 0, losses: 0, draws: 0, points: 0 },
+    { wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0 },
   ]));
 
   for (const match of matches) {
@@ -107,28 +107,92 @@ router.get("/ranking", async (req, res): Promise<void> => {
     const rows = grouped[match.id] ?? [];
     const team1 = rows.filter((row) => row.team === "team1").map((row) => row.playerId);
     const team2 = rows.filter((row) => row.team === "team2").map((row) => row.playerId);
-    if (!team1.length || !team2.length) continue;
-    if (effectiveResult === "draw") {
-      for (const playerId of [...team1, ...team2]) {
-        const playerStats = stats.get(playerId);
-        if (playerStats) {
-          playerStats.draws++;
-          playerStats.points++;
+    const isRivalMatch = match.matchType === "rival" || Boolean(match.rivalTeamName);
+
+    // Debe haber al menos jugadores en team1; team2 puede estar vacío en partidos con rival externo
+    if (!team1.length || (!team2.length && !isRivalMatch)) continue;
+
+    const t1Goals = Number(match.team1Score ?? 0);
+    const t2Goals = Number(match.team2Score ?? 0);
+
+    if (isRivalMatch) {
+      // Partido contra rival externo: team1 es la nómina de nuestro club
+      if (effectiveResult === "draw") {
+        for (const playerId of team1) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.draws++;
+            playerStats.points += 1;
+            playerStats.goalsFor += t1Goals;
+            playerStats.goalsAgainst += t2Goals;
+          }
+        }
+      } else if (effectiveResult === "team1") {
+        // Victoria del club: +3 puntos
+        for (const playerId of team1) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.wins++;
+            playerStats.points += 3;
+            playerStats.goalsFor += t1Goals;
+            playerStats.goalsAgainst += t2Goals;
+          }
+        }
+      } else {
+        // Derrota del club: 0 puntos
+        for (const playerId of team1) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.losses++;
+            playerStats.goalsFor += t1Goals;
+            playerStats.goalsAgainst += t2Goals;
+          }
         }
       }
     } else {
-      const winners = effectiveResult === "team1" ? team1 : team2;
-      const losers = effectiveResult === "team1" ? team2 : team1;
-      for (const playerId of winners) {
-        const playerStats = stats.get(playerId);
-        if (playerStats) {
-          playerStats.wins++;
-          playerStats.points += 3;
+      // Partido interno entre dos escuadras del club
+      if (effectiveResult === "draw") {
+        for (const playerId of team1) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.draws++;
+            playerStats.points += 1;
+            playerStats.goalsFor += t1Goals;
+            playerStats.goalsAgainst += t2Goals;
+          }
         }
-      }
-      for (const playerId of losers) {
-        const playerStats = stats.get(playerId);
-        if (playerStats) playerStats.losses++;
+        for (const playerId of team2) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.draws++;
+            playerStats.points += 1;
+            playerStats.goalsFor += t2Goals;
+            playerStats.goalsAgainst += t1Goals;
+          }
+        }
+      } else {
+        const winners = effectiveResult === "team1" ? team1 : team2;
+        const losers = effectiveResult === "team1" ? team2 : team1;
+        const winnerGoals = effectiveResult === "team1" ? t1Goals : t2Goals;
+        const loserGoals = effectiveResult === "team1" ? t2Goals : t1Goals;
+
+        for (const playerId of winners) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.wins++;
+            playerStats.points += 3;
+            playerStats.goalsFor += winnerGoals;
+            playerStats.goalsAgainst += loserGoals;
+          }
+        }
+        for (const playerId of losers) {
+          const playerStats = stats.get(playerId);
+          if (playerStats) {
+            playerStats.losses++;
+            playerStats.goalsFor += loserGoals;
+            playerStats.goalsAgainst += winnerGoals;
+          }
+        }
       }
     }
   }
@@ -146,6 +210,7 @@ router.get("/ranking", async (req, res): Promise<void> => {
       const playerStats = stats.get(player.id)!;
       const elo = ratingMap.get(player.id) ?? player.elo ?? 1500;
       const totalMatches = playerStats.wins + playerStats.losses + playerStats.draws;
+      const goalDiff = playerStats.goalsFor - playerStats.goalsAgainst;
       return {
         playerId: player.id,
         playerName: player.name,
@@ -154,11 +219,14 @@ router.get("/ranking", async (req, res): Promise<void> => {
         sportSlug: sportRecord?.slug ?? "padel",
         sportName: sportRecord?.name ?? "Pádel",
         isFootball,
-        elo,
+        elo: isFootball ? playerStats.points : elo,
         points: playerStats.points,
         wins: playerStats.wins,
         losses: playerStats.losses,
         draws: playerStats.draws,
+        goalsFor: playerStats.goalsFor,
+        goalsAgainst: playerStats.goalsAgainst,
+        goalDiff,
         totalMatches,
         winRate: totalMatches ? Math.round((playerStats.wins / totalMatches) * 100) : 0,
       };
@@ -167,10 +235,11 @@ router.get("/ranking", async (req, res): Promise<void> => {
       if (isFootball) {
         return (
           b.points - a.points ||
+          b.goalDiff - a.goalDiff ||
+          b.goalsFor - a.goalsFor ||
           b.wins - a.wins ||
           b.draws - a.draws ||
-          a.losses - b.losses ||
-          b.elo - a.elo
+          a.losses - b.losses
         );
       }
       return b.elo - a.elo || b.wins - a.wins || a.losses - b.losses;
@@ -235,7 +304,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 
   const isFootball = sportRecord?.slug === "futbol" || sportRecord?.name?.toLowerCase().includes("fútbol");
 
-  const playerStats = new Map(players.map((p) => [p.id, { wins: 0, losses: 0, draws: 0, points: 0 }]));
+  const playerStats = new Map(players.map((p) => [p.id, { wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0 }]));
   for (const m of confirmed) {
     let effResult = m.result;
     if (!["team1", "team2", "draw"].includes(effResult)) {
@@ -248,21 +317,47 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     const rows = grouped[m.id] ?? [];
     const team1 = rows.filter((r) => r.team === "team1").map((r) => r.playerId);
     const team2 = rows.filter((r) => r.team === "team2").map((r) => r.playerId);
-    if (effResult === "draw") {
-      for (const pid of [...team1, ...team2]) {
-        const ps = playerStats.get(pid);
-        if (ps) { ps.draws++; ps.points += 1; }
+    const isRivalMatch = m.matchType === "rival" || Boolean(m.rivalTeamName);
+
+    if (!team1.length || (!team2.length && !isRivalMatch)) continue;
+
+    const t1Goals = Number(m.team1Score ?? 0);
+    const t2Goals = Number(m.team2Score ?? 0);
+
+    if (isRivalMatch) {
+      if (effResult === "draw") {
+        for (const pid of team1) {
+          const ps = playerStats.get(pid);
+          if (ps) { ps.draws++; ps.points += 1; ps.goalsFor += t1Goals; ps.goalsAgainst += t2Goals; }
+        }
+      } else if (effResult === "team1") {
+        for (const pid of team1) {
+          const ps = playerStats.get(pid);
+          if (ps) { ps.wins++; ps.points += 3; ps.goalsFor += t1Goals; ps.goalsAgainst += t2Goals; }
+        }
+      } else {
+        for (const pid of team1) {
+          const ps = playerStats.get(pid);
+          if (ps) { ps.losses++; ps.goalsFor += t1Goals; ps.goalsAgainst += t2Goals; }
+        }
       }
     } else {
-      const winners = effResult === "team1" ? team1 : team2;
-      const losers = effResult === "team1" ? team2 : team1;
-      for (const pid of winners) {
-        const ps = playerStats.get(pid);
-        if (ps) { ps.wins++; ps.points += 3; }
-      }
-      for (const pid of losers) {
-        const ps = playerStats.get(pid);
-        if (ps) ps.losses++;
+      if (effResult === "draw") {
+        for (const pid of [...team1, ...team2]) {
+          const ps = playerStats.get(pid);
+          if (ps) { ps.draws++; ps.points += 1; }
+        }
+      } else {
+        const winners = effResult === "team1" ? team1 : team2;
+        const losers = effResult === "team1" ? team2 : team1;
+        for (const pid of winners) {
+          const ps = playerStats.get(pid);
+          if (ps) { ps.wins++; ps.points += 3; }
+        }
+        for (const pid of losers) {
+          const ps = playerStats.get(pid);
+          if (ps) ps.losses++;
+        }
       }
     }
   }
@@ -270,16 +365,24 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   let topPlayer: any = null;
   if (isFootball) {
     const sorted = [...players]
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        points: playerStats.get(p.id)?.points ?? 0,
-        wins: playerStats.get(p.id)?.wins ?? 0,
-        draws: playerStats.get(p.id)?.draws ?? 0,
-        losses: playerStats.get(p.id)?.losses ?? 0,
-        isFootball: true,
-      }))
-      .sort((a, b) => b.points - a.points || b.wins - a.wins);
+      .map((p) => {
+        const st = playerStats.get(p.id);
+        const gf = st?.goalsFor ?? 0;
+        const ga = st?.goalsAgainst ?? 0;
+        return {
+          id: p.id,
+          name: p.name,
+          points: st?.points ?? 0,
+          wins: st?.wins ?? 0,
+          draws: st?.draws ?? 0,
+          losses: st?.losses ?? 0,
+          goalsFor: gf,
+          goalsAgainst: ga,
+          goalDiff: gf - ga,
+          isFootball: true,
+        };
+      })
+      .sort((a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || b.wins - a.wins);
     if (sorted[0]) {
       topPlayer = sorted[0];
     }
@@ -298,6 +401,8 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     });
     return {
       id: match.id,
+      matchType: match.matchType,
+      rivalTeamName: match.rivalTeamName,
       team1Players: rows.filter((row) => row.team === "team1").map(toPlayer),
       team2Players: rows.filter((row) => row.team === "team2").map(toPlayer),
       team1Score: match.team1Score,

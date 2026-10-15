@@ -1,6 +1,6 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useGetDashboard, useGetRanking } from "@workspace/api-client-react";
-import { Users, Calendar, Trophy, TrendingUp, ChevronRight } from "lucide-react";
+import { Users, Calendar, Trophy, TrendingUp, ChevronRight, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatSportName } from "@/lib/translations";
@@ -16,10 +16,73 @@ function initials(name: string) {
 
 export default function Dashboard() {
   const { t, language } = useLanguage();
-  const { data: dashboard, isLoading: loadingDash } = useGetDashboard();
-  const { data: ranking } = useGetRanking();
+  const [club, setClub] = useState<any>(null);
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [ranking, setRanking] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (loadingDash) {
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setClub(d);
+        if (d?.sports && d.sports.length > 0) {
+          const savedSportId = localStorage.getItem("selected_sport_id");
+          const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+          if (found) {
+            setSelectedSportId(found.id);
+          } else {
+            const defaultSport =
+              d.sports.find((s: any) => s.slug === "padel") ||
+              d.sports.find((s: any) => s.slug === "tenis" || s.useSets) ||
+              d.sports[0];
+            setSelectedSportId(defaultSport.id);
+          }
+        }
+      })
+      .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      if (id) setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const dashUrl = selectedSportId ? `/api/dashboard?sportId=${selectedSportId}` : "/api/dashboard";
+    const rankUrl = selectedSportId ? `/api/ranking?sportId=${selectedSportId}` : "/api/ranking";
+
+    Promise.all([
+      fetch(dashUrl).then((r) => (r.ok ? r.json() : null)),
+      fetch(rankUrl).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([dashData, rankData]) => {
+        setDashboard(dashData);
+        setRanking(Array.isArray(rankData) ? rankData : []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [selectedSportId]);
+
+  const activeSport = club?.sports?.find((s: any) => s.id === selectedSportId) || club?.sports?.[0];
+  const isFootball =
+    activeSport?.slug === "futbol" ||
+    activeSport?.name?.toLowerCase().includes("fútbol");
+
+  const top5 = (ranking ?? []).slice(0, 5);
+
+  const handleSelectSport = (id: number) => {
+    setSelectedSportId(id);
+    localStorage.setItem("selected_sport_id", String(id));
+    window.dispatchEvent(new CustomEvent("sport_changed", { detail: id }));
+  };
+
+  if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-8 bg-muted rounded w-48" />
@@ -30,15 +93,121 @@ export default function Dashboard() {
     );
   }
 
-  const top5 = (ranking ?? []).slice(0, 5);
-  const isFootball = (dashboard as any)?.isFootball || (ranking as any)?.[0]?.isFootball;
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("dashboard")}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{t("dashboard.subtitle")}</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {isFootball
+              ? "Panel oficial de fútbol: nómina, partidos disputados y tabla de posiciones."
+              : t("dashboard.subtitle")}
+          </p>
+        </div>
+
+        {club?.sports && club.sports.length > 1 && (
+          <div className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-xl self-start sm:self-auto">
+            {club.sports.map((s: any) => {
+              const active = s.id === selectedSportId;
+              const isFut = s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol");
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelectSport(s.id)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  )}
+                >
+                  <span>{isFut ? "⚽" : "🎾"}</span>
+                  <span>{s.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Secretaría del Club con Parryn IA - Hero Banner Proactivo */}
+      <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden backdrop-blur">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600/25 border-2 border-emerald-500/40 flex items-center justify-center font-black text-2xl text-emerald-400 shrink-0 relative shadow-sm">
+              <span>P</span>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-bold text-foreground">
+                  Secretaría del Club con Parryn IA
+                </h2>
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">
+                  Secretario Activo
+                </span>
+              </div>
+              <p className="text-sm text-foreground/90 font-medium">
+                {isFootball
+                  ? 'Para "Liga Fútbol 7 - Fecha 3", van 10/14 convocados. ¡Faltan 4 cupos!'
+                  : 'Para "Torneo Pádel Sabatino - Categoría 3ª", van 0/4 confirmados. ¡Faltan 4 cupos!'}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <span className="bg-background/80 border border-border px-2.5 py-1 rounded-lg text-muted-foreground flex items-center gap-1.5 font-medium shadow-xs">
+                  <span>{isFootball ? "⚽" : "🎾"}</span>
+                  <span>
+                    Próximo: {isFootball ? "Liga Fútbol 7 - Fecha 3 (10/14 convocados)" : "Torneo Pádel Sabatino - Categoría 3ª (0/4 confirmados)"}
+                  </span>
+                </span>
+                <span className="bg-background/80 border border-border px-2.5 py-1 rounded-lg text-amber-400 flex items-center gap-1.5 font-medium shadow-xs">
+                  <span>💰</span>
+                  <span>Pendiente: $57.000</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Link
+            href="/secretario"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-emerald-950/40 transition-all shrink-0 self-start md:self-center"
+          >
+            <MessageSquare size={16} />
+            <span>Hablar con Parryn</span>
+          </Link>
+        </div>
+
+        {/* Acciones Rápidas */}
+        <div className="mt-4 pt-3.5 border-t border-emerald-500/20 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs">
+          <span className="text-emerald-500 dark:text-emerald-400 font-bold tracking-wider text-[11px] uppercase shrink-0">
+            ACCIONES RÁPIDAS:
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link
+              href="/secretario?q=quien_falta"
+              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+            >
+              📋 ¿Quién falta confirmar?
+            </Link>
+            <Link
+              href="/secretario?q=convocatoria"
+              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+            >
+              ✈️ Redactar Convocatoria WhatsApp
+            </Link>
+            <Link
+              href="/secretario?q=cobros"
+              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+            >
+              💲 Recordatorio de Cobros
+            </Link>
+            <Link
+              href="/ranking"
+              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+            >
+              🏆 Consultar Ranking
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -46,30 +215,32 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           icon={<Users size={18} className="text-primary" />}
-          label={t("players")}
+          label={isFootball ? "Plantel / Jugadores" : t("players")}
           value={dashboard?.totalPlayers ?? 0}
           href="/jugadores"
         />
         <StatCard
           icon={<Calendar size={18} className="text-chart-2" />}
-          label={t("matches")}
+          label={isFootball ? "Partidos de Fútbol" : t("matches")}
           value={dashboard?.totalMatches ?? 0}
           href="/partidos"
         />
         <StatCard
           icon={<Trophy size={18} className="text-yellow-400" />}
-          label={t("dashboard.leader")}
-          value={dashboard?.topPlayer?.name ?? "—"}
+          label={isFootball ? "Líder de la Liga" : t("dashboard.leader")}
+          value={dashboard?.topPlayer?.playerName || dashboard?.topPlayer?.name || "—"}
           sub={
             dashboard?.topPlayer
-              ? `${(dashboard.topPlayer as any).isFootball ? ((dashboard.topPlayer as any).points ?? 0) : ((dashboard.topPlayer as any).elo ?? (dashboard.topPlayer as any).points ?? "")} pts`
+              ? isFootball
+                ? `${dashboard.topPlayer.points ?? 0} pts (Liga)`
+                : `${dashboard.topPlayer.elo ?? dashboard.topPlayer.points ?? ""} pts`
               : undefined
           }
           href="/ranking"
         />
         <StatCard
           icon={<TrendingUp size={18} className="text-chart-3" />}
-          label={t("ranking")}
+          label={isFootball ? "Tabla Oficial" : t("ranking")}
           value={top5.length > 0 ? t("dashboard.activeCount", { count: top5.length }) : "0"}
           href="/ranking"
         />
@@ -135,11 +306,13 @@ export default function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{entry.playerName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {entry.wins}{t("parejas.winsShort") || "V"} / {entry.losses}{t("parejas.lossesShort") || "D"}{entry.draws > 0 ? ` / ${entry.draws}E` : ""}
+                      {isFootball
+                        ? `${entry.wins}PG · ${entry.draws ?? 0}PE · ${entry.losses}PP`
+                        : `${entry.wins}${t("parejas.winsShort") || "V"} / ${entry.losses}${t("parejas.lossesShort") || "D"}`}
                     </p>
                   </div>
                   <span className="font-bold text-primary text-sm">
-                    {entry.isFootball ? (entry.points ?? 0) : (entry.elo ?? entry.points)} pts
+                    {isFootball ? `${entry.points ?? 0} PTS` : `${entry.elo ?? entry.points} pts`}
                   </span>
                 </Link>
               ))}
@@ -177,8 +350,16 @@ function MatchRow({ match, language }: { match: any; language: string }) {
   const team1Won = match.result === "team1";
   const isDraw = match.result === "draw";
 
-  const team1Names = team1Players.map((p) => p.name).join(" / ") || "—";
-  const team2Names = team2Players.map((p) => p.name).join(" / ") || "—";
+  const isRival = match.matchType === "rival" || Boolean(match.rivalTeamName);
+  const team1Names = isRival
+    ? (team1Players.length > 0
+        ? `${team1Players.map((p) => p.name).slice(0, 3).join(", ")}${team1Players.length > 3 ? ` +${team1Players.length - 3}` : ""} (Club)`
+        : "Nuestro Club")
+    : team1Players.map((p) => p.name).join(" / ") || "—";
+
+  const team2Names = isRival
+    ? `🛡️ ${match.rivalTeamName || "Equipo Rival"}`
+    : team2Players.map((p) => p.name).join(" / ") || "—";
 
   return (
     <Link href="/partidos" className="block px-4 py-3 hover:bg-muted/30 transition-colors">

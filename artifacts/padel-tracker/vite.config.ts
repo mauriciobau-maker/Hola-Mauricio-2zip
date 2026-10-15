@@ -28,6 +28,7 @@ export default defineConfig({
     port,
     strictPort: true,
     host: "0.0.0.0",
+    hmr: false,
     allowedHosts: true,
     fs: { strict: true },
     proxy: {

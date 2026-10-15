@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListPlayers, useDeletePlayer, getListPlayersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,19 +21,69 @@ const avatarColors = [
 
 export default function Jugadores() {
   const { t } = useLanguage();
-  const { data: players, isLoading } = useListPlayers();
   const [search, setSearch] = useState("");
+  const [club, setClub] = useState<any>(null);
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      return saved ? Number(saved) : null;
+    }
+    return null;
+  });
+  const [playersList, setPlayersList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setClub(d);
+        if (!selectedSportId && d?.sports?.length > 0) {
+          const savedSportId = localStorage.getItem("selected_sport_id");
+          const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+          setSelectedSportId(found ? found.id : d.sports[0].id);
+        }
+      })
+      .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      if (id) setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setIsLoading(true);
+    const url = selectedSportId ? `/api/players?sportId=${selectedSportId}` : "/api/players";
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setPlayersList(Array.isArray(data) ? data : []))
+      .catch(() => setPlayersList([]))
+      .finally(() => setIsLoading(false));
+  }, [selectedSportId]);
+
   const deleteMutation = useDeletePlayer({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListPlayersQueryKey() });
+        const url = selectedSportId ? `/api/players?sportId=${selectedSportId}` : "/api/players";
+        fetch(url).then((r) => r.json()).then((data) => setPlayersList(data)).catch(() => {});
       },
     },
   });
 
-  const filteredPlayers = players?.filter((p) =>
+  const activeSport = club?.sports?.find((s: any) => s.id === selectedSportId) || club?.sports?.[0];
+  const isClubFootball =
+    selectedSportId === 3 ||
+    activeSport?.slug === "futbol" ||
+    activeSport?.name?.toLowerCase().includes("fútbol");
+
+  const filteredPlayers = playersList?.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     (p.nickname && p.nickname.toLowerCase().includes(search.toLowerCase()))
   );
@@ -85,17 +135,19 @@ export default function Jugadores() {
             <div key={i} className="h-16 bg-card rounded-xl border border-border animate-pulse" />
           ))}
         </div>
-      ) : !players?.length ? (
+      ) : !playersList?.length ? (
         <div className="text-center py-20 text-muted-foreground">{t("jugadores.noPlayers")}</div>
       ) : (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden">
           {filteredPlayers?.map((player: any, idx) => {
             const isFootball =
+              isClubFootball ||
               player.isFootball ||
               player.sportSlug === "futbol" ||
               player.sportName?.toLowerCase().includes("fútbol");
             const points = isFootball ? (player.points ?? 0) : (player.elo ?? 1500);
-            const label = isFootball ? "Pts" : "Elo";
+            const label = isFootball ? "PTS (Liga)" : "Elo";
+            const diff = player.goalDiff ?? ((player.goalsFor ?? 0) - (player.goalsAgainst ?? 0));
 
             return (
               <div key={player.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
@@ -104,11 +156,16 @@ export default function Jugadores() {
                 </div>
 
                 <Link href={`/jugadores/${player.id}`} className="flex-1 min-w-0 flex items-center justify-between group-hover:scale-[1.005] transition-transform">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-sm truncate">{player.name}</p>
                     {player.nickname && <p className="text-[11px] text-muted-foreground uppercase tracking-wide">&quot;{player.nickname}&quot;</p>}
+                    {isFootball && (
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                        {player.wins ?? 0}PG · {player.draws ?? 0}PE · {player.losses ?? 0}PP · Dif: {diff > 0 ? `+${diff}` : diff}
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right mr-2">
+                  <div className="text-right mr-2 flex-shrink-0">
                     <span className="text-lg font-black text-primary tracking-tighter">{points}</span>
                     <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold -mt-1">{label}</p>
                   </div>

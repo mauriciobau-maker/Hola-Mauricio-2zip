@@ -228,7 +228,7 @@ export function ClubPlansModal({
 
                     <div className="flex items-center gap-2 text-foreground">
                       <Check size={14} className="text-emerald-400 shrink-0" />
-                      <span>{language === "en" ? "Elo Ranking & Match Tracking" : language === "pt" ? "Ranking Elo e Partidas" : "Ranking Elo y Registro de Partidos"}</span>
+                      <span>{language === "en" ? "Standings & Match Tracking" : language === "pt" ? "Tabela de Pontos e Partidas" : "Tabla de Posiciones y Registro de Partidos"}</span>
                     </div>
 
                     <div className="flex items-center gap-2">

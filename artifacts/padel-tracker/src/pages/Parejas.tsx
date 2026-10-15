@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useListParejas } from "@workspace/api-client-react";
 import type { ParejaStats } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -167,6 +167,39 @@ export default function Parejas() {
   const { t } = useLanguage();
   const { data: parejas, isLoading } = useListParejas();
   const [search, setSearch] = useState("");
+  const [club, setClub] = useState<any>(null);
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      return saved ? Number(saved) : null;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClub(d))
+      .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
+
+  const racketSports = useMemo(() => {
+    return (club?.sports ?? []).filter((s: any) => s.slug === "padel" || s.slug === "tenis" || s.useSets);
+  }, [club]);
+
+  const handleSelectSport = (id: number) => {
+    setSelectedSportId(id);
+    localStorage.setItem("selected_sport_id", String(id));
+    window.dispatchEvent(new CustomEvent("sport_changed", { detail: id }));
+  };
 
   const filtered = useMemo(() => {
     if (!parejas) return [];
@@ -201,19 +234,45 @@ export default function Parejas() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("parejas.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {t("parejas.subtitle")}
           </p>
         </div>
-        {parejas && (
-          <div className="text-right">
-            <span className="text-2xl font-bold text-primary">{parejas.length}</span>
-            <p className="text-xs text-muted-foreground">{t("parejas.activeCount", { count: parejas.length })}</p>
-          </div>
-        )}
+
+        <div className="flex items-center gap-3">
+          {racketSports.length > 1 && (
+            <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border rounded-xl">
+              {racketSports.map((s: any) => {
+                const active = s.id === selectedSportId || (!selectedSportId && s.slug === "padel");
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectSport(s.id)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1",
+                      active
+                        ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <span>{s.slug === "padel" ? "🏸" : "🎾"}</span>
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {parejas && (
+            <div className="text-right shrink-0">
+              <span className="text-2xl font-bold text-primary">{parejas.length}</span>
+              <p className="text-xs text-muted-foreground">{t("parejas.activeCount", { count: parejas.length })}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Podium top 3 */}

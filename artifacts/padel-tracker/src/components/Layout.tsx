@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles } from "lucide-react";
 import { cn, hexToHslChannels } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
 import { ParrynFloatingWidget } from "@/components/ParrynFloatingWidget";
@@ -31,7 +31,6 @@ const navItems: NavItem[] = [
   { href: "/jugadores", key: "players", icon: Users },
   { href: "/encuentros", key: "encuentros", icon: CalendarDays },
   { href: "/cobros", key: "payments", icon: DollarSign },
-  { href: "/secretario", key: "parrynSecretary", icon: Bot },
 ];
 
 const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros", "/secretario"]);
@@ -98,14 +97,77 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 
-  const isFutbolClub =
-    (club as any)?.isFootball ||
-    (club as any)?.sports?.some((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol")) ||
-    (club as any)?.name?.toLowerCase().includes("fútbol") ||
-    (club as any)?.name?.toLowerCase().includes("futbol") ||
-    (user as any)?.clubId === 3;
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      return saved ? Number(saved) : null;
+    }
+    return null;
+  });
 
-  const activeNavItems = navItems.filter((item) => !(isFutbolClub && item.href === "/parejas"));
+  useEffect(() => {
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    window.addEventListener("storage", handleSportChange);
+    return () => {
+      window.removeEventListener("sport_changed", handleSportChange);
+      window.removeEventListener("storage", handleSportChange);
+    };
+  }, []);
+
+  const activeSports = useMemo(() => {
+    const sports = (club as any)?.sports?.filter((s: any) => s.active !== false) || [];
+    return [...sports].sort((a: any, b: any) => {
+      const order: Record<string, number> = { padel: 1, tenis: 2, futbol: 3 };
+      return (order[a.slug] || 99) - (order[b.slug] || 99);
+    });
+  }, [club]);
+
+  const currentSport = useMemo(() => {
+    if (selectedSportId) {
+      const found = activeSports.find((s: any) => s.id === selectedSportId);
+      if (found) return found;
+    }
+    // Por defecto en club multideporte, priorizar Pádel o deportes de raqueta
+    return (
+      activeSports.find((s: any) => s.slug === "padel") ||
+      activeSports.find((s: any) => s.slug === "tenis" || s.useSets) ||
+      activeSports[0]
+    );
+  }, [activeSports, selectedSportId]);
+
+  const hasRacketSports = activeSports.some(
+    (s: any) => s.slug === "padel" || s.slug === "tenis" || s.useSets
+  );
+
+  const isCurrentSportFootball =
+    currentSport?.slug === "futbol" ||
+    currentSport?.name?.toLowerCase().includes("fútbol");
+
+  const isCurrentSportRacket =
+    currentSport?.slug === "padel" ||
+    currentSport?.slug === "tenis" ||
+    currentSport?.useSets;
+
+  // REGLA CRÍTICA:
+  // Al seleccionar un club con multideporte, cuando se escoge Pádel o Tenis:
+  // ¡PAREJAS NO DEBE DESAPARECER!
+  // Solo se oculta si no es raqueta y se está explícitamente en fútbol.
+  const shouldHideParejas =
+    !isCurrentSportRacket &&
+    (isCurrentSportFootball || (!hasRacketSports && (club as any)?.isFootball));
+
+  const activeNavItems = navItems.filter((item) => !(shouldHideParejas && item.href === "/parejas"));
+
+  const switchSport = (sportId: number) => {
+    setSelectedSportId(sportId);
+    localStorage.setItem("selected_sport_id", String(sportId));
+    window.dispatchEvent(new CustomEvent("sport_changed", { detail: sportId }));
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden w-full max-w-full" style={dynamicStyles as React.CSSProperties}>
@@ -125,9 +187,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-foreground font-black text-xs sm:text-sm md:text-base tracking-tight truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]">
-                {club?.name || "Club Pádel"}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-foreground font-black text-xs sm:text-sm md:text-base tracking-tight truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]">
+                  {club?.name || "Club Pádel"}
+                </span>
+                <span className="hidden sm:inline-flex text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
+                  Secretario IA
+                </span>
+              </div>
               <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
                 <span className="opacity-75">powered by</span>
                 <span className="font-semibold text-foreground/80">Parryn Sport Hub</span>
@@ -137,6 +204,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {activeSports.length > 1 && (
+              <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/60 border border-border p-0.5 rounded-lg shrink-0">
+                {activeSports.map((s: any) => {
+                  const isSelected = currentSport?.id === s.id;
+                  const icon = s.slug === "padel" ? "🏸" : s.slug === "tenis" ? "🎾" : "⚽";
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => switchSport(s.id)}
+                      className={cn(
+                        "px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-all cursor-pointer flex items-center gap-1",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                      )}
+                      title={`Cambiar a ${s.name}`}
+                    >
+                      <span>{icon}</span>
+                      <span className="hidden sm:inline">{s.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <LanguageSelector />
             <AuthButton />
             {!isPublicClubRoute && (
@@ -170,11 +262,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {t(item.key)}
                 </Link>
               ))}
+
+              {/* Botón Destacado de Parryn IA */}
+              <Link
+                href="/secretario"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ml-auto",
+                  location === "/secretario"
+                    ? "bg-emerald-600 text-white shadow-md border border-emerald-400"
+                    : "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-600/30"
+                )}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <Sparkles size={13} className="text-emerald-300" />
+                <span>Parryn IA</span>
+              </Link>
+
               {isAdmin && (
                 <Link
                   href="/admin"
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ml-auto",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0",
                     location === "/admin"
                       ? "bg-purple-500/25 text-purple-300 border border-purple-500/40"
                       : "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
@@ -190,7 +298,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Menú Desplegable Móvil */}
         {mobileOpen && !isPublicClubRoute && (
-          <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-1 shadow-lg">
+          <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-2 shadow-lg">
+            {activeSports.length > 1 && (
+              <div className="p-2 bg-muted/40 rounded-lg border border-border space-y-1 mb-1">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Deporte Activo</span>
+                <div className="grid grid-cols-3 gap-1">
+                  {activeSports.map((s: any) => {
+                    const isSelected = currentSport?.id === s.id;
+                    const icon = s.slug === "padel" ? "🏸" : s.slug === "tenis" ? "🎾" : "⚽";
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { switchSport(s.id); setMobileOpen(false); }}
+                        className={cn(
+                          "py-1.5 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer",
+                          isSelected
+                            ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                            : "bg-background border border-border text-foreground hover:bg-muted"
+                        )}
+                      >
+                        <span>{icon}</span>
+                        <span className="truncate">{s.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {activeNavItems.map((item) => (
               <Link
                 key={item.href}

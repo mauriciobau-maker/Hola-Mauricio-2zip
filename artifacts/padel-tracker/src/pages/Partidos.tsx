@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   useListMatches,
@@ -26,8 +27,44 @@ type TeamPlayer = { id: number; name: string };
 export default function Partidos() {
   const { t, language } = useLanguage();
   const { data: matches, isLoading } = useListMatches();
+  const [selectedSport, setSelectedSport] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      if (saved === "3") return "futbol";
+      if (saved === "2") return "tenis";
+      if (saved === "1") return "padel";
+    }
+    return "all";
+  });
+  const [club, setClub] = useState<any>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClub(d))
+      .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id = e?.detail ?? (localStorage.getItem("selected_sport_id") ? Number(localStorage.getItem("selected_sport_id")) : null);
+      if (id === 3) setSelectedSport("futbol");
+      else if (id === 2) setSelectedSport("tenis");
+      else if (id === 1) setSelectedSport("padel");
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
+
+  const handleSelectSport = (key: string, sportId?: number) => {
+    setSelectedSport(key);
+    if (sportId) {
+      localStorage.setItem("selected_sport_id", String(sportId));
+      window.dispatchEvent(new CustomEvent("sport_changed", { detail: sportId }));
+    }
+  };
+
   const deleteMutation = useDeleteMatch({
     mutation: {
       onSuccess: () => {
@@ -63,21 +100,67 @@ export default function Partidos() {
     }
   };
 
+  const filteredMatches = (matches ?? []).filter((m: any) => {
+    if (selectedSport === "all") return true;
+    if (selectedSport === "futbol") {
+      return m.sportSlug === "futbol" || m.sportName?.toLowerCase().includes("fútbol") || m.sportId === 3;
+    }
+    if (selectedSport === "padel") {
+      return m.sportSlug === "padel" || m.sportName?.toLowerCase().includes("pádel") || m.sportId === 1;
+    }
+    if (selectedSport === "tenis") {
+      return m.sportSlug === "tenis" || m.sportName?.toLowerCase().includes("tenis") || m.sportId === 2;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("partidos.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {t("partidos.count", { count: matches?.length ?? 0 })}
+            {t("partidos.count", { count: filteredMatches.length })}
           </p>
         </div>
-        <Link
-          href="/partidos/nuevo"
-          className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus size={15} /> {t("partidos.new")}
-        </Link>
+        <div className="flex items-center gap-2">
+          {club?.sports && club.sports.length > 1 && (
+            <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border rounded-xl">
+              <button
+                onClick={() => handleSelectSport("all")}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  selectedSport === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Todos
+              </button>
+              {club.sports.map((s: any) => {
+                const isFut = s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol");
+                const key = isFut ? "futbol" : s.slug;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectSport(key, s.id)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer",
+                      selectedSport === key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>{isFut ? "⚽" : "🎾"}</span>
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <Link
+            href="/partidos/nuevo"
+            className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Plus size={15} /> {t("partidos.new")}
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
@@ -86,14 +169,20 @@ export default function Partidos() {
             <div key={i} className="h-28 bg-card rounded-xl border border-border animate-pulse" />
           ))}
         </div>
-      ) : !matches?.length ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <Calendar size={28} className="text-muted-foreground" />
+      ) : !filteredMatches.length ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center bg-card border border-border rounded-xl">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-3xl">
+            {selectedSport === "futbol" ? "⚽" : <Calendar size={28} className="text-muted-foreground" />}
           </div>
           <div>
-            <p className="font-semibold">{t("partidos.noMatches")}</p>
-            <p className="text-sm text-muted-foreground">{t("partidos.noMatchesDesc")}</p>
+            <p className="font-semibold">
+              {selectedSport === "futbol" ? "Sin partidos de fútbol registrados" : t("partidos.noMatches")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {selectedSport === "futbol"
+                ? "Registra el primer partido de fútbol (amistoso interno o contra un rival externo) para calcular la tabla de posiciones."
+                : t("partidos.noMatchesDesc")}
+            </p>
           </div>
           <Link
             href="/partidos/nuevo"
@@ -104,7 +193,7 @@ export default function Partidos() {
         </div>
       ) : (
         <div className="space-y-2">
-          {matches.map((m: any) => {
+          {filteredMatches.map((m: any) => {
             const team1Players: TeamPlayer[] = m.team1Players ?? [];
             const team2Players: TeamPlayer[] = m.team2Players ?? [];
             const t1ScoreNum = Number(m.team1Score ?? 0);
@@ -120,47 +209,82 @@ export default function Partidos() {
             const sets = m.sets as Array<{ setNumber: number; team1Games: number; team2Games: number }> | null;
 
             const isStaff = (user as any)?.isAdmin === 1 || (user as any)?.isClubAdmin === 1;
-            const userPlayerId = (user as any)?.playerId;
-            const isParticipant = userPlayerId && (team1Ids.includes(userPlayerId) || team2Ids.includes(userPlayerId));
+            const isRival = m.matchType === "rival" || Boolean(m.rivalTeamName);
+            const team1Substitutes: TeamPlayer[] = m.team1Substitutes ?? [];
+            const team2Substitutes: TeamPlayer[] = m.team2Substitutes ?? [];
+            const userInClubSquad = team1Ids.includes(userPlayerId) || team1Substitutes.some((s) => s.id === userPlayerId);
+            const isParticipant = userPlayerId && (isRival ? userInClubSquad : (team1Ids.includes(userPlayerId) || team2Ids.includes(userPlayerId)));
             const canEdit = isStaff || isParticipant;
             const canDelete = isStaff;
 
             return (
               <div key={m.id} className="bg-card border border-border rounded-xl p-4 group">
-                {/* Sport badge */}
-                {m.sportName && (
-                  <div className="mb-2">
+                {/* Sport & Modality Badges */}
+                <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+                  {m.sportName && (
                     <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                       {formatSportName(m.sportName, language)}
                     </span>
-                  </div>
-                )}
+                  )}
+                  {m.modalityName && (
+                    <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
+                      {m.modalityName}
+                    </span>
+                  )}
+                  {isRival && (
+                    <span className="text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full border border-purple-500/20">
+                      vs Rival
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    {/* Team 1 */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                        team1Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {team1Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
-                      </span>
-                      <p className="text-sm font-medium truncate">
-                        {team1Players.map((p) => p.name).join(" / ") || "—"}
-                      </p>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    {/* Team 1 / Nuestro Club */}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                          team1Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                        )}>
+                          {team1Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
+                        </span>
+                        <p className="text-sm font-medium truncate">
+                          {isRival && <span className="text-xs font-semibold text-primary mr-1">[Nuestro Club]</span>}
+                          {team1Players.map((p) => p.name).join(" / ") || "—"}
+                        </p>
+                      </div>
+                      {team1Substitutes.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground truncate pl-6 mt-0.5">
+                          <span className="font-semibold text-muted-foreground/80">Banca:</span> {team1Substitutes.map((s) => s.name).join(", ")}
+                        </p>
+                      )}
                     </div>
-                    {/* Team 2 */}
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
-                        team2Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {team2Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
-                      </span>
-                      <p className="text-sm font-medium truncate">
-                        {team2Players.map((p) => p.name).join(" / ") || "—"}
-                      </p>
+
+                    {/* Team 2 / Rival */}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0",
+                          team2Won ? "bg-primary/20 text-primary font-bold" : isDraw ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+                        )}>
+                          {team2Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
+                        </span>
+                        <p className="text-sm font-medium truncate">
+                          {isRival ? (
+                            <span className="font-semibold text-foreground">
+                              🛡️ {m.rivalTeamName || "Equipo Rival"}
+                            </span>
+                          ) : (
+                            team2Players.map((p) => p.name).join(" / ") || "—"
+                          )}
+                        </p>
+                      </div>
+                      {!isRival && team2Substitutes.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground truncate pl-6 mt-0.5">
+                          <span className="font-semibold text-muted-foreground/80">Banca:</span> {team2Substitutes.map((s) => s.name).join(", ")}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -224,16 +348,49 @@ export default function Partidos() {
                   </div>
                 )}
 
-                {/* Elo changes */}
-                {eloChanges.length > 0 && (
-                  <div className="mt-2.5 pt-2.5 border-t border-border">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {[...team1EloChanges, ...team2EloChanges].map((c) => (
-                        <EloChangePill key={c.playerId} change={c} />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Puntos / Elo changes */}
+                {(() => {
+                  const isMatchFootball = m.sportSlug === "futbol" || m.sportName?.toLowerCase().includes("fútbol") || m.sportId === 3;
+                  if (isMatchFootball) {
+                    const isDraw = m.result === "draw";
+                    const isT1Win = m.result === "team1";
+                    const isT2Win = m.result === "team2";
+                    return (
+                      <div className="mt-2.5 pt-2.5 border-t border-border flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span className="font-semibold text-muted-foreground flex items-center gap-1">
+                          ⚽ Puntos de Liga:
+                        </span>
+                        {isDraw ? (
+                          <span className="bg-yellow-500/15 text-yellow-400 font-semibold px-2 py-0.5 rounded text-[11px]">
+                            +1 pto cada equipo (Empate)
+                          </span>
+                        ) : isT1Win ? (
+                          <span className="bg-green-500/15 text-green-400 font-semibold px-2 py-0.5 rounded text-[11px]">
+                            +3 pts {m.matchType === "rival" ? "Nuestro Club" : "Equipo 1"} (Victoria) · 0 pts {m.matchType === "rival" ? (m.rivalTeamName || "Rival") : "Equipo 2"}
+                          </span>
+                        ) : isT2Win ? (
+                          <span className="bg-green-500/15 text-green-400 font-semibold px-2 py-0.5 rounded text-[11px]">
+                            +3 pts {m.matchType === "rival" ? (m.rivalTeamName || "Rival") : "Equipo 2"} · 0 pts {m.matchType === "rival" ? "Nuestro Club" : "Equipo 1"}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  }
+
+                  if (eloChanges.length > 0) {
+                    return (
+                      <div className="mt-2.5 pt-2.5 border-t border-border">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {[...team1EloChanges, ...team2EloChanges].map((c) => (
+                            <EloChangePill key={c.playerId} change={c} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
 
                 {/* Fair Play Validation Bar */}
                 {m.status === "pending_confirmation" && (
@@ -243,7 +400,7 @@ export default function Partidos() {
                         ⚖️ Fair Play:
                       </span>
                       <span className="text-muted-foreground ml-1">
-                        {m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para afectar el Elo.
+                        {m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para validar los puntos en la tabla de posiciones.
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

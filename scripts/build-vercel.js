@@ -19,8 +19,19 @@ if (!fs.existsSync(path.join(rootDir, 'artifacts/padel-tracker'))) {
 }
 
 console.log('Project Root resolved to:', rootDir);
-console.log('--- 1. Building Vite app with Bun ---');
-execSync('bun run --filter @workspace/padel-tracker build', { cwd: rootDir, stdio: 'inherit' });
+console.log('--- 1. Building Vite app ---');
+try {
+  execSync('bun run --filter @workspace/padel-tracker build', { cwd: rootDir, stdio: 'inherit' });
+} catch (bunErr) {
+  console.log('Bun not available or failed, falling back to npm/npx...');
+  try {
+    execSync('npm run build --workspace=@workspace/padel-tracker', { cwd: rootDir, stdio: 'inherit' });
+  } catch (npmErr) {
+    console.log('Workspace build failed, running vite build directly in padel-tracker directory...');
+    const trackerDir = path.resolve(rootDir, 'artifacts/padel-tracker');
+    execSync('npx vite build --config vite.config.ts', { cwd: trackerDir, stdio: 'inherit' });
+  }
+}
 
 const srcDir = path.resolve(rootDir, 'artifacts/padel-tracker/dist/public');
 console.log('--- 2. Checking build output in:', srcDir);

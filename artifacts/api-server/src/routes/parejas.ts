@@ -19,10 +19,17 @@ function sortedPair(a: number, b: number): ParejaKey {
 function pairKey(p: ParejaKey): string { return `${p.p1}_${p.p2}`; }
 
 router.get("/parejas", async (req, res): Promise<void> => {
-  const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const queryClubId = req.query.clubId ? Number(req.query.clubId) : null;
+  const clubId = (queryClubId && !Number.isNaN(queryClubId)) ? queryClubId : (req.user as { clubId?: number | null } | undefined)?.clubId;
+  const sportId = req.query.sportId ? Number(req.query.sportId) : null;
+
+  const matchConditions = [];
+  if (clubId) matchConditions.push(eq(matchesTable.clubId, clubId));
+  if (sportId && !Number.isNaN(sportId)) matchConditions.push(eq(matchesTable.sportId, sportId));
+
   const [matches, players, allMatchPlayers] = await Promise.all([
-    clubId
-      ? db.select().from(matchesTable).where(eq(matchesTable.clubId, clubId))
+    matchConditions.length > 0
+      ? db.select().from(matchesTable).where(and(...matchConditions))
       : db.select().from(matchesTable),
     clubId
       ? db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
