@@ -197,18 +197,8 @@ export async function seedSports(): Promise<void> {
           await db.insert(clubSportsTable).values({
             clubId: club.id,
             sportId: futbolSport.id,
-            active: true,
+            active: club.id === 3 || club.id === 4,
           });
-        } else {
-          await db
-            .update(clubSportsTable)
-            .set({ active: true })
-            .where(
-              and(
-                eq(clubSportsTable.clubId, club.id),
-                eq(clubSportsTable.sportId, futbolSport.id)
-              )
-            );
         }
       }
     } catch (err: any) {

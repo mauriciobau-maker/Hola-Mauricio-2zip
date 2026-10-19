@@ -12,6 +12,7 @@ import cobrosRouter from "./cobros";
 import sportsRouter from "./sports";
 import categoriesRouter from "./categories";
 import parrynRouter from "./parryn";
+import weatherRouter from "./weather";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use("/cobros", cobrosRouter);
 router.use(sportsRouter);
 router.use(categoriesRouter);
 router.use("/parryn", parrynRouter);
+router.use(weatherRouter);
 
 export default router;

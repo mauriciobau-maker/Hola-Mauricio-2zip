@@ -1,6 +1,26 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Bot, Sparkles, Send, Calendar, Users, CloudRain, Copy, Check, ShieldCheck, Trophy, PhoneCall, ExternalLink } from "lucide-react";
+import { 
+  Bot, 
+  Sparkles, 
+  Send, 
+  Calendar, 
+  Users, 
+  CloudRain, 
+  Copy, 
+  Check, 
+  ShieldCheck, 
+  Trophy, 
+  PhoneCall, 
+  ExternalLink,
+  Wind,
+  Droplets,
+  Thermometer,
+  AlertTriangle,
+  RefreshCw,
+  Sun,
+  CheckCircle2
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,13 +69,35 @@ export function SecretarioParryn() {
     });
   }, [language, t]);
 
-  // Estados de simulación operativa
+  // Estados de simulación y clima real
   const [club, setClub] = useState<any>(null);
   const [clubName, setClubName] = useState("Club Pádel Central");
   const [coveredCourts, setCoveredCourts] = useState("2");
   const [openCourts, setOpenCourts] = useState("2");
-  const [weatherCondition, setWeatherCondition] = useState("rain_risk");
+  const [weatherCondition, setWeatherCondition] = useState("good");
   const [schedulingPlan, setSchedulingPlan] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState<any>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
+
+  const loadLiveWeather = async (clubId?: number) => {
+    try {
+      setLoadingWeather(true);
+      const res = await fetch(`/api/weather?clubId=${clubId || 1}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWeatherData(data);
+        if (data.sportSuitability?.coveredCourtsRecommended) {
+          setWeatherCondition("rain_risk");
+        } else {
+          setWeatherCondition("good");
+        }
+      }
+    } catch (e) {
+      console.error("Error al cargar clima en vivo:", e);
+    } finally {
+      setLoadingWeather(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/clubs/current")
@@ -64,9 +106,14 @@ export function SecretarioParryn() {
         if (data) {
           setClub(data);
           if (data.name) setClubName(data.name);
+          loadLiveWeather(data.id);
+        } else {
+          loadLiveWeather(1);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        loadLiveWeather(1);
+      });
   }, []);
 
   const isFutbolClub =
@@ -478,6 +525,29 @@ export function SecretarioParryn() {
               </div>
             </div>
 
+            {weatherData && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/60 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{weatherData.icon}</span>
+                  <div>
+                    <span className="font-semibold text-foreground">
+                      Clima detectado en {weatherData.city}: {weatherData.temperature}°C, {weatherData.condition}
+                    </span>
+                    <span className="text-muted-foreground ml-2">
+                      (Prob. lluvia máx: {weatherData.maxRainNextHours}%, Viento: {weatherData.windSpeed} km/h)
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("clima")}
+                  className="text-primary hover:underline font-semibold text-[11px] cursor-pointer"
+                >
+                  Ver pronóstico completo →
+                </button>
+              </div>
+            )}
+
             <Button onClick={handlePlanScheduling} disabled={loading} className="gap-2">
               <Sparkles className="w-4 h-4" />
               {loading ? t("parryn.calculatingPlan") : t("parryn.generatePlan")}
@@ -496,32 +566,232 @@ export function SecretarioParryn() {
         </Card>
       )}
 
-      {/* Tab 3: Alertas Climáticas */}
+      {/* Tab 3: Alertas Climáticas en Vivo */}
       {activeTab === "clima" && (
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CloudRain className="w-5 h-5 text-blue-500" />
-              {t("parryn.weatherTitle")}
-            </CardTitle>
-            <CardDescription>
-              {t("parryn.weatherDesc")}
-            </CardDescription>
+        <Card className="border shadow-sm space-y-4">
+          <CardHeader className="border-b border-border/50 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CloudRain className="w-5 h-5 text-blue-500" />
+                  Pronóstico Meteorológico y Alertas Deportivas
+                </CardTitle>
+                <CardDescription>
+                  {weatherData
+                    ? `Monitoreo meteorológico en tiempo real para ${weatherData.city}, ${weatherData.country}`
+                    : t("parryn.weatherDesc")}
+                </CardDescription>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadLiveWeather(club?.id)}
+                disabled={loadingWeather}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/50 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer w-fit"
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5", loadingWeather && "animate-spin text-primary")} />
+                {loadingWeather ? "Actualizando..." : "Actualizar Clima"}
+              </button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm text-blue-700 dark:text-blue-300 space-y-2">
-              <h4 className="font-bold flex items-center gap-1.5">
+          <CardContent className="space-y-6 pt-2">
+            {weatherData ? (
+              <>
+                {/* 1. Tarjeta Principal de Clima Actual */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-sky-500/5 to-transparent border border-blue-500/20 flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                          {weatherData.city}
+                        </span>
+                        <div className="text-4xl font-black text-foreground mt-1 flex items-baseline gap-1">
+                          {weatherData.temperature}°C
+                          <span className="text-xs font-medium text-muted-foreground">
+                            / Sens. {weatherData.apparentTemperature}°C
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-4xl">{weatherData.icon}</span>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-blue-500/15 flex items-center justify-between text-xs text-muted-foreground font-medium">
+                      <span>{weatherData.condition}</span>
+                      <span>{weatherData.country}</span>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                        <CloudRain className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Prob. Lluvia</span>
+                      </div>
+                      <div className="text-xl font-bold text-foreground mt-2">
+                        {weatherData.maxRainNextHours}%
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">próximas horas</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                        <Wind className="w-3.5 h-3.5 text-teal-500" />
+                        <span>Viento</span>
+                      </div>
+                      <div className="text-xl font-bold text-foreground mt-2">
+                        {weatherData.windSpeed} <span className="text-xs font-normal">km/h</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {weatherData.windSpeed > 25 ? "Viento moderado" : "Viento calmo"}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                        <Droplets className="w-3.5 h-3.5 text-cyan-500" />
+                        <span>Humedad</span>
+                      </div>
+                      <div className="text-xl font-bold text-foreground mt-2">
+                        {weatherData.humidity}%
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">relativa</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                        <Thermometer className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Precipitación</span>
+                      </div>
+                      <div className="text-xl font-bold text-foreground mt-2">
+                        {weatherData.precipitationMm} <span className="text-xs font-normal">mm</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">acumulada hoy</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Semáforo Deportivo de Parryn */}
+                <div
+                  className={cn(
+                    "p-4 sm:p-5 rounded-2xl border transition-all",
+                    weatherData.sportSuitability.status === "danger"
+                      ? "bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200"
+                      : weatherData.sportSuitability.status === "warning"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
+                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+                  )}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      {weatherData.sportSuitability.status === "danger" ? (
+                        <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                      ) : weatherData.sportSuitability.status === "warning" ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      )}
+                      <div>
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          Semáforo Deportivo Parryn:
+                        </span>
+                        <h4 className="text-base font-extrabold">
+                          {weatherData.sportSuitability.badge}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("chat");
+                        setQuery(
+                          `Redacta un aviso de WhatsApp para los socios sobre las condiciones climáticas de hoy (${weatherData.condition}, ${weatherData.temperature}°C, prob. lluvia ${weatherData.maxRainNextHours}%) informando la asignación de canchas.`
+                        );
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-background/80 hover:bg-background border border-current text-xs font-bold transition-all shadow-xs cursor-pointer w-fit"
+                    >
+                      💬 Redactar Aviso WhatsApp con Parryn
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-xs sm:text-sm leading-relaxed opacity-90 font-medium">
+                    {weatherData.sportSuitability.recommendation}
+                  </p>
+                </div>
+
+                {/* 3. Pronóstico por Horas */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Evolución Próximas Horas
+                  </h4>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 overflow-x-auto pb-1">
+                    {weatherData.hourly.map((h: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-muted/40 border border-border/50 text-center flex flex-col items-center gap-1 min-w-[70px]"
+                      >
+                        <span className="text-[11px] font-semibold text-muted-foreground">{h.hour}</span>
+                        <span className="text-xl my-0.5">{h.icon}</span>
+                        <span className="text-xs font-bold text-foreground">{h.temp}°C</span>
+                        <div className="w-full bg-border rounded-full h-1 mt-1 overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              h.rainProb > 50 ? "bg-blue-500" : h.rainProb > 20 ? "bg-amber-400" : "bg-emerald-400"
+                            )}
+                            style={{ width: `${Math.min(100, Math.max(10, h.rainProb))}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{h.rainProb}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Pronóstico para los próximos 3 días */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Pronóstico Próximos 3 Días
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {weatherData.daily.map((d: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">{d.icon}</span>
+                          <div>
+                            <div className="text-xs font-bold text-foreground">{d.dayName}</div>
+                            <div className="text-[11px] text-muted-foreground">{d.condition}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-black text-foreground">
+                            {d.maxTemp}° / <span className="text-muted-foreground font-normal">{d.minTemp}°</span>
+                          </div>
+                          <div className="text-[10px] text-blue-500 font-medium">
+                            🌧️ {d.rainProb}% prob.
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin text-primary" />
+                Obteniendo pronóstico meteorológico en tiempo real...
+              </div>
+            )}
+
+            {/* Reglas de Oro Comunitarias */}
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-800 dark:text-blue-300 space-y-1.5">
+              <h4 className="font-bold flex items-center gap-1.5 text-xs">
                 {t("parryn.goldenRuleTitle")}
               </h4>
-              <p>
-                {t("parryn.rule1")}
-              </p>
-              <p>
-                {t("parryn.rule2")}
-              </p>
-              <p>
-                {t("parryn.rule3")}
-              </p>
+              <p>• {t("parryn.rule1")}</p>
+              <p>• {t("parryn.rule2")}</p>
+              <p>• {t("parryn.rule3")}</p>
             </div>
           </CardContent>
         </Card>

@@ -9,9 +9,9 @@
     "scripts"
   ],
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "NODE_PATH=artifacts/api-server/node_modules:artifacts/padel-tracker/node_modules:node_modules tsx server.ts",
     "build": "npm run build --workspace=@workspace/padel-tracker",
-    "start": "NODE_ENV=production tsx server.ts",
+    "start": "NODE_ENV=production NODE_PATH=artifacts/api-server/node_modules:artifacts/padel-tracker/node_modules:node_modules tsx server.ts",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs",
     "seed:demo": "tsx scripts/seed_demo.ts",
