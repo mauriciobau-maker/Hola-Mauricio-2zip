@@ -8,13 +8,11 @@ const router: Router = Router();
 
 // Inicialización segura del cliente Gemini con headers recomendados
 function getGenAI(): GoogleGenAI | null {
-  // 1. Cambia esta línea:
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
     return null;
   }
   try {
     return new GoogleGenAI({
-      // 2. Cambia esta línea:
       apiKey: import.meta.env.VITE_GEMINI_API_KEY,
       httpOptions: {
         headers: {
