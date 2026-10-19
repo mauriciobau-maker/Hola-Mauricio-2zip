@@ -8,12 +8,12 @@ const router: Router = Router();
 
 // Inicialización segura del cliente Gemini con headers recomendados
 function getGenAI(): GoogleGenAI | null {
-  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return null;
   }
   try {
     return new GoogleGenAI({
-      apiKey: import.meta.env.VITE_GEMINI_API_KEY,
+      apiKey: process.env.GEMINI_API_KEY,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
