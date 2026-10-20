@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
+import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   sender: "user" | "parryn";

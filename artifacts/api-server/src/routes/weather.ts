@@ -26,7 +26,7 @@ function interpretWmoCode(code: number): { condition: string; icon: string } {
   return { condition: "Nublado", icon: "⛅" };
 }
 
-async function fetchOpenMeteoWeather(cityName: string, countryName?: string) {
+export async function fetchOpenMeteoWeather(cityName: string, countryName?: string) {
   const cacheKey = `${cityName}_${countryName || ""}`.toLowerCase();
   const cached = weatherCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {

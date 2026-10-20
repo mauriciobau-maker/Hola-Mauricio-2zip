@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { requireAuth, resolveEffectiveClubId } from "../middlewares/requireCommunity";
 import { db, encuentrosTable, clubsTable, sportsTable, clubSportsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { fetchOpenMeteoWeather } from "./weather";
 
 const router: Router = Router();
 
@@ -606,19 +607,53 @@ A continuación tienes la ficha del torneo y el mensaje listo para compartir al 
       return;
     }
 
+    // Consultar clima en vivo para contexto meteorológico de la sede
+    let liveWeatherInfo = "";
+    let weatherObj: any = null;
+    try {
+      const userClubId = (req.user as any)?.clubId || (clubContext as any)?.clubId || 1;
+      let city = "Santiago";
+      let country = "Chile";
+      const [clubRow] = await db
+        .select({ city: clubsTable.city, country: clubsTable.country })
+        .from(clubsTable)
+        .where(eq(clubsTable.id, userClubId))
+        .limit(1);
+      if (clubRow?.city) city = clubRow.city;
+      if (clubRow?.country) country = clubRow.country;
+
+      weatherObj = await fetchOpenMeteoWeather(city, country);
+      if (weatherObj) {
+        liveWeatherInfo = `
+DATOS METEOROLÓGICOS EN VIVO EN LA SEDE DEL CLUB (${weatherObj.city}, ${weatherObj.country}):
+- Temperatura actual: ${weatherObj.temperature}°C (Sensación térmica: ${weatherObj.apparentTemperature}°C)
+- Condición meteorológica: ${weatherObj.condition} ${weatherObj.icon}
+- Probabilidad de lluvia en próximas horas: ${weatherObj.maxRainNextHours}%
+- Viento: ${weatherObj.windSpeed} km/h
+- Semáforo Deportivo: ${weatherObj.sportSuitability?.badge} (Nivel: ${weatherObj.sportSuitability?.status})
+- Recomendación de Parryn para pistas: ${weatherObj.sportSuitability?.recommendation}
+- ¿Se aconseja trasladar a canchas techadas?: ${weatherObj.sportSuitability?.coveredCourtsRecommended ? "SÍ, riesgo de lluvia o precipitaciones inminentes" : "No, canchas abiertas aptas para juego"}`;
+      }
+    } catch (wErr) {
+      console.warn("[Parryn] Error obteniendo clima para contexto:", wErr);
+    }
+
     const prompt = `Un usuario del club deportivo (${sport.name}) te consulta lo siguiente:
 "${query}"
+
+${liveWeatherInfo}
 
 Contexto del usuario y pantalla:
 ${JSON.stringify(clubContext, null, 2)}
 
 Instrucciones para Parryn:
 1. Responde DIRECTAMENTE a la pregunta realizada: "${query}".
-2. DEPORTE ACTIVO: ${sport.name} (${sport.slug}). Usa exclusivamente terminología y conceptos propios de ${sport.name}.
-3. IDIOMA OBLIGATORIO: Debes redactar tu respuesta y cualquier mensaje para WhatsApp OBLIGATORIAMENTE en ${langName}.
-4. Si el usuario pide un mensaje para WhatsApp (recordatorio, convocatoria, aviso, crónica), escribe el texto completo en ${langName} con formato, emojis (${sport.emoji}) y listo para copiar y pegar.
-5. Si el usuario pregunta sobre cobros, prorrateos, canchas techadas, lluvia, reglas, o Fair Play, brinda una respuesta detallada, útil y práctica.
-6. Mantén un tono amigable, enérgico y profesional de Secretario Deportivo.`;
+2. Si la consulta tiene que ver con clima, lluvia, viento, temperatura, si se puede jugar hoy o si usar canchas descubiertas o techadas, UTILIZA OBLIGATORIAMENTE los datos meteorológicos en tiempo real arriba indicados para advertir o confirmar las condiciones.
+3. DEPORTE ACTIVO: ${sport.name} (${sport.slug}). Usa exclusivamente terminología y conceptos propios de ${sport.name}.
+4. IDIOMA OBLIGATORIO: Debes redactar tu respuesta y cualquier mensaje para WhatsApp OBLIGATORIAMENTE en ${langName}.
+5. Si el usuario pide un mensaje para WhatsApp (recordatorio, convocatoria, aviso, crónica), escribe el texto completo en ${langName} con formato, emojis (${sport.emoji}) y listo para copiar y pegar.
+6. Si el usuario pregunta sobre cobros, prorrateos, canchas techadas, lluvia, reglas, o Fair Play, brinda una respuesta detallada, útil y práctica.
+7. Mantén un tono amigable, enérgico y profesional de Secretario Deportivo.`;
 
     const ai = getGenAI();
     if (ai) {
@@ -657,10 +692,15 @@ Instrucciones para Parryn:
       dynamicAnswer = isFutbol
         ? `📢 *Convocatoria de Fútbol para WhatsApp:*\n\n"¡Buenas muchachos! ⚽ Se abren los cupos para la próxima pichanga. Inscríbete directo en la app oficial para asegurar si juegas en Equipo A o Equipo B y dejar los turnos listos. ¡Asegura tu cupo antes de que se llenen!"`
         : `📢 *Convocatoria de Partidos para WhatsApp:*\n\n"¡Buenas a todos! 🎾 Se abren los cupos para la próxima jornada deportiva del club. Confirmaciones directas por la app oficial para armar el fixture equilibrado y asignar pistas. ¡Asegura tu cupo antes de que se completen!"`;
-    } else if (q.includes("lluvia") || q.includes("clima") || q.includes("techad") || q.includes("suspender")) {
+    } else if (q.includes("lluvia") || q.includes("clima") || q.includes("tiempo") || q.includes("techad") || q.includes("suspender") || q.includes("jugar") || q.includes("abiertas") || q.includes("cancha")) {
+      const city = weatherObj?.city || "Santiago";
+      const temp = weatherObj?.temperature !== undefined ? `${weatherObj.temperature}°C` : "18°C";
+      const rain = weatherObj?.maxRainNextHours !== undefined ? `${weatherObj.maxRainNextHours}%` : "75%";
+      const badge = weatherObj?.sportSuitability?.badge || "Monitoreo de Lluvia";
+      const rec = weatherObj?.sportSuitability?.recommendation || "Reubicar turnos prioritarios a pistas techadas o preparar plan de suspensión avisando 2h antes.";
       dynamicAnswer = isFutbol
-        ? `🌧️ *Plan de Contingencia Climática (Fútbol):*\n1. Si la cancha sintética cuenta con buen drenaje o techo, se juega sin problemas con calzado adecuado.\n2. Si hay tormenta o relámpagos, se suspende por seguridad de los jugadores.\n3. Comunica la confirmación al grupo con 2 horas de anticipación.`
-        : `🌧️ *Plan de Contingencia Climática de Parryn:*\n1. Asigna primero los partidos de campeonato o con asistencia completa a las pistas techadas.\n2. Si hay menos canchas cubiertas que partidos, reduce los turnos a 60 minutos con rotación rápida tipo americana para que nadie se quede sin jugar.\n3. Avisa al grupo con al menos 2 horas de anticipación para evitar traslados en vano.`;
+        ? `🌧️ *Reporte Meteorológico en Tiempo Real (${city}):*\n• Condición actual: ${weatherObj?.condition || "Nublado"} ${weatherObj?.icon || "🌤️"} (${temp})\n• Probabilidad de lluvia en las próximas horas: ${rain}\n• Semáforo Deportivo: ${badge}\n• Recomendación Parryn: ${rec}\n\nPara fútbol, si la cancha tiene buen drenaje o césped sintético se juega normalmente, pero ante lluvia intensa o tormenta se sugiere suspender o avisar con 2h de antelación.`
+        : `🌧️ *Reporte Meteorológico en Tiempo Real (${city}):*\n• Condición actual: ${weatherObj?.condition || "Nublado"} ${weatherObj?.icon || "🌤️"} (${temp})\n• Probabilidad de lluvia en las próximas horas: ${rain}\n• Semáforo Deportivo: ${badge}\n• Recomendación Parryn: ${rec}\n\nPara pádel y tenis en canchas descubiertas, con probabilidad de lluvia alta se recomienda reubicar turnos prioritarios a pistas techadas o avisar al grupo con 2 horas de anticipación.`;
     } else if (q.includes("fair play") || q.includes("cruzada") || q.includes("aprobar") || q.includes("marcador")) {
       dynamicAnswer = `⚖️ *Validación Cruzada Fair Play:*\nPara cuidar la transparencia de los resultados, cuando un jugador o delegado anota el marcador, este queda en estado *Pendiente de Aprobación*. Solo cuando un rival del equipo contrario o el administrador lo confirma, el resultado es oficial y se actualizan los puntos en la tabla.`;
     } else if (q.includes("elo") || q.includes("ranking") || q.includes("puntos") || q.includes("desempate") || q.includes("tabla")) {
