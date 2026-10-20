@@ -16,6 +16,14 @@ if (isVercel) {
     let url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
     if (url.startsWith("/api/")) {
       url = `${API_BASE}${url}`;
+      const headers = new Headers(init?.headers || {});
+      try {
+        const token = localStorage.getItem("padel_auth_token");
+        if (token && !headers.has("Authorization")) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
+      } catch {}
+
       try {
         const stored = localStorage.getItem("padel_auth_user");
         if (stored) {
@@ -26,7 +34,7 @@ if (isVercel) {
           }
         }
       } catch {}
-      return originalFetch(url, { ...init, credentials: init?.credentials || "include" });
+      return originalFetch(url, { ...init, headers, credentials: init?.credentials || "include" });
     }
     return originalFetch(input, init);
   };
