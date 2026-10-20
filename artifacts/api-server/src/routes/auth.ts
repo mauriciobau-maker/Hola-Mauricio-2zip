@@ -97,6 +97,17 @@ async function getUserWithClub(userId: string) {
 
   if (!user) return null;
 
+  const SUPER_ADMINS = [
+    "mauricio.bau@gmail.com",
+    "pedidosltdc@gmail.com",
+    "admin@padeltracker.com",
+    "mbau73@hotmail.com"
+  ];
+  if (user.email && SUPER_ADMINS.includes(user.email.toLowerCase())) {
+    user.isAdmin = 1;
+    user.isClubAdmin = 1;
+  }
+
   let club = null;
   if (user.clubId) {
     const [c] = await db
