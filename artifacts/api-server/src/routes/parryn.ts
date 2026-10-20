@@ -731,4 +731,29 @@ Instrucciones para Parryn:
   }
 });
 
+router.get("/diagnostic", async (_req: Request, res: Response) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const keyStatus = apiKey ? `Present (length ${apiKey.length}, prefix ${apiKey.slice(0, 7)})` : "MISSING";
+  let aiTestResult = "Not run (ai is null)";
+  let testError: any = null;
+  const ai = getGenAI();
+  if (ai) {
+    try {
+      const resp = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: "Di OK",
+        config: { maxOutputTokens: 20 },
+      });
+      aiTestResult = resp.text?.trim() || "Empty text";
+    } catch (e: any) {
+      testError = e?.message || String(e);
+    }
+  }
+  res.json({
+    geminiKey: keyStatus,
+    aiTestResult,
+    testError,
+  });
+});
+
 export default router;
