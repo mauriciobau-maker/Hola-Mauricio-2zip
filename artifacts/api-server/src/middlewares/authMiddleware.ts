@@ -83,5 +83,44 @@ export async function authMiddleware(
   }
 
   req.user = refreshed.user;
+
+  // Sincronizar permisos en tiempo real desde la base de datos
+  if (req.user?.id || req.user?.email) {
+    try {
+      const { db, usersTable } = await import("@workspace/db");
+      const { eq, or } = await import("drizzle-orm");
+      const conditions = [];
+      if (req.user.id) conditions.push(eq(usersTable.id, req.user.id));
+      if (req.user.email) conditions.push(eq(usersTable.email, req.user.email));
+
+      const [dbUser] = await db
+        .select()
+        .from(usersTable)
+        .where(or(...conditions))
+        .limit(1);
+
+      if (dbUser) {
+        req.user = {
+          ...req.user,
+          isAdmin: Number(dbUser.isAdmin) >= 1 ? 1 : 0,
+          isClubAdmin: Number(dbUser.isClubAdmin) >= 1 ? 1 : 0,
+          clubId: dbUser.clubId ?? (req.user as any).clubId,
+        };
+      }
+    } catch {}
+  }
+
+  // Lista de Super Administradores maestros garantizados
+  const SUPER_ADMINS = [
+    "mauricio.bau@gmail.com",
+    "pedidosltdc@gmail.com",
+    "admin@padeltracker.com",
+    "mbau73@hotmail.com"
+  ];
+  if (req.user?.email && SUPER_ADMINS.includes(req.user.email.toLowerCase())) {
+    req.user.isAdmin = 1;
+    req.user.isClubAdmin = 1;
+  }
+
   next();
 }

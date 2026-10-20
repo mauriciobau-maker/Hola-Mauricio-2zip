@@ -32,10 +32,20 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
       return;
     }
 
+    const SUPER_ADMINS = [
+      "mauricio.bau@gmail.com",
+      "pedidosltdc@gmail.com",
+      "admin@padeltracker.com",
+      "mbau73@hotmail.com"
+    ];
+
     const isSuperAdmin =
-      user.isAdmin === 1 ||
+      Number(user.isAdmin) >= 1 ||
+      user.isAdmin === true ||
       user.role === "superadmin" ||
-      user.role === "admin";
+      user.role === "admin" ||
+      user.role === "SUPER_ADMIN" ||
+      (user.email && SUPER_ADMINS.includes(user.email.toLowerCase()));
 
     if (isSuperAdmin) {
       next();
@@ -43,7 +53,7 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
     }
 
     const isClubAdmin =
-      user.isClubAdmin === 1 ||
+      Number(user.isClubAdmin) >= 1 ||
       user.role === "club_admin" ||
       user.isClubAdmin === true;
 
@@ -398,9 +408,17 @@ router.patch(
       const adminNickname = body.adminNickname || body.nickname || body.apodo;
       const currentUser = req.user as any;
       const isSuperAdmin =
-        currentUser?.isAdmin === 1 ||
+        Number(currentUser?.isAdmin) >= 1 ||
+        currentUser?.isAdmin === true ||
         currentUser?.role === "superadmin" ||
-        currentUser?.role === "admin";
+        currentUser?.role === "admin" ||
+        currentUser?.role === "SUPER_ADMIN" ||
+        (currentUser?.email && [
+          "mauricio.bau@gmail.com",
+          "pedidosltdc@gmail.com",
+          "admin@padeltracker.com",
+          "mbau73@hotmail.com"
+        ].includes(currentUser.email.toLowerCase()));
 
       if (adminEmail && !isSuperAdmin) {
         res.status(403).json({

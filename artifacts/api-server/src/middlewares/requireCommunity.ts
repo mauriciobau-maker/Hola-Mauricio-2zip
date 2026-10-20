@@ -49,14 +49,24 @@ export async function resolveEffectiveClubId(req: Request): Promise<number | nul
 }
 
 export function isSuperAdminUser(
-  user: { isAdmin?: number | boolean | null; role?: string | null } | undefined,
+  user: { isAdmin?: number | boolean | null; role?: string | null; email?: string | null } | undefined,
 ): boolean {
+  if (!user) return false;
+  const SUPER_ADMINS = [
+    "mauricio.bau@gmail.com",
+    "pedidosltdc@gmail.com",
+    "admin@padeltracker.com",
+    "mbau73@hotmail.com"
+  ];
+  if (user.email && SUPER_ADMINS.includes(user.email.toLowerCase())) {
+    return true;
+  }
   return (
-    user?.isAdmin === 1 ||
-    user?.isAdmin === true ||
-    user?.role === "superadmin" ||
-    user?.role === "admin" ||
-    user?.role === "SUPER_ADMIN"
+    Number(user.isAdmin) >= 1 ||
+    user.isAdmin === true ||
+    user.role === "superadmin" ||
+    user.role === "admin" ||
+    user.role === "SUPER_ADMIN"
   );
 }
 

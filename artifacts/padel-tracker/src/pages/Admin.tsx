@@ -149,7 +149,19 @@ function getEffectiveMapUrl(location: { mapUrl?: string | null; address?: string
 export default function Admin() {
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
-  const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0);
+  const isAdmin = !!(
+    user && (
+      Number((user as any).isAdmin) > 0 ||
+      (user as any).isSuperAdmin ||
+      Number((user as any).isClubAdmin) > 0 ||
+      ((user as any).email && [
+        "mauricio.bau@gmail.com",
+        "pedidosltdc@gmail.com",
+        "admin@padeltracker.com",
+        "mbau73@hotmail.com"
+      ].includes(String((user as any).email).toLowerCase()))
+    )
+  );
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [allSports, setAllSports] = useState<Sport[]>(DEFAULT_SPORTS);
