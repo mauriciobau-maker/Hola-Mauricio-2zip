@@ -135,9 +135,15 @@ export function SecretarioParryn() {
     setLoading(true);
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("padel_auth_token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch("/api/parryn/asistente", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           query: userText,
@@ -152,16 +158,20 @@ export function SecretarioParryn() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
       setChatLog((prev) => [
         ...prev,
         {
           sender: "parryn",
-          text: data.answer || "He tomado nota. Cuéntame si necesitas redactar un mensaje o ajustar los horarios.",
+          text: data.answer || "He tomado nota de tu consulta. Dime si requieres redactar una convocatoria o revisar turnos.",
           createdEncuentro: data.createdEncuentro,
           whatsappMessage: data.whatsappMessage,
         },
       ]);
-    } catch {
+    } catch (err: any) {
       setChatLog((prev) => [
         ...prev,
         {
