@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles } from "lucide-react";
 import { cn, hexToHslChannels } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
-import { ParrynFloatingWidget } from "@/components/ParrynFloatingWidget";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslationKey } from "../lib/translations";
@@ -263,19 +262,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               ))}
 
-              {/* Botón Destacado de Parryn IA */}
+              {/* Enlace elegante a Secretaría */}
               <Link
                 href="/secretario"
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ml-auto",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ml-auto",
                   location === "/secretario"
-                    ? "bg-emerald-600 text-white shadow-md border border-emerald-400"
-                    : "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-600/30"
+                    ? "bg-primary/15 text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <Sparkles size={13} className="text-emerald-300" />
-                <span>Parryn IA</span>
+                <Sparkles size={13} className="text-primary/70" />
+                <span>Secretaría</span>
               </Link>
 
               {isAdmin && (
@@ -365,14 +363,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Powered by Parryn Sport Hub IA.</p>
+          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Plataforma de Gestión Deportiva.</p>
           {club?.address && <span className="flex items-center gap-1 font-medium bg-background border border-border px-2 py-1 rounded-md shadow-sm"><MapPin size={12} className="text-primary" /> {club.address}</span>}
         </div>
       </footer>
 
       {!isPublicClubRoute && (
         <>
-          <ParrynFloatingWidget club={club} />
           <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur flex items-center justify-around z-40 h-14 px-1 shadow-lg">
             <Link
               href="/"

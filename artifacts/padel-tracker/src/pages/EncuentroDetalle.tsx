@@ -1580,8 +1580,8 @@ export function EncuentroDetalle() {
                   variant="outline"
                   className="flex-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 text-xs font-semibold gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  {previewLoading ? "Calculando equilibrio..." : "🤖 Simular Cruces (Vista Previa Parryn)"}
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  {previewLoading ? "Calculando equilibrio..." : "Simular Cruces Equilibrados ✨"}
                 </Button>
                 <Button
                   onClick={handleGenerateMatches}
@@ -1858,7 +1858,7 @@ export function EncuentroDetalle() {
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-emerald-500" />
                   <div>
-                    <h3 className="font-bold text-base">Vista Previa del Fixture (Parryn IA)</h3>
+                    <h3 className="font-bold text-base">Vista Previa del Fixture Equilibrado</h3>
                     <p className="text-[11px] text-muted-foreground">Cruces calculados y balanceados por nivel Elo</p>
                   </div>
                 </div>

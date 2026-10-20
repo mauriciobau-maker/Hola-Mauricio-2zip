@@ -130,22 +130,20 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Secretaría del Club con Parryn IA - Hero Banner Proactivo */}
-      <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden backdrop-blur">
+      {/* Secretaría y Estado Operativo del Club */}
+      <div className="bg-card border border-border rounded-xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600/25 border-2 border-emerald-500/40 flex items-center justify-center font-black text-2xl text-emerald-400 shrink-0 relative shadow-sm">
-              <span>P</span>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-xs">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div className="space-y-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-bold text-foreground">
-                  Secretaría del Club con Parryn IA
+                <h2 className="text-base font-bold text-foreground">
+                  Secretaría Deportiva
                 </h2>
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">
-                  Secretario Activo
+                <span className="text-[11px] text-muted-foreground font-medium">
+                  · Asistencia y Convocatorias
                 </span>
               </div>
               <p className="text-sm text-foreground/90 font-medium">
@@ -154,13 +152,13 @@ export default function Dashboard() {
                   : 'Para "Torneo Pádel Sabatino - Categoría 3ª", van 0/4 confirmados. ¡Faltan 4 cupos!'}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                <span className="bg-background/80 border border-border px-2.5 py-1 rounded-lg text-muted-foreground flex items-center gap-1.5 font-medium shadow-xs">
+                <span className="bg-muted/50 border border-border px-2.5 py-1 rounded-md text-muted-foreground flex items-center gap-1.5 font-medium">
                   <span>{isFootball ? "⚽" : "🎾"}</span>
                   <span>
                     Próximo: {isFootball ? "Liga Fútbol 7 - Fecha 3 (10/14 convocados)" : "Torneo Pádel Sabatino - Categoría 3ª (0/4 confirmados)"}
                   </span>
                 </span>
-                <span className="bg-background/80 border border-border px-2.5 py-1 rounded-lg text-amber-400 flex items-center gap-1.5 font-medium shadow-xs">
+                <span className="bg-muted/50 border border-border px-2.5 py-1 rounded-md text-amber-500 dark:text-amber-400 flex items-center gap-1.5 font-medium">
                   <span>💰</span>
                   <span>Pendiente: $57.000</span>
                 </span>
@@ -170,42 +168,42 @@ export default function Dashboard() {
 
           <Link
             href="/secretario"
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-emerald-950/40 transition-all shrink-0 self-start md:self-center"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs sm:text-sm px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-all shrink-0 self-start md:self-center"
           >
-            <MessageSquare size={16} />
-            <span>Hablar con Parryn</span>
+            <Sparkles size={14} />
+            <span>Abrir Secretaría</span>
           </Link>
         </div>
 
         {/* Acciones Rápidas */}
-        <div className="mt-4 pt-3.5 border-t border-emerald-500/20 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs">
-          <span className="text-emerald-500 dark:text-emerald-400 font-bold tracking-wider text-[11px] uppercase shrink-0">
-            ACCIONES RÁPIDAS:
+        <div className="mt-4 pt-3 border-t border-border/60 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs">
+          <span className="text-muted-foreground font-semibold text-[11px] uppercase tracking-wider shrink-0">
+            Acciones Rápidas:
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
             <Link
               href="/secretario?q=quien_falta"
-              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+              className="bg-muted/40 hover:bg-muted border border-border px-2.5 py-1 rounded-md text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
             >
               📋 ¿Quién falta confirmar?
             </Link>
             <Link
               href="/secretario?q=convocatoria"
-              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+              className="bg-muted/40 hover:bg-muted border border-border px-2.5 py-1 rounded-md text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
             >
-              ✈️ Redactar Convocatoria WhatsApp
+              ✉️ Redactar Convocatoria WhatsApp
             </Link>
             <Link
               href="/secretario?q=cobros"
-              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+              className="bg-muted/40 hover:bg-muted border border-border px-2.5 py-1 rounded-md text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
             >
               💲 Recordatorio de Cobros
             </Link>
             <Link
               href="/ranking"
-              className="bg-background/70 hover:bg-emerald-500/15 border border-border hover:border-emerald-500/40 px-2.5 py-1 rounded-lg text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
+              className="bg-muted/40 hover:bg-muted border border-border px-2.5 py-1 rounded-md text-foreground transition-all flex items-center gap-1.5 text-xs font-medium"
             >
-              🏆 Consultar Ranking
+              🏆 Consultar Tabla
             </Link>
           </div>
         </div>

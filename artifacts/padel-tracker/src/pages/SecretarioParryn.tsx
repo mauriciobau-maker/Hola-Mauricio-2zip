@@ -239,28 +239,26 @@ export function SecretarioParryn() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 text-white p-6 sm:p-8 shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-emerald-200 text-xs font-semibold backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5" />
-              {t("parryn.role")}
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Parryn</h1>
-            <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
-              {t("parryn.motto")}
-            </p>
-            <div className="pt-2 flex flex-wrap gap-2 text-xs text-emerald-200">
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeAlwaysAvailable")}</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeRemembersAll")}</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeOrganizesAll")}</span>
-              <span className="flex items-center gap-1 bg-white/10 px-2.5 py-1 rounded-md">✓ {t("parryn.badgeFairPlay")}</span>
-            </div>
+      {/* Header Ejecutivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              Secretaría Deportiva
+            </h1>
+            <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-md">
+              Asistencia Operativa
+            </span>
           </div>
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/15 backdrop-blur-lg border border-white/20 flex items-center justify-center text-4xl shadow-inner shrink-0">
-            {isFutbolClub ? "🤖⚽" : "🤖🎾"}
-          </div>
+          <p className="text-muted-foreground text-sm mt-1">
+            Gestión de convocatorias, asignación de pistas y monitoreo meteorológico del club.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+          <span className="flex items-center gap-1.5 bg-muted/50 border border-border px-3 py-1.5 rounded-lg font-medium">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            Convocatorias WhatsApp & Clima
+          </span>
         </div>
       </div>
 

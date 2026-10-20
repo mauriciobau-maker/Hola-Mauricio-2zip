@@ -223,30 +223,29 @@ export function Encuentros() {
         )}
       </div>
 
-      {/* Banner Parryn IA para armar convocatorias por lenguaje natural */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/30 p-4 sm:p-5 shadow-sm">
+      {/* Asistente para armar convocatorias por lenguaje natural */}
+      <div className="rounded-xl bg-card border border-border p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> {t.parrynBadge}
+              <span className="p-1 rounded-md bg-primary/10 text-primary font-semibold text-xs flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" /> Asistente de Convocatorias
               </span>
-              <span className="text-xs text-muted-foreground font-medium">{t.parrynSubtitle}</span>
             </div>
-            <h3 className="font-semibold text-sm sm:text-base text-white">
-              {t.parrynTitle}
+            <h3 className="font-semibold text-sm sm:text-base text-foreground">
+              ¿Quieres programar un encuentro rápido por chat?
             </h3>
-            <p className="text-xs text-emerald-200/80 max-w-xl">
-              {t.parrynPromptPrefix}<em>{t.parrynPromptExample}</em>{t.parrynPromptSuffix}
+            <p className="text-xs text-muted-foreground max-w-xl">
+              Describe fecha, cupos y pistas (ej: <em>"Convocatoria para mañana a las 19:00 para 12 jugadores en 3 canchas"</em>) y el asistente generará el evento y el mensaje listo para WhatsApp.
             </p>
           </div>
           <Button
             size="sm"
             onClick={() => navigate("/secretario")}
-            className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs gap-1.5 shadow"
+            className="shrink-0 font-semibold text-xs gap-1.5 shadow-xs"
           >
-            <Bot className="w-4 h-4" />
-            {t.parrynButton}
+            <Sparkles className="w-3.5 h-3.5" />
+            Programar con Asistente
           </Button>
         </div>
       </div>

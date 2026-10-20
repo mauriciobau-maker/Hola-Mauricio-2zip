@@ -19,11 +19,11 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
   const [error, setError] = useState<string | null>(null);
 
   const defaultLabels = {
-    convocatoria: language === "en" ? "🤖 Parryn: Draft WhatsApp Invite" : language === "pt" ? "🤖 Parryn: Redigir Convocação WhatsApp" : "🤖 Parryn: Redactar Convocatoria WhatsApp",
-    matchmaking: language === "en" ? "🤖 Parryn: Analyze Match Balance" : language === "pt" ? "🤖 Parryn: Analisar Equilíbrio dos Jogos" : "🤖 Parryn: Analizar Equilibrio de Cruces",
-    cierre: language === "en" ? "🤖 Parryn: Draft WhatsApp Matchday Recap" : language === "pt" ? "🤖 Parryn: Redigir Crônica WhatsApp" : "🤖 Parryn: Redactar Crónica Oficial WhatsApp",
-    "recordatorio-cobro": language === "en" ? "🤖 Parryn: Friendly Payment Reminder" : language === "pt" ? "🤖 Parryn: Lembrete Amigável de Pagamento" : "🤖 Parryn: Recordatorio Amable de Cobro",
-    general: language === "en" ? "🤖 Consult Secretary Parryn" : language === "pt" ? "🤖 Consultar o Secretário Parryn" : "🤖 Consultar al Secretario Parryn",
+    convocatoria: language === "en" ? "Redactar WhatsApp ✨" : language === "pt" ? "Redigir WhatsApp ✨" : "Redactar Convocatoria WhatsApp ✨",
+    matchmaking: language === "en" ? "Analizar Cruces ✨" : language === "pt" ? "Analisar Jogos ✨" : "Analizar Equilibrio de Cruces ✨",
+    cierre: language === "en" ? "Crónica de la Jornada ✨" : language === "pt" ? "Crônica da Rodada ✨" : "Redactar Crónica Oficial ✨",
+    "recordatorio-cobro": language === "en" ? "Recordatorio de Cobro ✨" : language === "pt" ? "Lembrete de Cobrança ✨" : "Recordatorio Amable de Cobro ✨",
+    general: language === "en" ? "Asistente Deportivo ✨" : language === "pt" ? "Assistente Esportivo ✨" : "Consultar Asistente Deportivo ✨",
   };
 
   const handleGenerate = async () => {
@@ -83,25 +83,22 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
           {buttonLabel || defaultLabels[mode]}
         </Button>
       ) : (
-        <div className="bg-card border border-emerald-500/30 rounded-xl p-4 shadow-lg space-y-3 animate-in fade-in zoom-in-95">
+        <div className="bg-card border border-border rounded-xl p-4 shadow-lg space-y-3 animate-in fade-in zoom-in-95">
           <div className="flex items-center justify-between border-b border-border/50 pb-2">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold text-xs">
-                🎾
+              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                <Sparkles className="w-4 h-4" />
               </div>
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                  Parryn
-                  <span className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-normal">
-                    {t("parryn.role")}
-                  </span>
+                  Asistencia Deportiva
                 </h4>
                 <p className="text-xs text-muted-foreground">
                   {language === "en"
-                    ? "Your assistant to organize, remind and communicate"
+                    ? "Smart assistant for match organization and communication"
                     : language === "pt"
-                    ? "Seu assistente para organizar, lembrar e comunicar"
-                    : "Tu asistente para organizar, recordar y comunicar"}
+                    ? "Assistente inteligente para organização e comunicação"
+                    : "Asistente para organización, convocatorias y comunicación"}
                 </p>
               </div>
             </div>
