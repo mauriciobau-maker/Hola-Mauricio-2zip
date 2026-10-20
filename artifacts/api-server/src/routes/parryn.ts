@@ -657,22 +657,31 @@ Instrucciones para Parryn:
 
     const ai = getGenAI();
     if (ai) {
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-          config: {
-            systemInstruction: getSystemInstruction(sport.name, sport.slug),
-            temperature: 0.7,
-          },
-        });
-        const answer = response.text || "";
-        if (answer) {
-          res.json({ answer, aiPowered: true });
-          return;
+      const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+      for (const modelName of modelsToTry) {
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("AI_TIMEOUT_10S")), 10000)
+          );
+          const genPromise = ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction: getSystemInstruction(sport.name, sport.slug),
+              temperature: 0.7,
+              maxOutputTokens: 600,
+            },
+          });
+
+          const response = await Promise.race([genPromise, timeoutPromise]);
+          const answer = response.text || "";
+          if (answer) {
+            res.json({ answer, aiPowered: true });
+            return;
+          }
+        } catch (err: any) {
+          console.warn(`[Parryn] Fallo en ${modelName}:`, err.message);
         }
-      } catch (err: any) {
-        console.warn("[Parryn] Fallo en Gemini asistente general:", err.message);
       }
     }
 
