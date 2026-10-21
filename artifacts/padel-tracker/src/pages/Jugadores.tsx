@@ -106,7 +106,7 @@ export default function Jugadores() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("jugadores.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {t("jugadores.count", { count: players?.length ?? 0 })}
+            {t("jugadores.count", { count: filteredPlayers?.length ?? 0 })}
           </p>
         </div>
         <Link

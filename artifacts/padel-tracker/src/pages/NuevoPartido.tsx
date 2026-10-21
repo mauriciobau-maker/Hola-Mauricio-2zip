@@ -111,6 +111,7 @@ const TRANSLATIONS = {
     errorStartersMissing: "Faltan jugadores titulares por seleccionar.",
     errorDuplicatePlayer: "Un jugador no puede estar repetido entre titulares o suplentes.",
     errorSave: "Error al registrar el partido. Inténtalo de nuevo.",
+    selectPlayers: "Seleccionar Jugadores Convocados",
     playerIdx: (n: number) => `Titular #${n}`,
   },
   en: {
@@ -150,6 +151,7 @@ const TRANSLATIONS = {
     errorStartersMissing: "Please select all required starting players.",
     errorDuplicatePlayer: "A player cannot be selected more than once.",
     errorSave: "Error registering match. Please try again.",
+    selectPlayers: "Select Squad Players",
     playerIdx: (n: number) => `Starter #${n}`,
   },
   pt: {
@@ -189,6 +191,7 @@ const TRANSLATIONS = {
     errorStartersMissing: "Selecione todos os titulares necessários.",
     errorDuplicatePlayer: "Um jogador não pode estar repetido.",
     errorSave: "Erro ao registrar a partida. Tente novamente.",
+    selectPlayers: "Selecionar Jogadores Convocados",
     playerIdx: (n: number) => `Titular #${n}`,
   },
 };

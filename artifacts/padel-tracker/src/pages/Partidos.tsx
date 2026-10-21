@@ -38,6 +38,7 @@ export default function Partidos() {
   });
   const [club, setClub] = useState<any>(null);
   const { user } = useAuth();
+  const userPlayerId = (user as any)?.playerId ?? null;
   const queryClient = useQueryClient();
 
   useEffect(() => {
