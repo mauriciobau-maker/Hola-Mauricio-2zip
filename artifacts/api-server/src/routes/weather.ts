@@ -26,6 +26,56 @@ function interpretWmoCode(code: number): { condition: string; icon: string } {
   return { condition: "Nublado", icon: "⛅" };
 }
 
+export function getFallbackWeather(city = "Santiago", country = "Chile") {
+  const now = new Date();
+  const hourly = Array.from({ length: 8 }, (_, i) => {
+    const hour = (now.getHours() + i) % 24;
+    return {
+      time: new Date(now.getTime() + i * 3600000).toISOString(),
+      hour: `${String(hour).padStart(2, "0")}:00`,
+      temp: 20 - Math.min(i, 3),
+      rainProb: 10,
+      condition: "Parcialmente nublado",
+      icon: "⛅",
+    };
+  });
+
+  const dayNames = ["Hoy", "Mañana", "Pasado mañana"];
+  const daily = dayNames.map((dayName, i) => ({
+    date: new Date(now.getTime() + i * 86400000).toISOString().slice(0, 10),
+    dayName,
+    maxTemp: 22,
+    minTemp: 13,
+    rainProb: 15,
+    condition: "Parcialmente nublado",
+    icon: "⛅",
+  }));
+
+  return {
+    city,
+    country,
+    temperature: 20,
+    apparentTemperature: 19,
+    humidity: 55,
+    windSpeed: 10,
+    condition: "Parcialmente nublado",
+    icon: "⛅",
+    precipitationMm: 0,
+    maxRainNextHours: 15,
+    sportSuitability: {
+      status: "optimal",
+      badge: "Condiciones Óptimas",
+      color: "emerald",
+      recommendation: "Condiciones favorables para la práctica deportiva al aire libre y en pistas techadas.",
+      coveredCourtsRecommended: false,
+    },
+    hourly,
+    daily,
+    updatedAt: new Date().toISOString(),
+    isFallback: true,
+  };
+}
+
 export async function fetchOpenMeteoWeather(cityName: string, countryName?: string) {
   const cacheKey = `${cityName}_${countryName || ""}`.toLowerCase();
   const cached = weatherCache.get(cacheKey);
@@ -33,31 +83,42 @@ export async function fetchOpenMeteoWeather(cityName: string, countryName?: stri
     return cached.data;
   }
 
-  // 1. Geocoding: Buscar coordenadas
-  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-    cityName
-  )}&count=1&language=es&format=json`;
+  try {
+    // 1. Geocoding: Buscar coordenadas
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+      cityName
+    )}&count=1&language=es&format=json`;
 
-  const geoRes = await fetch(geoUrl);
-  if (!geoRes.ok) {
-    throw new Error("No se pudo conectar al servicio de geocodificación");
-  }
-  const geoData = await geoRes.json();
-  const location = geoData.results?.[0];
+    const geoRes = await fetch(geoUrl, {
+      headers: { "User-Agent": "PadelTrackerApp/1.0 (deporte@padeltracker.com)" },
+    });
+    let lat = -33.4489;
+    let lon = -70.6693;
+    let resolvedCity = cityName || "Santiago";
+    let resolvedCountry = countryName || "Chile";
 
-  const lat = location?.latitude ?? -33.4489; // Default Santiago de Chile
-  const lon = location?.longitude ?? -70.6693;
-  const resolvedCity = location?.name || cityName || "Santiago";
-  const resolvedCountry = location?.country || countryName || "Chile";
+    if (geoRes.ok) {
+      const geoData = await geoRes.json();
+      const location = geoData.results?.[0];
+      if (location) {
+        lat = location.latitude ?? lat;
+        lon = location.longitude ?? lon;
+        resolvedCity = location.name || resolvedCity;
+        resolvedCountry = location.country || resolvedCountry;
+      }
+    }
 
-  // 2. Forecast: Clima actual + próximas horas y días
-  const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=3`;
+    // 2. Forecast: Clima actual + próximas horas y días
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=3`;
 
-  const weatherRes = await fetch(forecastUrl);
-  if (!weatherRes.ok) {
-    throw new Error("No se pudo obtener el pronóstico meteorológico");
-  }
-  const rawWeather = await weatherRes.json();
+    const weatherRes = await fetch(forecastUrl, {
+      headers: { "User-Agent": "PadelTrackerApp/1.0 (deporte@padeltracker.com)" },
+    });
+    if (!weatherRes.ok) {
+      console.warn("[Weather] Fallo al consultar Open-Meteo, usando fallback estructurado");
+      return getFallbackWeather(resolvedCity, resolvedCountry);
+    }
+    const rawWeather = await weatherRes.json();
 
   const current = rawWeather.current;
   const currentWmo = interpretWmoCode(current.weather_code);
@@ -182,22 +243,8 @@ router.get("/weather", async (req: Request, res: Response): Promise<void> => {
     res.json(weatherData);
   } catch (error: any) {
     console.error("Error en /api/weather:", error?.message);
-    res.status(500).json({
-      error: "No se pudo obtener el pronóstico meteorológico en tiempo real",
-      fallback: {
-        city: "Santiago",
-        temperature: 20,
-        condition: "Parcialmente nublado",
-        icon: "⛅",
-        sportSuitability: {
-          status: "optimal",
-          badge: "Clima Normal",
-          color: "emerald",
-          recommendation: "Condiciones adecuadas para la práctica deportiva.",
-          coveredCourtsRecommended: false,
-        },
-      },
-    });
+    const fallbackData = getFallbackWeather(cityName || "Santiago", countryName || "Chile");
+    res.json(fallbackData);
   }
 });
 

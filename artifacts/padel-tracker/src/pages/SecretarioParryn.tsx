@@ -84,10 +84,11 @@ export function SecretarioParryn() {
     try {
       setLoadingWeather(true);
       const res = await fetch(`/api/weather?clubId=${clubId || 1}`);
-      if (res.ok) {
-        const data = await res.json();
-        setWeatherData(data);
-        if (data.sportSuitability?.coveredCourtsRecommended) {
+      const data = await res.json();
+      if (data && (data.city || data.fallback)) {
+        const actual = data.fallback || data;
+        setWeatherData(actual);
+        if (actual.sportSuitability?.coveredCourtsRecommended) {
           setWeatherCondition("rain_risk");
         } else {
           setWeatherCondition("good");
