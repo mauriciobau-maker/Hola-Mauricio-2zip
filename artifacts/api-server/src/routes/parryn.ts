@@ -478,9 +478,59 @@ function extractLocation(query: string, defaultName: string): string {
 
 function isCreateEventQuery(text: string): boolean {
   const norm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const hasAction = norm.includes("haz") || norm.includes("hqz") || norm.includes("arma") || norm.includes("crea") || norm.includes("organiza") || norm.includes("monta") || norm.includes("programa") || norm.includes("genera");
-  const hasEvent = norm.includes("convocatoria") || norm.includes("encuentro") || norm.includes("torneo") || norm.includes("partido") || norm.includes("pichanga") || norm.includes("americano");
-  return (hasAction && hasEvent) || norm.includes("convocatoria para") || norm.includes("torneo para") || norm.includes("partido para");
+
+  // Si la consulta es una pregunta sobre clima, lluvia, estado de canchas o factibilidad, NUNCA debe crear un evento
+  if (
+    norm.includes("clima") ||
+    norm.includes("clina") ||
+    norm.includes("tiempo") ||
+    norm.includes("lluv") ||
+    norm.includes("llov") ||
+    norm.includes("temperatura") ||
+    norm.includes("pronostico") ||
+    norm.includes("viento") ||
+    norm.includes("como esta") ||
+    norm.includes("como va a") ||
+    norm.includes("se puede") ||
+    norm.includes("podemos") ||
+    norm.includes("conviene") ||
+    norm.includes("vale la pena") ||
+    norm.startsWith("dime como") ||
+    norm.startsWith("como") ||
+    norm.startsWith("que tal") ||
+    norm.startsWith("cual es")
+  ) {
+    return false;
+  }
+
+  // Comandos imperativos directos para crear un evento en la base de datos
+  const isDirectCommand =
+    norm.startsWith("crea ") ||
+    norm.startsWith("crear ") ||
+    norm.startsWith("haz ") ||
+    norm.startsWith("hazme ") ||
+    norm.startsWith("arma ") ||
+    norm.startsWith("armar ") ||
+    norm.startsWith("programa ") ||
+    norm.startsWith("programar ") ||
+    norm.startsWith("organiza ") ||
+    norm.startsWith("organizar ") ||
+    norm.startsWith("genera ") ||
+    norm.startsWith("generar ") ||
+    norm.includes("convocatoria para") ||
+    norm.includes("torneo para") ||
+    norm.includes("partido para") ||
+    norm.includes("pichanga para");
+
+  const hasEvent =
+    norm.includes("convocatoria") ||
+    norm.includes("encuentro") ||
+    norm.includes("torneo") ||
+    norm.includes("partido") ||
+    norm.includes("pichanga") ||
+    norm.includes("americano");
+
+  return isDirectCommand && hasEvent;
 }
 
 // 5. Asistente General de Operaciones (Scheduling, Clima, Canchas, Dudas & Creación Automática)
