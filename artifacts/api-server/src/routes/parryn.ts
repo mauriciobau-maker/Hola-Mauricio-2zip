@@ -9,12 +9,13 @@ const router: Router = Router();
 
 // Inicialización segura del cliente Gemini con headers recomendados
 function getGenAI(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     return null;
   }
   try {
     return new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -701,7 +702,26 @@ Instrucciones para Parryn:
       dynamicAnswer = isFutbol
         ? `📢 *Convocatoria de Fútbol para WhatsApp:*\n\n"¡Buenas muchachos! ⚽ Se abren los cupos para la próxima pichanga. Inscríbete directo en la app oficial para asegurar si juegas en Equipo A o Equipo B y dejar los turnos listos. ¡Asegura tu cupo antes de que se llenen!"`
         : `📢 *Convocatoria de Partidos para WhatsApp:*\n\n"¡Buenas a todos! 🎾 Se abren los cupos para la próxima jornada deportiva del club. Confirmaciones directas por la app oficial para armar el fixture equilibrado y asignar pistas. ¡Asegura tu cupo antes de que se completen!"`;
-    } else if (q.includes("lluvia") || q.includes("clima") || q.includes("tiempo") || q.includes("techad") || q.includes("suspender") || q.includes("jugar") || q.includes("abiertas") || q.includes("cancha")) {
+    } else if (
+      q.includes("lluv") ||
+      q.includes("llov") ||
+      q.includes("clima") ||
+      q.includes("clina") ||
+      q.includes("tiempo") ||
+      q.includes("meteo") ||
+      q.includes("pronostico") ||
+      q.includes("pronóstico") ||
+      q.includes("temperatura") ||
+      q.includes("calor") ||
+      q.includes("frio") ||
+      q.includes("frío") ||
+      q.includes("viento") ||
+      q.includes("techad") ||
+      q.includes("suspender") ||
+      q.includes("jugar") ||
+      q.includes("abiertas") ||
+      q.includes("cancha")
+    ) {
       const city = weatherObj?.city || "Santiago";
       const temp = weatherObj?.temperature !== undefined ? `${weatherObj.temperature}°C` : "18°C";
       const rain = weatherObj?.maxRainNextHours !== undefined ? `${weatherObj.maxRainNextHours}%` : "75%";
