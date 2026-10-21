@@ -213,8 +213,12 @@ export async function fetchOpenMeteoWeather(cityName: string, countryName?: stri
     updatedAt: new Date().toISOString(),
   };
 
-  weatherCache.set(cacheKey, { timestamp: Date.now(), data: result });
-  return result;
+    weatherCache.set(cacheKey, { timestamp: Date.now(), data: result });
+    return result;
+  } catch (err: any) {
+    console.warn("[Weather] Error al consultar clima externo:", err?.message);
+    return getFallbackWeather(cityName || "Santiago", countryName || "Chile");
+  }
 }
 
 // GET /api/weather — Clima en tiempo real del club actual
