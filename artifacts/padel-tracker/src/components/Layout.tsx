@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles, Building2 } from "lucide-react";
 import { cn, hexToHslChannels } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -32,7 +32,7 @@ const navItems: NavItem[] = [
   { href: "/cobros", key: "payments", icon: DollarSign },
 ];
 
-const reservedSingleSegmentRoutes = new Set(["/admin", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros", "/secretario"]);
+const reservedSingleSegmentRoutes = new Set(["/admin", "/mi-club", "/onboarding", "/vincular", "/jugadores", "/partidos", "/ranking", "/parejas", "/encuentros", "/cobros", "/secretario"]);
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
@@ -276,6 +276,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span>Secretaría</span>
               </Link>
 
+              <Link
+                href="/mi-club"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0",
+                  location === "/mi-club"
+                    ? "bg-primary/20 text-primary border border-primary/40 font-bold"
+                    : "text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border/80"
+                )}
+                title="Personalizar mi club, colores y foto"
+              >
+                <Building2 size={13} className="text-primary" />
+                <span>Mi Club</span>
+              </Link>
+
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -290,6 +304,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {t("adminPanel")}
                 </Link>
               )}
+
+              <Link
+                href="/landing"
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 transition-colors flex items-center gap-1 shrink-0 ml-1"
+                title="Página comercial de presentación para captación de clubes"
+              >
+                <span>Landing Pública</span>
+              </Link>
             </div>
           </div>
         )}
@@ -340,6 +362,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {t(item.key)}
               </Link>
             ))}
+            <Link
+              href="/mi-club"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-colors",
+                location === "/mi-club"
+                  ? "bg-primary/15 text-primary"
+                  : "text-foreground hover:bg-muted/50"
+              )}
+            >
+              <Building2 size={16} className="text-primary" />
+              <span>Configuración de Mi Club</span>
+            </Link>
+
             {isAdmin && (
               <Link
                 href="/admin"

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -229,6 +229,41 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
   }
 });
 
+// PATCH /club/settings — Actualiza parámetros del club (nombre, colores, logo, ciudad, etc.)
+router.patch("/club/settings", async (req, res): Promise<void> => {
+  try {
+    const user = req.user as any;
+    const clubId = Number(req.body.clubId) || user?.clubId || 1;
+    const { name, logoUrl, primaryColor, secondaryColor, city, country, address, mapUrl } = req.body;
+
+    const updateData: Record<string, any> = {};
+    if (name) updateData.name = String(name).trim();
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl ? String(logoUrl).trim() : null;
+    if (primaryColor) updateData.primaryColor = String(primaryColor).trim();
+    if (secondaryColor !== undefined) updateData.secondaryColor = secondaryColor ? String(secondaryColor).trim() : null;
+    if (city) updateData.city = String(city).trim();
+    if (country) updateData.country = String(country).trim();
+    if (address !== undefined) updateData.address = address ? String(address).trim() : null;
+    if (mapUrl !== undefined) updateData.mapUrl = mapUrl ? String(mapUrl).trim() : null;
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: "No se proporcionaron datos para actualizar" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(clubsTable)
+      .set(updateData)
+      .where(eq(clubsTable.id, clubId))
+      .returning();
+
+    res.json({ success: true, club: updated });
+  } catch (error: any) {
+    console.error("Error en PATCH /club/settings:", error);
+    res.status(500).json({ error: error?.message || "Error al actualizar la configuración del club" });
+  }
+});
+
 // PATCH /club/sports — activa o desactiva un deporte para el club
 router.patch("/club/sports", async (req, res): Promise<void> => {
   if (!req.isAuthenticated() || !req.user) {
@@ -359,6 +394,122 @@ router.post("/club/categories", async (req, res): Promise<void> => {
   } catch (error) {
     console.error("Error en POST /club/categories:", error);
     res.status(500).json({ error: "Error interno al crear la categoría" });
+  }
+});
+
+// POST /clubs/register — Registro autoservicio para nuevos clubes con 14 días gratis
+router.post("/clubs/register", async (req, res): Promise<void> => {
+  try {
+    const {
+      clubName,
+      sportId = 1,
+      city = "Santiago",
+      country = "Chile",
+      adminName,
+      adminEmail,
+      adminPhone,
+    } = req.body as any;
+
+    if (!clubName || !adminName || !adminEmail) {
+      res.status(400).json({
+        error: "Nombre del club, nombre del administrador y correo electrónico son requeridos",
+      });
+      return;
+    }
+
+    const baseSlug =
+      clubName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || `club-${Date.now()}`;
+
+    let finalSlug = baseSlug;
+    let counter = 1;
+    while (true) {
+      const [existing] = await db
+        .select()
+        .from(clubsTable)
+        .where(eq(clubsTable.slug, finalSlug));
+      if (!existing) break;
+      finalSlug = `${baseSlug}-${counter++}`;
+    }
+
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const sId = Number(sportId) || 1;
+    const primaryColor = sId === 3 ? "#1e40af" : sId === 2 ? "#ea580c" : "#10b981";
+
+    try {
+      await db.execute(sql`SELECT setval('clubs_id_seq', COALESCE((SELECT MAX(id) FROM clubs), 1))`);
+    } catch (seqErr) {
+      console.warn("Advertencia sincronizando secuencia clubs_id_seq:", seqErr);
+    }
+
+    const [newClub] = await db
+      .insert(clubsTable)
+      .values({
+        name: clubName.trim(),
+        slug: finalSlug,
+        plan: "pro", // 14 días de prueba incluidos
+        active: true,
+        inviteCode,
+        city: city.trim(),
+        country: country.trim(),
+        primaryColor,
+        defaultLanguage: "es",
+      })
+      .returning();
+
+    // Asociar deporte principal seleccionado
+    try {
+      await db.insert(clubSportsTable).values({
+        clubId: newClub.id,
+        sportId: sId,
+        active: true,
+      });
+    } catch (sErr) {
+      console.warn("Advertencia al vincular deporte inicial:", sErr);
+    }
+
+    // Crear o actualizar usuario administrador
+    const emailNorm = adminEmail.toLowerCase().trim();
+    let [user] = await db.select().from(usersTable).where(eq(usersTable.email, emailNorm));
+    if (!user) {
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: emailNorm,
+          name: adminName.trim(),
+          phone: adminPhone ? String(adminPhone).trim() : null,
+          clubId: newClub.id,
+          isClubAdmin: 1,
+          active: 1,
+        })
+        .returning();
+    } else {
+      await db
+        .update(usersTable)
+        .set({ clubId: newClub.id, isClubAdmin: 1 })
+        .where(eq(usersTable.id, user.id));
+    }
+
+    res.status(201).json({
+      success: true,
+      club: newClub,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        clubId: newClub.id,
+        isClubAdmin: 1,
+      },
+      inviteCode,
+      slug: finalSlug,
+      trialDaysRemaining: 14,
+    });
+  } catch (err: any) {
+    console.error("Error en POST /clubs/register:", err);
+    res.status(500).json({ error: err?.message || "No se pudo registrar el club" });
   }
 });
 

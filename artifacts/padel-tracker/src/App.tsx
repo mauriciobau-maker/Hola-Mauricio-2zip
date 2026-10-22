@@ -25,6 +25,9 @@ import { Onboarding } from "@/pages/Onboarding";
 import Cobros from "@/pages/Cobros";
 import PublicClub from "@/pages/PublicClub";
 import { SecretarioParryn } from "@/pages/SecretarioParryn";
+import LandingPage from "@/pages/LandingPage";
+import CrearClub from "@/pages/CrearClub";
+import ConfiguracionClub from "@/pages/ConfiguracionClub";
 
 import { LanguageProvider } from "./context/LanguageContext";
 
@@ -102,33 +105,40 @@ const queryClient = new QueryClient({
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/jugadores" component={Jugadores} />
-        <Route path="/jugadores/nuevo" component={NuevoJugador} />
-        <Route path="/jugadores/:id/editar" component={EditarJugador} />
-        <Route path="/jugadores/:id" component={JugadorDetalle} />
-        <Route path="/partidos" component={Partidos} />
-        <Route path="/partidos/nuevo" component={NuevoPartido} />
-        <Route path="/partidos/:id/editar" component={EditarPartido} />
-        <Route path="/ranking" component={Ranking} />
-        <Route path="/parejas" component={Parejas} />
-        <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
-        <Route path="/encuentros" component={Encuentros} />
-        <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
-        <Route path="/encuentros/:id" component={EncuentroDetalle} />
-        <Route path="/cobros" component={Cobros} />
-        <Route path="/secretario" component={SecretarioParryn} />
-        <Route path="/onboarding" component={Onboarding} />
-        <Route path="/vincular" component={VincularJugador} />
-        <Route path="/admin" component={Admin} />
-        <Route path="/club/:slug" component={PublicClub} />
-        <Route path="/c/:slug" component={PublicClub} />
-        <Route path="/:slug" component={PublicClub} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/landing" component={LandingPage} />
+      <Route path="/crear-club" component={CrearClub} />
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/jugadores" component={Jugadores} />
+            <Route path="/jugadores/nuevo" component={NuevoJugador} />
+            <Route path="/jugadores/:id/editar" component={EditarJugador} />
+            <Route path="/jugadores/:id" component={JugadorDetalle} />
+            <Route path="/partidos" component={Partidos} />
+            <Route path="/partidos/nuevo" component={NuevoPartido} />
+            <Route path="/partidos/:id/editar" component={EditarPartido} />
+            <Route path="/ranking" component={Ranking} />
+            <Route path="/parejas" component={Parejas} />
+            <Route path="/parejas/:player1Id/:player2Id" component={ParejaDetalle} />
+            <Route path="/encuentros" component={Encuentros} />
+            <Route path="/encuentros/nuevo" component={NuevoEncuentro} />
+            <Route path="/encuentros/:id" component={EncuentroDetalle} />
+            <Route path="/cobros" component={Cobros} />
+            <Route path="/secretario" component={SecretarioParryn} />
+            <Route path="/onboarding" component={Onboarding} />
+            <Route path="/vincular" component={VincularJugador} />
+            <Route path="/mi-club" component={ConfiguracionClub} />
+            <Route path="/admin" component={Admin} />
+            <Route path="/club/:slug" component={PublicClub} />
+            <Route path="/c/:slug" component={PublicClub} />
+            <Route path="/:slug" component={PublicClub} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

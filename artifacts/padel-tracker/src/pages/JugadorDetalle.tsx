@@ -295,8 +295,8 @@ export default function JugadorDetalle() {
         </div>
       )}
 
-      {/* Match history */}
-      {eloHistory && eloHistory.length > 0 && (
+      {/* Match history & Gráfica de Progreso */}
+      {(!isFootball || (eloHistory && eloHistory.length > 0)) && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
             <Trophy size={14} className="text-primary" />
@@ -304,15 +304,16 @@ export default function JugadorDetalle() {
               {isFootball ? "Historial de Puntos y Resultados" : t("jugadores.eloHistory")}
             </h3>
             <span className="text-xs text-muted-foreground ml-auto">
-              {t("jugadores.eloMatchesCount", { count: eloHistory.length })}
+              {t("jugadores.eloMatchesCount", { count: eloHistory?.length ?? 0 })}
             </span>
           </div>
           {/* Mini sparkline only for Padel/Tennis */}
-          {!isFootball && <EloSparkline history={eloHistory as any} t={t} />}
+          {!isFootball && <EloSparkline history={(eloHistory ?? []) as any} t={t} />}
           {/* List — last 8 entries reversed (most recent first) */}
-          <div className="divide-y divide-border">
-            {[...eloHistory].reverse().slice(0, 8).map((entry) => {
-              const positive = entry.eloChange > 0;
+          {eloHistory && eloHistory.length > 0 ? (
+            <div className="divide-y divide-border">
+              {[...eloHistory].reverse().slice(0, 8).map((entry) => {
+                const positive = entry.eloChange > 0;
               const isDraw = entry.eloChange === 0;
               return (
                 <div key={entry.id} className="flex items-center gap-3 px-4 py-2.5">
@@ -367,6 +368,11 @@ export default function JugadorDetalle() {
               );
             })}
           </div>
+          ) : (
+            <div className="p-4 text-center text-xs text-foreground/80 font-medium">
+              Aún no hay partidos oficiales registrados para este jugador.
+            </div>
+          )}
         </div>
       )}
 
@@ -425,15 +431,42 @@ export default function JugadorDetalle() {
 
 /** Inline SVG sparkline for Elo progression */
 function EloSparkline({ history, t }: { history: Array<{ eloAfter: number }>; t: (key: string) => string }) {
-  const values = history.map((h) => h.eloAfter);
-  if (values.length < 2) return null;
+  const values = (history ?? []).map((h) => h.eloAfter);
+  const W = 300;
+  const H = 48;
+  const pad = 6;
+
+  // Si tiene menos de 2 partidos, mostramos la gráfica con la base 1500 y mensaje
+  if (values.length < 2) {
+    const currentElo = values[0] ?? 1500;
+    return (
+      <div className="px-4 py-3 bg-muted/20 border-b border-border/50">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-12" preserveAspectRatio="none">
+          <line
+            x1={pad}
+            y1={H / 2}
+            x2={W - pad}
+            y2={H / 2}
+            stroke="hsl(var(--primary))"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            opacity="0.6"
+          />
+          <circle cx={pad + 10} cy={H / 2} r="3.5" fill="hsl(var(--primary))" />
+        </svg>
+        <div className="flex items-center justify-between text-xs text-foreground/80 mt-1">
+          <span className="font-semibold text-primary">Nivel Inicial: {currentElo} Elo</span>
+          <span className="text-[11px] text-muted-foreground font-medium">
+            Juega 2 partidos para ver la curva dinámica
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const min = Math.min(...values, 1480);
   const max = Math.max(...values, 1520);
   const range = max - min || 40;
-  const W = 300;
-  const H = 48;
-  const pad = 4;
 
   const points = values.map((v, i) => {
     const x = pad + (i / (values.length - 1)) * (W - pad * 2);
@@ -442,20 +475,19 @@ function EloSparkline({ history, t }: { history: Array<{ eloAfter: number }>; t:
   });
 
   const polyline = points.join(" ");
-  const startLine = `${pad},${pad + ((max - 1500) / range) * (H - pad * 2)}`;
-  const endLine = `${W - pad},${pad + ((max - 1500) / range) * (H - pad * 2)}`;
+  const baselineY = pad + ((max - 1500) / range) * (H - pad * 2);
 
   return (
-    <div className="px-4 py-2">
+    <div className="px-4 py-3 bg-muted/20 border-b border-border/50">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-12" preserveAspectRatio="none">
         {/* Baseline at 1500 */}
         <line
-          x1={startLine.split(",")[0]}
-          y1={startLine.split(",")[1]}
-          x2={endLine.split(",")[0]}
-          y2={endLine.split(",")[1]}
+          x1={pad}
+          y1={baselineY}
+          x2={W - pad}
+          y2={baselineY}
           stroke="hsl(var(--muted-foreground))"
-          strokeWidth="0.5"
+          strokeWidth="0.8"
           strokeDasharray="3 3"
           opacity="0.4"
         />
@@ -463,8 +495,8 @@ function EloSparkline({ history, t }: { history: Array<{ eloAfter: number }>; t:
         <polyline
           points={polyline}
           fill="none"
-          stroke="hsl(162 80% 42%)"
-          strokeWidth="1.5"
+          stroke="hsl(var(--primary))"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -473,15 +505,15 @@ function EloSparkline({ history, t }: { history: Array<{ eloAfter: number }>; t:
           <circle
             cx={points[points.length - 1].split(",")[0]}
             cy={points[points.length - 1].split(",")[1]}
-            r="2.5"
-            fill="hsl(162 80% 42%)"
+            r="3.5"
+            fill="hsl(var(--primary))"
           />
         )}
       </svg>
-      <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-        <span>{t("jugadores.start")}</span>
-        <span className="text-muted-foreground/50">{t("jugadores.baseElo")}</span>
-        <span>{t("jugadores.now")}</span>
+      <div className="flex justify-between text-xs text-foreground/80 font-medium mt-1">
+        <span>{t("jugadores.start")} (1500)</span>
+        <span className="text-muted-foreground text-[11px]">{t("jugadores.baseElo")}</span>
+        <span className="text-primary font-bold">{t("jugadores.now")} ({values[values.length - 1]})</span>
       </div>
     </div>
   );

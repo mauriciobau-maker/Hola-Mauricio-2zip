@@ -1271,7 +1271,7 @@ export default function Cobros() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleOpenComprobanteModal(cobro)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/15 text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 transition-all shadow-sm"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 transition-all shadow-sm"
                               title={t("cobros.viewReceipt")}
                             >
                               <Paperclip size={13} className="stroke-[2.5]" />
@@ -1330,7 +1330,7 @@ export default function Cobros() {
                               {t("cobros.pending")}
                             </span>
                             {cobro.comprobanteUrl && (
-                              <span className="text-[10px] text-blue-400 mt-0.5 font-medium">
+                              <span className="text-[10px] text-sky-600 dark:text-sky-300 mt-0.5 font-bold">
                                 {t("cobros.underReview")}
                               </span>
                             )}
@@ -1452,7 +1452,7 @@ export default function Cobros() {
                       href={comprobanteModalCobro.comprobanteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-blue-400 hover:underline flex items-center gap-1"
+                      className="text-sky-600 dark:text-sky-400 font-semibold hover:underline flex items-center gap-1"
                     >
                       <ExternalLink size={12} /> {t("cobros.openOriginalImage")}
                     </a>

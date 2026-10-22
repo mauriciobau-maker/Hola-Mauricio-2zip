@@ -87,6 +87,8 @@ export function SecretarioParryn() {
       const data = await res.json();
       if (data && (data.city || data.fallback)) {
         const actual = data.fallback || data;
+        if (!Array.isArray(actual.hourly)) actual.hourly = [];
+        if (!Array.isArray(actual.daily)) actual.daily = [];
         setWeatherData(actual);
         if (actual.sportSuitability?.coveredCourtsRecommended) {
           setWeatherCondition("rain_risk");
@@ -611,7 +613,7 @@ export function SecretarioParryn() {
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-sky-500/5 to-transparent border border-blue-500/20 flex flex-col justify-between">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        <span className="text-xs font-black uppercase tracking-wider text-sky-400">
                           {weatherData.city}
                         </span>
                         <div className="text-4xl font-black text-foreground mt-1 flex items-baseline gap-1">
@@ -728,80 +730,84 @@ export function SecretarioParryn() {
                 </div>
 
                 {/* 3. Pronóstico por Horas */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Evolución Próximas Horas
-                  </h4>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 overflow-x-auto pb-1">
-                    {weatherData.hourly.map((h: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-xl bg-muted/40 border border-border/50 text-center flex flex-col items-center gap-1 min-w-[70px]"
-                      >
-                        <span className="text-[11px] font-semibold text-muted-foreground">{h.hour}</span>
-                        <span className="text-xl my-0.5">{h.icon}</span>
-                        <span className="text-xs font-bold text-foreground">{h.temp}°C</span>
-                        <div className="w-full bg-border rounded-full h-1 mt-1 overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full",
-                              h.rainProb > 50 ? "bg-blue-500" : h.rainProb > 20 ? "bg-amber-400" : "bg-emerald-400"
-                            )}
-                            style={{ width: `${Math.min(100, Math.max(10, h.rainProb))}%` }}
-                          />
+                {(weatherData.hourly ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Evolución Próximas Horas
+                    </h4>
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 overflow-x-auto pb-1">
+                      {weatherData.hourly.map((h: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-xl bg-muted/40 border border-border/50 text-center flex flex-col items-center gap-1 min-w-[70px]"
+                        >
+                          <span className="text-[11px] font-semibold text-muted-foreground">{h.hour}</span>
+                          <span className="text-xl my-0.5">{h.icon}</span>
+                          <span className="text-xs font-bold text-foreground">{h.temp}°C</span>
+                          <div className="w-full bg-border rounded-full h-1 mt-1 overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full rounded-full",
+                                h.rainProb > 50 ? "bg-blue-500" : h.rainProb > 20 ? "bg-amber-400" : "bg-emerald-400"
+                              )}
+                              style={{ width: `${Math.min(100, Math.max(10, h.rainProb))}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{h.rainProb}%</span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground">{h.rainProb}%</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* 4. Pronóstico para los próximos 3 días */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Pronóstico Próximos 3 Días
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {weatherData.daily.map((d: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-2xl">{d.icon}</span>
-                          <div>
-                            <div className="text-xs font-bold text-foreground">{d.dayName}</div>
-                            <div className="text-[11px] text-muted-foreground">{d.condition}</div>
+                {(weatherData.daily ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Pronóstico Próximos 3 Días
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {weatherData.daily.map((d: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-2xl">{d.icon}</span>
+                            <div>
+                              <div className="text-xs font-bold text-foreground">{d.dayName}</div>
+                              <div className="text-[11px] text-muted-foreground">{d.condition}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs font-black text-foreground">
+                              {d.maxTemp}° / <span className="text-muted-foreground font-normal">{d.minTemp}°</span>
+                            </div>
+                            <div className="text-[11px] text-sky-400 font-bold">
+                              🌧️ {d.rainProb}% prob.
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs font-black text-foreground">
-                            {d.maxTemp}° / <span className="text-muted-foreground font-normal">{d.minTemp}°</span>
-                          </div>
-                          <div className="text-[10px] text-blue-500 font-medium">
-                            🌧️ {d.rainProb}% prob.
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">
+              <div className="p-8 text-center text-sm text-foreground/80 font-medium">
                 <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin text-primary" />
                 Obteniendo pronóstico meteorológico en tiempo real...
               </div>
             )}
 
             {/* Reglas de Oro Comunitarias */}
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-800 dark:text-blue-300 space-y-1.5">
-              <h4 className="font-bold flex items-center gap-1.5 text-xs">
+            <div className="p-4 rounded-xl bg-sky-950/40 border border-sky-500/40 text-xs text-sky-100 dark:text-sky-100 font-medium space-y-2 shadow-xs">
+              <h4 className="font-bold flex items-center gap-1.5 text-xs text-sky-300 dark:text-sky-300 uppercase tracking-wider">
                 {t("parryn.goldenRuleTitle")}
               </h4>
-              <p>• {t("parryn.rule1")}</p>
-              <p>• {t("parryn.rule2")}</p>
-              <p>• {t("parryn.rule3")}</p>
+              <p className="leading-relaxed text-sky-100 font-medium">• {t("parryn.rule1")}</p>
+              <p className="leading-relaxed text-sky-100 font-medium">• {t("parryn.rule2")}</p>
+              <p className="leading-relaxed text-sky-100 font-medium">• {t("parryn.rule3")}</p>
             </div>
           </CardContent>
         </Card>

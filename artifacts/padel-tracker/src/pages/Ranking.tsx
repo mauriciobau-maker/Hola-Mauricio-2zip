@@ -22,16 +22,20 @@ export default function Ranking() {
       .then((d) => {
         setClub(d);
         if (d?.sports && d.sports.length > 0) {
+          const validSports = d.sports.filter((s: any) => s.active !== false);
           const savedSportId = localStorage.getItem("selected_sport_id");
-          const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+          const found = validSports.find((s: any) => String(s.id) === savedSportId);
           if (found) {
             setSelectedSportId(found.id);
           } else {
             const defaultSport =
-              d.sports.find((s: any) => s.slug === "padel") ||
-              d.sports.find((s: any) => s.slug === "tenis" || s.useSets) ||
-              d.sports[0];
+              validSports.find((s: any) => s.slug === "padel") ||
+              validSports.find((s: any) => s.slug === "tenis" || s.useSets) ||
+              validSports[0];
             setSelectedSportId(defaultSport.id);
+            try {
+              localStorage.setItem("selected_sport_id", String(defaultSport.id));
+            } catch {}
           }
         }
       })

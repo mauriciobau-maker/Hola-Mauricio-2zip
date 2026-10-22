@@ -191,10 +191,10 @@ export function AuthButton() {
           </DropdownMenuItem>
 
           <DropdownMenuItem onClick={() => handleLoginAs("admin_futbol")} className="gap-2.5 cursor-pointer py-1.5">
-            <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
+            <Building2 className="h-4 w-4 text-sky-500 shrink-0" />
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-foreground">Admin Liga Fútbol 5 & 7</span>
-              <span className="text-[10px] text-blue-400/90 font-medium">Monodeporte: Solo Fútbol</span>
+              <span className="text-[10px] text-sky-400 font-semibold">Monodeporte: Solo Fútbol</span>
             </div>
           </DropdownMenuItem>
 
@@ -229,7 +229,7 @@ export function AuthButton() {
   const roleColor = isSuperAdmin
     ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
     : isClubAdmin
-    ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+    ? "bg-sky-500/20 text-sky-300 border-sky-500/40 font-semibold"
     : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
 
   const initials = [user.firstName, user.lastName]
