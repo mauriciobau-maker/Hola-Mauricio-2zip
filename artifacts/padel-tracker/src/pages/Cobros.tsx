@@ -167,7 +167,7 @@ export default function Cobros() {
         setCostosCompartidos([{ id: "1", concepto: `Cancha: ${decodeURIComponent(titleParam)}`, monto: "" }]);
       }
       if (playersParam) {
-        const ids = playersParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0);
+        const ids = Array.from(new Set(playersParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0)));
         if (ids.length > 0) {
           setSelectedPlayerIds(ids);
           setShowCalculator(true);
@@ -635,11 +635,21 @@ export default function Cobros() {
   }, [cobros, searchTerm, filterEstado]);
 
   const filteredPlayersForCalc = useMemo(() => {
-    return allPlayers.filter(
-      (p) =>
-        p.name.toLowerCase().includes(calcSearch.toLowerCase()) ||
-        (p.nickname || "").toLowerCase().includes(calcSearch.toLowerCase())
-    );
+    const seen = new Set<string>();
+    return allPlayers
+      .filter((p) => {
+        const idKey = `id_${p.id}`;
+        const nameKey = `name_${p.name.trim().toLowerCase()}`;
+        if (seen.has(idKey) || seen.has(nameKey)) return false;
+        seen.add(idKey);
+        seen.add(nameKey);
+        return true;
+      })
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(calcSearch.toLowerCase()) ||
+          (p.nickname || "").toLowerCase().includes(calcSearch.toLowerCase())
+      );
   }, [allPlayers, calcSearch]);
 
   return (
