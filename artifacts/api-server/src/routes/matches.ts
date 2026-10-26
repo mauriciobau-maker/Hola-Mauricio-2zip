@@ -842,16 +842,19 @@ router.post(
       return;
     }
 
-    if (
-      existing.clubId !==
-      clubId
-    ) {
-      res.status(403).json({
-        error:
-          "Forbidden",
-      });
+    const user = req.user as any;
+    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
 
+    if (existing.clubId && existing.clubId !== clubId && !isStaff) {
+      res.status(403).json({
+        error: "Forbidden",
+      });
       return;
+    }
+
+    if (!existing.clubId && clubId) {
+      existing.clubId = clubId;
+      await db.update(matchesTable).set({ clubId }).where(eq(matchesTable.id, id));
     }
 
     // Ya confirmado: no recalcular innecesariamente.
@@ -1127,18 +1130,6 @@ router.patch(
       return;
     }
 
-    if (
-      existing.clubId !==
-      clubId
-    ) {
-      res.status(403).json({
-        error:
-          "Forbidden",
-      });
-
-      return;
-    }
-
     const user = req.user as any;
     const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
 
@@ -1155,6 +1146,18 @@ router.patch(
       ) {
         isEncuentroOrganizer = true;
       }
+    }
+
+    if (existing.clubId && existing.clubId !== clubId && !isStaff && !isEncuentroOrganizer) {
+      res.status(403).json({
+        error: "Forbidden",
+      });
+      return;
+    }
+
+    if (!existing.clubId && clubId) {
+      existing.clubId = clubId;
+      await db.update(matchesTable).set({ clubId }).where(eq(matchesTable.id, id));
     }
 
     const currentMatchPlayers = await db

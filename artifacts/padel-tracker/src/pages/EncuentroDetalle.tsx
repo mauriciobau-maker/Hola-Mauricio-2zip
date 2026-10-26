@@ -879,30 +879,56 @@ export function EncuentroDetalle() {
       let t2Games = 0;
 
       editSets.forEach((s) => {
-        t1Games += s.team1;
-        t2Games += s.team2;
+        t1Games += Number(s.team1 || 0);
+        t2Games += Number(s.team2 || 0);
         if (s.team1 > s.team2) t1Sets++;
         else if (s.team2 > s.team1) t2Sets++;
       });
 
       // Si hay más de 1 set, el score global suele ser la cantidad de sets ganados. Si es 1 set, son los juegos.
-      const team1Score = editSets.length > 1 ? t1Sets : editSets[0].team1;
-      const team2Score = editSets.length > 1 ? t2Sets : editSets[0].team2;
+      const team1Score = editSets.length > 1 ? t1Sets : (editSets[0]?.team1 ?? 0);
+      const team2Score = editSets.length > 1 ? t2Sets : (editSets[0]?.team2 ?? 0);
+      const result = team1Score > team2Score ? "team1" : team2Score > team1Score ? "team2" : "draw";
 
-      const res = await fetch(`/api/matches/${matchId}`, {
+      // 1. Intentar primero con la ruta especializada de partidos de encuentros
+      let res = await fetch(`/api/encuentros/${id}/partidos/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           team1Score,
           team2Score,
+          result,
           sets: editSets,
+          status: "confirmed",
         }),
       });
+
+      // 2. Fallback a /api/matches/:id
+      if (!res.ok) {
+        res = await fetch(`/api/matches/${matchId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            team1Score,
+            team2Score,
+            sets: editSets,
+            status: "confirmed",
+          }),
+        });
+      }
+
       if (res.ok) {
         setEditingMatchId(null);
         reloadMatches();
+        await refreshEncuentroData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || errData.error || "No se pudo guardar el resultado del partido.");
       }
+    } catch (err: any) {
+      alert("Error al guardar resultado: " + (err?.message || "Error de conexión"));
     } finally {
       setSavingScore(false);
     }
@@ -1888,17 +1914,19 @@ export function EncuentroDetalle() {
                                 </div>
                               ) : (
                                 <button
+                                  type="button"
                                   onClick={() => handleStartEditMatch(match)}
-                                  className="w-full mt-3 text-xs text-primary hover:underline font-medium"
+                                  className="w-full mt-3 py-2 px-3 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
                                 >
-                                  {match.pendingResult ? t.enterScore : t.editScore}
+                                  <Pencil size={13} />
+                                  <span>{match.pendingResult ? (t.enterScore || "Ingresar resultado") : (t.editScore || "Editar resultado")}</span>
                                 </button>
                               )}
                             </>
                           )}
 
-                          {/* Banner de Validación Cruzada Fair Play */}
-                          {((match as any).status === "pending_confirmation" || (!match.pendingResult && (match as any).status !== "confirmed")) && (
+                          {/* Banner de Validación Cruzada Fair Play (solo si ya se registró un marcador) */}
+                          {(!match.pendingResult && (match.team1Score > 0 || match.team2Score > 0) && (match as any).status !== "confirmed") && (
                             <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                               <div>
                                 <span className="font-semibold text-amber-600 dark:text-amber-400">

@@ -618,25 +618,56 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
   try {
     const rawMatchId = req.params.matchId;
     const matchId = parseInt(Array.isArray(rawMatchId) ? rawMatchId[0] : rawMatchId, 10);
+    const rawEncuentroId = req.params.id;
+    const encuentroId = parseInt(Array.isArray(rawEncuentroId) ? rawEncuentroId[0] : rawEncuentroId, 10);
 
-    const { team1Score, team2Score, result, sets } = req.body;
+    const { team1Score, team2Score, result, sets, status } = req.body;
+
+    const [existingMatch] = await db
+      .select()
+      .from(matchesTable)
+      .where(eq(matchesTable.id, matchId));
+
+    if (!existingMatch) {
+      res.status(404).json({ message: "Partido no encontrado" });
+      return;
+    }
+
+    const t1 = team1Score !== undefined ? Number(team1Score) : existingMatch.team1Score ?? 0;
+    const t2 = team2Score !== undefined ? Number(team2Score) : existingMatch.team2Score ?? 0;
 
     const updateData: Record<string, any> = {};
-    if (team1Score !== undefined) updateData.team1Score = team1Score;
-    if (team2Score !== undefined) updateData.team2Score = team2Score;
-    if (result !== undefined) updateData.result = result;
+    if (team1Score !== undefined) updateData.team1Score = t1;
+    if (team2Score !== undefined) updateData.team2Score = t2;
     if (sets !== undefined) updateData.sets = sets;
+
+    if (result !== undefined) {
+      updateData.result = result;
+    } else if (team1Score !== undefined && team2Score !== undefined) {
+      updateData.result = t1 > t2 ? "team1" : t2 > t1 ? "team2" : "draw";
+    }
+
+    if (status !== undefined) {
+      updateData.status = status;
+    } else if (t1 > 0 || t2 > 0) {
+      updateData.status = "confirmed";
+    }
+
+    // Asegurar clubId si no estaba asignado
+    if (!existingMatch.clubId) {
+      const [encuentro] = await db
+        .select({ clubId: encuentrosTable.clubId })
+        .from(encuentrosTable)
+        .where(eq(encuentrosTable.id, encuentroId));
+      const effectiveClubId = encuentro?.clubId || (req.user as any)?.clubId || 1;
+      updateData.clubId = effectiveClubId;
+    }
 
     const [updated] = await db
       .update(matchesTable)
       .set(updateData)
       .where(eq(matchesTable.id, matchId))
       .returning();
-
-    if (!updated) {
-      res.status(404).json({ message: "Partido no encontrado" });
-      return;
-    }
 
     res.json(updated);
   } catch (err: any) {
@@ -1049,11 +1080,13 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       .where(eq(matchesTable.encuentroId, encuentroId));
 
     const partidosCreados = [];
+    const effectiveClubId = encuentroDb?.clubId || (req.user as any)?.clubId || 1;
 
     for (const cruce of crucesPartidos) {
       const [newMatch] = await db
         .insert(matchesTable)
         .values({
+          clubId: effectiveClubId,
           encuentroId,
           sportId: idDeDeporte,
           modalityId: modality.id,
@@ -1062,7 +1095,7 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
           team1Score: 0,
           team2Score: 0,
           result: "pending",
-          status: "pending_confirmation",
+          status: "pending",
           playedAt: new Date(),
         } as any)
         .returning();
