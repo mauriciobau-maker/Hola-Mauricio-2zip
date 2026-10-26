@@ -8,8 +8,9 @@ import {
   getGetPlayerStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, Phone, MessageSquare, Globe, Lock, Trophy } from "lucide-react";
+import { ArrowLeft, Save, Phone, MessageSquare, Globe, Lock, Trophy, Mail, Image as ImageIcon, Activity, Upload, Trash2, Camera } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@workspace/replit-auth-web";
 
 function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -92,9 +93,11 @@ export default function EditarJugador() {
   const queryClient = useQueryClient();
   const { language: activeAppLanguage } = useLanguage();
 
-  // Simulación del rol activo (por defecto "admin" para pruebas; integrable con Auth Context)
-  const [currentUserRole] = useState<"admin" | "superadmin" | "player">("admin");
-  const isAdmin = currentUserRole === "admin" || currentUserRole === "superadmin";
+  const { user } = useAuth();
+  const isSuperAdmin = !!(user && ((user as any).role === "superadmin" || (user as any).role === "super_admin" || (user as any).isAdmin === 2));
+  const isClubAdmin = !!(user && ((user as any).isClubAdmin && (user as any).isClubAdmin > 0));
+  const isAdmin = isSuperAdmin || isClubAdmin;
+  const isSelf = user?.playerId === id;
 
   const { data: player, isLoading } = useGetPlayer(id, {
     query: { enabled: !!id, queryKey: getGetPlayerQueryKey(id) },
@@ -103,6 +106,10 @@ export default function EditarJugador() {
   // Estados del formulario
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [email, setEmail] = useState("");
+  const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [dominantHand, setDominantHand] = useState("diestro");
+  const [courtSide, setCourtSide] = useState("ambos");
   const [language, setLanguage] = useState("es");
   const [phone, setPhone] = useState("");
   const [waId, setWaId] = useState("");
@@ -137,6 +144,10 @@ export default function EditarJugador() {
     if (player) {
       setName(player.name);
       setNickname(player.nickname ?? "");
+      setEmail((player as any).email ?? "");
+      setProfileImageUrl((player as any).profileImageUrl ?? "");
+      setDominantHand((player as any).dominantHand ?? "diestro");
+      setCourtSide((player as any).courtSide ?? "ambos");
       setLanguage((player as any).language ?? "es");
       setPhone((player as any).phone ?? "");
       setWaId((player as any).waId ?? "");
@@ -169,6 +180,50 @@ export default function EditarJugador() {
     );
   };
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 320;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          setProfileImageUrl(compressedDataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -182,10 +237,14 @@ export default function EditarJugador() {
       id,
       data: {
         ...(isAdmin ? { name: name.trim(), nickname: nickname.trim() || null } : {}),
+        email: email.trim() || null,
+        profileImageUrl: profileImageUrl.trim() || null,
         language,
         phone: phone.trim() || null,
         waId: waId.trim() || null,
         wspConsent,
+        dominantHand: dominantHand.trim() || null,
+        courtSide: courtSide.trim() || null,
         categoryIds: selectedCategoryIds,
       } as any,
     });
@@ -220,6 +279,10 @@ export default function EditarJugador() {
 
   const isDirty =
     (isAdmin && (name !== player.name || nickname !== (player.nickname ?? ""))) ||
+    email !== ((player as any).email ?? "") ||
+    profileImageUrl !== ((player as any).profileImageUrl ?? "") ||
+    dominantHand !== ((player as any).dominantHand ?? "diestro") ||
+    courtSide !== ((player as any).courtSide ?? "ambos") ||
     language !== ((player as any).language ?? "es") ||
     phone !== ((player as any).phone ?? "") ||
     waId !== ((player as any).waId ?? "") ||
@@ -227,6 +290,10 @@ export default function EditarJugador() {
     categoriesChanged;
 
   const activeSports = clubSports.filter((s) => s.active);
+  const isFootball =
+    (player as any)?.isFootball ||
+    (player as any)?.sportSlug === "futbol" ||
+    activeSports.some((s) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol"));
 
   return (
     <div className="max-w-md mx-auto space-y-6">
@@ -244,14 +311,79 @@ export default function EditarJugador() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6">
-        {/* Avatar preview */}
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-2xl font-bold text-primary">
-            {name.trim() ? initials(name.trim()) : "?"}
+        {/* Avatar preview and upload controls */}
+        <div className="flex flex-col items-center justify-center mb-6 gap-3">
+          <div className="relative group">
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt={name || "Avatar"}
+                className="w-20 h-20 rounded-full object-cover border-2 border-primary/50 shadow-md"
+                onError={() => {}}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-3xl font-bold text-primary">
+                {name.trim() ? initials(name.trim()) : "?"}
+              </div>
+            )}
+            <label
+              className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+              title="Cambiar foto de perfil"
+            >
+              <Camera size={14} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                className="hidden"
+              />
+            </label>
           </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 hover:bg-muted/70 text-xs font-semibold text-foreground cursor-pointer transition-colors shadow-sm">
+              <Upload size={13} className="text-primary" />
+              <span>Subir foto desde dispositivo</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                className="hidden"
+              />
+            </label>
+            {profileImageUrl && (
+              <button
+                type="button"
+                onClick={() => setProfileImageUrl("")}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-medium text-destructive transition-colors"
+                title="Quitar foto y usar iniciales"
+              >
+                <Trash2 size={12} />
+                <span>Quitar</span>
+              </button>
+            )}
+          </div>
+          <span className="text-[11px] text-muted-foreground text-center">
+            Formatos JPG, PNG o WebP. Se optimiza y recorta automáticamente.
+          </span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Foto de perfil (URL alternativa) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <ImageIcon size={13} />
+              <span>O pega un enlace directo de foto (URL)</span>
+            </label>
+            <input
+              type="url"
+              value={profileImageUrl.startsWith("data:") ? "" : profileImageUrl}
+              onChange={(e) => setProfileImageUrl(e.target.value)}
+              placeholder="https://ejemplo.com/mi-foto.jpg"
+              className="w-full bg-background border border-input rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground text-foreground"
+            />
+          </div>
+
           {/* Nombre completo */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium flex items-center justify-between">
@@ -297,6 +429,68 @@ export default function EditarJugador() {
             <p className="text-xs text-muted-foreground italic flex items-center gap-1 mt-1">
               <Lock size={11} /> {t.readOnlyNotice}
             </p>
+          )}
+
+          {/* Correo Electrónico */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium flex items-center gap-1.5">
+              <Mail size={14} className="text-muted-foreground" />
+              <span>Correo electrónico <span className="text-muted-foreground text-xs">(opcional)</span></span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="jugador@ejemplo.com"
+              className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+            />
+          </div>
+
+          {/* Posición / Mano según deporte */}
+          {isFootball ? (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <Activity size={14} className="text-muted-foreground" />
+                <span>Posición en Cancha (Fútbol)</span>
+              </label>
+              <select
+                value={courtSide}
+                onChange={(e) => setCourtSide(e.target.value)}
+                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+              >
+                <option value="Delantero">Delantero / Atacante</option>
+                <option value="Mediocampista">Mediocampista / Volante</option>
+                <option value="Defensa">Defensa / Zaguero</option>
+                <option value="Arquero">Arquero / Guardameta</option>
+                <option value="Polifuncional">Polifuncional / Rotativo</option>
+              </select>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Mano hábil</label>
+                <select
+                  value={dominantHand}
+                  onChange={(e) => setDominantHand(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                >
+                  <option value="diestro">Diestro</option>
+                  <option value="zurdo">Zurdo</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Lado preferido</label>
+                <select
+                  value={courtSide}
+                  onChange={(e) => setCourtSide(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                >
+                  <option value="drive">Drive (Derecha)</option>
+                  <option value="reves">Revés (Izquierda)</option>
+                  <option value="ambos">Ambos lados</option>
+                </select>
+              </div>
+            </div>
           )}
 
           {/* Selector de Idioma de la Aplicación */}

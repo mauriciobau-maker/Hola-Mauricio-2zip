@@ -51,6 +51,15 @@ function groupMatchPlayers(rows: typeof matchPlayersTable.$inferSelect[]) {
   return grouped;
 }
 
+function getEloCategory(elo: number) {
+  if (elo >= 1800) return { name: "1ª Cat", badge: "1ª Categoría", tier: "Master" };
+  if (elo >= 1650) return { name: "2ª Cat", badge: "2ª Categoría", tier: "Avanzado Pro" };
+  if (elo >= 1520) return { name: "3ª Cat", badge: "3ª Categoría", tier: "Avanzado" };
+  if (elo >= 1400) return { name: "4ª Cat", badge: "4ª Categoría", tier: "Intermedio" };
+  if (elo >= 1250) return { name: "5ª Cat", badge: "5ª Categoría", tier: "Iniciación" };
+  return { name: "6ª Cat", badge: "6ª Categoría", tier: "Principiante" };
+}
+
 router.get("/ranking", async (req, res): Promise<void> => {
   const clubId = await resolveEffectiveClubId(req);
   if (!clubId) {
@@ -69,7 +78,8 @@ router.get("/ranking", async (req, res): Promise<void> => {
     db
       .select()
       .from(matchesTable)
-      .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId))),
+      .where(and(eq(matchesTable.clubId, clubId), eq(matchesTable.sportId, sportId)))
+      .orderBy(matchesTable.playedAt),
   ]);
   const matchIds = matches.map((match) => match.id);
   const participants = matchIds.length
@@ -85,11 +95,22 @@ router.get("/ranking", async (req, res): Promise<void> => {
       ),
     );
   const ratingMap = new Map(ratings.map((rating) => [rating.playerId, rating.elo]));
-  const playersById = new Map(players.map((player) => [player.id, player]));
   const grouped = groupMatchPlayers(participants);
   const stats = new Map(players.map((player) => [
     player.id,
-    { wins: 0, losses: 0, draws: 0, points: 0, goalsFor: 0, goalsAgainst: 0 },
+    {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      setsWon: 0,
+      setsLost: 0,
+      gamesWon: 0,
+      gamesLost: 0,
+      history: [] as ("V" | "D" | "E")[],
+    },
   ]));
 
   for (const match of matches) {
@@ -115,8 +136,28 @@ router.get("/ranking", async (req, res): Promise<void> => {
     const t1Goals = Number(match.team1Score ?? 0);
     const t2Goals = Number(match.team2Score ?? 0);
 
+    let t1Sets = 0;
+    let t2Sets = 0;
+    let t1Games = 0;
+    let t2Games = 0;
+
+    if (Array.isArray(match.sets) && match.sets.length > 0) {
+      for (const s of match.sets as any[]) {
+        const s1 = Number(s.team1Score ?? s.team1 ?? 0);
+        const s2 = Number(s.team2Score ?? s.team2 ?? 0);
+        t1Games += s1;
+        t2Games += s2;
+        if (s1 > s2) t1Sets++;
+        else if (s2 > s1) t2Sets++;
+      }
+    } else {
+      t1Sets = t1Goals;
+      t2Sets = t2Goals;
+      t1Games = t1Goals * 6;
+      t2Games = t2Goals * 6;
+    }
+
     if (isRivalMatch) {
-      // Partido contra rival externo: team1 es la nómina de nuestro club
       if (effectiveResult === "draw") {
         for (const playerId of team1) {
           const playerStats = stats.get(playerId);
@@ -125,10 +166,14 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.points += 1;
             playerStats.goalsFor += t1Goals;
             playerStats.goalsAgainst += t2Goals;
+            playerStats.setsWon += t1Sets;
+            playerStats.setsLost += t2Sets;
+            playerStats.gamesWon += t1Games;
+            playerStats.gamesLost += t2Games;
+            playerStats.history.push("E");
           }
         }
       } else if (effectiveResult === "team1") {
-        // Victoria del club: +3 puntos
         for (const playerId of team1) {
           const playerStats = stats.get(playerId);
           if (playerStats) {
@@ -136,21 +181,29 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.points += 3;
             playerStats.goalsFor += t1Goals;
             playerStats.goalsAgainst += t2Goals;
+            playerStats.setsWon += t1Sets;
+            playerStats.setsLost += t2Sets;
+            playerStats.gamesWon += t1Games;
+            playerStats.gamesLost += t2Games;
+            playerStats.history.push("V");
           }
         }
       } else {
-        // Derrota del club: 0 puntos
         for (const playerId of team1) {
           const playerStats = stats.get(playerId);
           if (playerStats) {
             playerStats.losses++;
             playerStats.goalsFor += t1Goals;
             playerStats.goalsAgainst += t2Goals;
+            playerStats.setsWon += t1Sets;
+            playerStats.setsLost += t2Sets;
+            playerStats.gamesWon += t1Games;
+            playerStats.gamesLost += t2Games;
+            playerStats.history.push("D");
           }
         }
       }
     } else {
-      // Partido interno entre dos escuadras del club
       if (effectiveResult === "draw") {
         for (const playerId of team1) {
           const playerStats = stats.get(playerId);
@@ -159,6 +212,11 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.points += 1;
             playerStats.goalsFor += t1Goals;
             playerStats.goalsAgainst += t2Goals;
+            playerStats.setsWon += t1Sets;
+            playerStats.setsLost += t2Sets;
+            playerStats.gamesWon += t1Games;
+            playerStats.gamesLost += t2Games;
+            playerStats.history.push("E");
           }
         }
         for (const playerId of team2) {
@@ -168,6 +226,11 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.points += 1;
             playerStats.goalsFor += t2Goals;
             playerStats.goalsAgainst += t1Goals;
+            playerStats.setsWon += t2Sets;
+            playerStats.setsLost += t1Sets;
+            playerStats.gamesWon += t2Games;
+            playerStats.gamesLost += t1Games;
+            playerStats.history.push("E");
           }
         }
       } else {
@@ -175,6 +238,10 @@ router.get("/ranking", async (req, res): Promise<void> => {
         const losers = effectiveResult === "team1" ? team2 : team1;
         const winnerGoals = effectiveResult === "team1" ? t1Goals : t2Goals;
         const loserGoals = effectiveResult === "team1" ? t2Goals : t1Goals;
+        const winnerSets = effectiveResult === "team1" ? t1Sets : t2Sets;
+        const loserSets = effectiveResult === "team1" ? t2Sets : t1Sets;
+        const winnerGames = effectiveResult === "team1" ? t1Games : t2Games;
+        const loserGames = effectiveResult === "team1" ? t2Games : t1Games;
 
         for (const playerId of winners) {
           const playerStats = stats.get(playerId);
@@ -183,6 +250,11 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.points += 3;
             playerStats.goalsFor += winnerGoals;
             playerStats.goalsAgainst += loserGoals;
+            playerStats.setsWon += winnerSets;
+            playerStats.setsLost += loserSets;
+            playerStats.gamesWon += winnerGames;
+            playerStats.gamesLost += loserGames;
+            playerStats.history.push("V");
           }
         }
         for (const playerId of losers) {
@@ -191,6 +263,11 @@ router.get("/ranking", async (req, res): Promise<void> => {
             playerStats.losses++;
             playerStats.goalsFor += loserGoals;
             playerStats.goalsAgainst += winnerGoals;
+            playerStats.setsWon += loserSets;
+            playerStats.setsLost += winnerSets;
+            playerStats.gamesWon += loserGames;
+            playerStats.gamesLost += winnerGames;
+            playerStats.history.push("D");
           }
         }
       }
@@ -211,6 +288,22 @@ router.get("/ranking", async (req, res): Promise<void> => {
       const elo = ratingMap.get(player.id) ?? player.elo ?? 1500;
       const totalMatches = playerStats.wins + playerStats.losses + playerStats.draws;
       const goalDiff = playerStats.goalsFor - playerStats.goalsAgainst;
+      const gamesDiff = playerStats.gamesWon - playerStats.gamesLost;
+
+      // Calcular racha
+      let streak = "-";
+      if (playerStats.history.length > 0) {
+        const last = playerStats.history[playerStats.history.length - 1];
+        let count = 0;
+        for (let i = playerStats.history.length - 1; i >= 0; i--) {
+          if (playerStats.history[i] === last) count++;
+          else break;
+        }
+        streak = last === "V" ? `🔥 ${count}V` : last === "D" ? `${count}D` : `${count}E`;
+      }
+
+      const catInfo = getEloCategory(elo);
+
       return {
         playerId: player.id,
         playerName: player.name,
@@ -227,6 +320,15 @@ router.get("/ranking", async (req, res): Promise<void> => {
         goalsFor: playerStats.goalsFor,
         goalsAgainst: playerStats.goalsAgainst,
         goalDiff,
+        setsWon: playerStats.setsWon,
+        setsLost: playerStats.setsLost,
+        gamesWon: playerStats.gamesWon,
+        gamesLost: playerStats.gamesLost,
+        gamesDiff,
+        streak,
+        category: catInfo.name,
+        categoryTier: catInfo.tier,
+        categoryBadge: catInfo.badge,
         totalMatches,
         winRate: totalMatches ? Math.round((playerStats.wins / totalMatches) * 100) : 0,
       };
@@ -242,7 +344,13 @@ router.get("/ranking", async (req, res): Promise<void> => {
           a.losses - b.losses
         );
       }
-      return b.elo - a.elo || b.wins - a.wins || a.losses - b.losses;
+      return (
+        b.elo - a.elo ||
+        b.wins - a.wins ||
+        a.losses - b.losses ||
+        b.setsWon - a.setsWon ||
+        b.gamesDiff - a.gamesDiff
+      );
     })
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 

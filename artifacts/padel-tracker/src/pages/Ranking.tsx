@@ -78,12 +78,12 @@ export default function Ranking() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {isFootball ? "Tabla de Posiciones" : t("ranking.title")}
+            {isFootball ? "Tabla de Posiciones" : "Ranking Oficial del Club"}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {isFootball
-              ? "Clasificación oficial de fútbol: 3 pts victoria, 1 pto empate, 0 pts derrota."
-              : t("ranking.subtitle")}
+              ? "Clasificación oficial de fútbol: 3 pts victoria, 1 pto empate, 0 pts derrota y estadísticas de gol."
+              : "Clasificación por sistema Elo dinámico según nivel de rivales, sets y games disputados."}
           </p>
         </div>
 
@@ -125,12 +125,12 @@ export default function Ranking() {
           </div>
           <div>
             <p className="font-semibold text-foreground">
-              {isFootball ? "Sin partidos de fútbol registrados aún" : t("ranking.noData")}
+              {isFootball ? "Sin partidos de fútbol registrados aún" : "Sin partidos de pádel/tenis registrados aún"}
             </p>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm">
               {isFootball
                 ? "Registra partidos internos o contra rivales externos en Nuevo Partido para sumar puntos a la tabla de posiciones."
-                : t("ranking.noDataDesc")}
+                : "Registra y confirma partidos en Nuevo Partido para calcular el Elo y la clasificación del club."}
             </p>
           </div>
           <Link
@@ -152,7 +152,7 @@ export default function Ranking() {
           )}
 
           {/* Full table */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
             {isFootball ? (
               <div className="overflow-x-auto">
                 <div className="min-w-[700px]">
@@ -229,54 +229,90 @@ export default function Ranking() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-1">{t("ranking.pos")}</div>
-                <div className="col-span-4">{t("ranking.player")}</div>
-                <div className="col-span-3 text-center">Elo</div>
-                <div className="col-span-1 text-center">{t("ranking.wins")}</div>
-                <div className="col-span-1 text-center">{t("ranking.losses")}</div>
-                <div className="col-span-2 text-center">{t("ranking.winRate")}</div>
-              </div>
-            )}
-            {!isFootball && (
-              <div className="divide-y divide-border">
-                {ranking.map((entry: any) => (
-                  <Link
-                    key={entry.playerId}
-                    href={`/jugadores/${entry.playerId}`}
-                    className="grid grid-cols-12 gap-1 md:gap-2 px-3 md:px-4 py-3 items-center hover:bg-muted/20 transition-colors"
-                  >
-                    <div className="col-span-1">
-                      <RankBadge rank={entry.rank} />
-                    </div>
-                    <div className="col-span-4 flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                        {initials(entry.playerName)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{entry.playerName}</p>
-                        {entry.nickname && (
-                          <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="col-span-3 text-center">
-                      <EloDisplay elo={entry.elo} />
-                    </div>
-                    <div className="col-span-1 text-center text-sm text-green-400 font-medium">{entry.wins}</div>
-                    <div className="col-span-1 text-center text-sm text-red-400 font-medium">{entry.losses}</div>
-                    <div className="col-span-2 text-center">
-                      <WinRateBar rate={entry.winRate} />
-                    </div>
-                  </Link>
-                ))}
+              <div className="overflow-x-auto">
+                <div className="min-w-[760px]">
+                  <div className="grid grid-cols-12 gap-1 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider items-center">
+                    <div className="col-span-1 text-center">{t("ranking.pos")}</div>
+                    <div className="col-span-3">{t("ranking.player")}</div>
+                    <div className="col-span-1 text-center">Cat.</div>
+                    <div className="col-span-1 text-center text-primary font-bold">Elo</div>
+                    <div className="col-span-1 text-center">PJ</div>
+                    <div className="col-span-1 text-center text-green-400 font-semibold">PG</div>
+                    <div className="col-span-1 text-center text-red-400 font-medium">PP</div>
+                    <div className="col-span-1 text-center font-mono">Sets</div>
+                    <div className="col-span-1 text-center font-mono">Games</div>
+                    <div className="col-span-1 text-center">Racha</div>
+                    <div className="col-span-1 text-center">% Ef.</div>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {ranking.map((entry: any) => {
+                      const totalMatches = entry.totalMatches ?? (entry.wins + entry.losses);
+                      const gamesDiff = entry.gamesDiff ?? ((entry.gamesWon ?? 0) - (entry.gamesLost ?? 0));
+                      return (
+                        <Link
+                          key={entry.playerId}
+                          href={`/jugadores/${entry.playerId}`}
+                          className="grid grid-cols-12 gap-1 px-4 py-3 items-center hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="col-span-1 text-center">
+                            <RankBadge rank={entry.rank} />
+                          </div>
+                          <div className="col-span-3 flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                              {initials(entry.playerName)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{entry.playerName}</p>
+                              {entry.nickname && (
+                                <p className="text-xs text-muted-foreground truncate">&quot;{entry.nickname}&quot;</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-muted/60 border border-border text-foreground/80">
+                              {entry.category ?? "4ª Cat"}
+                            </span>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <EloDisplay elo={entry.elo} />
+                          </div>
+                          <div className="col-span-1 text-center text-sm font-medium text-foreground/90">
+                            {totalMatches}
+                          </div>
+                          <div className="col-span-1 text-center text-sm text-green-400 font-semibold">
+                            {entry.wins}
+                          </div>
+                          <div className="col-span-1 text-center text-sm text-red-400 font-medium">
+                            {entry.losses}
+                          </div>
+                          <div className="col-span-1 text-center text-xs font-mono text-muted-foreground">
+                            {entry.setsWon ?? 0}-{entry.setsLost ?? 0}
+                          </div>
+                          <div className="col-span-1 text-center text-xs font-mono font-medium">
+                            <span className={gamesDiff > 0 ? "text-green-400" : gamesDiff < 0 ? "text-red-400" : "text-muted-foreground"}>
+                              {gamesDiff > 0 ? `+${gamesDiff}` : gamesDiff}
+                            </span>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <span className="text-xs font-semibold text-foreground/90">
+                              {entry.streak ?? "-"}
+                            </span>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <span className="text-xs font-medium text-muted-foreground">{entry.winRate}%</span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* Rules / Explanation */}
           {isFootball ? (
-            <div className="bg-card border border-border rounded-xl p-5 space-y-3.5">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-3.5 shadow-xs">
               <div className="flex items-center gap-2">
                 <span className="text-lg">⚽</span>
                 <div>
@@ -324,24 +360,48 @@ export default function Ranking() {
               </div>
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-3.5 shadow-xs">
               <div className="flex items-center gap-2">
-                <Zap size={14} className="text-primary" />
-                <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
+                <Zap size={18} className="text-primary" />
+                <div>
+                  <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Cálculo oficial de puntuación Elo individual para Pádel y Tenis por cada set y partido disputado.
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <TrendingUp size={12} className="text-green-400 mt-0.5 flex-shrink-0" />
-                  <span>{t("ranking.eloWinLossRule")}</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <TrendingUp size={16} className="text-green-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Victoria y Nivel de Rival</strong>
+                    <span>{t("ranking.eloWinLossRule")}</span>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <TrendingDown size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-                  <span>{t("ranking.eloDrawRule")}</span>
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <TrendingDown size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Derrota y Rendimiento</strong>
+                    <span>{t("ranking.eloDrawRule")}</span>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <span className="w-3 h-3 rounded-full bg-primary/50 flex-shrink-0 mt-0.5" />
-                  <span>{t("ranking.eloBaseRule")}</span>
+                <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
+                  <span className="w-3.5 h-3.5 rounded-full bg-primary/30 flex items-center justify-center text-primary font-bold text-[9px] mt-0.5 flex-shrink-0">
+                    ⚡
+                  </span>
+                  <div>
+                    <strong className="text-foreground block mb-0.5">Puntuación Base y Categorías</strong>
+                    <span>{t("ranking.eloBaseRule")}</span>
+                  </div>
                 </div>
+              </div>
+              <div className="pt-2 text-xs text-muted-foreground border-t border-border/40 flex flex-wrap gap-x-5 gap-y-1.5">
+                <span><strong className="text-foreground">Categorías Oficiales:</strong> 1ª Cat (1800+ Elo)</span>
+                <span>2ª Cat (1650-1799)</span>
+                <span>3ª Cat (1520-1649)</span>
+                <span>4ª Cat (1400-1519)</span>
+                <span>5ª Cat (1250-1399)</span>
+                <span>6ª Cat (&lt;1250)</span>
               </div>
             </div>
           )}
@@ -423,8 +483,8 @@ function PodiumCard({ entry, isFirst = false, isFootball = false }: { entry: any
         <span className="text-sm font-bold text-primary tabular-nums">
           {isFootball ? `${entry.points ?? 0} pts` : entry.elo}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {isFootball ? "Puntos Liga" : "Elo"}
+        <span className="text-[11px] text-muted-foreground font-medium">
+          {isFootball ? "Puntos Liga" : entry.category ?? "4ª Cat"}
         </span>
       </div>
     </Link>

@@ -3,6 +3,7 @@ import { eq, desc, asc, and } from "drizzle-orm";
 import {
   db,
   playersTable,
+  usersTable,
   matchesTable,
   eloHistoryTable,
   matchPlayersTable,
@@ -192,11 +193,32 @@ async function enrichPlayer(
     } catch {}
   }
 
+  let email: string | null = null;
+  let profileImageUrl: string | null = null;
+
+  try {
+    const [linkedUser] = await db
+      .select({
+        email: usersTable.email,
+        profileImageUrl: usersTable.profileImageUrl,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.playerId, player.id))
+      .limit(1);
+
+    if (linkedUser) {
+      email = linkedUser.email ?? null;
+      profileImageUrl = linkedUser.profileImageUrl ?? null;
+    }
+  } catch {}
+
   return {
     id: player.id,
     name: player.name,
     nickname:
       player.nickname ?? null,
+    email,
+    profileImageUrl,
     elo: isFootball ? points : player.elo,
     phone:
       player.phone ?? null,
@@ -206,6 +228,10 @@ async function enrichPlayer(
       player.wspConsent ?? false,
     language:
       player.language ?? "es",
+    dominantHand:
+      (player as any).dominantHand ?? null,
+    courtSide:
+      (player as any).courtSide ?? null,
     clubId:
       player.clubId ?? null,
     isFootball,
@@ -668,6 +694,10 @@ router.patch(
       wspConsent,
       language,
       categoryIds,
+      dominantHand,
+      courtSide,
+      email,
+      profileImageUrl,
     } = req.body;
 
     if (
@@ -710,6 +740,46 @@ router.patch(
     ) {
       updates.language =
         language;
+    }
+
+    if (dominantHand !== undefined) {
+      updates.dominantHand = dominantHand && typeof dominantHand === "string" ? dominantHand.trim() : null;
+    }
+
+    if (courtSide !== undefined) {
+      updates.courtSide = courtSide && typeof courtSide === "string" ? courtSide.trim() : null;
+    }
+
+    if (email !== undefined || profileImageUrl !== undefined) {
+      try {
+        const [existingUser] = await db
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.playerId, params.data.id))
+          .limit(1);
+
+        const cleanEmail = email !== undefined && typeof email === "string" ? email.trim() || null : undefined;
+        const cleanPhoto = profileImageUrl !== undefined && typeof profileImageUrl === "string" ? profileImageUrl.trim() || null : undefined;
+
+        if (existingUser) {
+          const userUpdates: Record<string, unknown> = {};
+          if (cleanEmail !== undefined) userUpdates.email = cleanEmail;
+          if (cleanPhoto !== undefined) userUpdates.profileImageUrl = cleanPhoto;
+          if (Object.keys(userUpdates).length > 0) {
+            await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, existingUser.id));
+          }
+        } else if (cleanEmail || cleanPhoto) {
+          await db.insert(usersTable).values({
+            email: cleanEmail ?? null,
+            profileImageUrl: cleanPhoto ?? null,
+            playerId: params.data.id,
+            name: updates.name ? String(updates.name) : undefined,
+            clubId: clubId ?? null,
+          });
+        }
+      } catch (err) {
+        logger.warn("Could not index linked user photo/email:", err);
+      }
     }
 
     const clubId =

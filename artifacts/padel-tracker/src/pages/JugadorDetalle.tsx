@@ -8,7 +8,7 @@ import {
   getGetPlayerStatsQueryKey,
   getGetPlayerEloHistoryQueryKey,
 } from "@workspace/api-client-react";
-import { ArrowLeft, TrendingUp, TrendingDown, Award, Target, Flame, Pencil, Zap, Trophy } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Award, Target, Flame, Pencil, Zap, Trophy, Mail, Phone, MessageSquare, ShieldCheck, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -128,13 +128,27 @@ export default function JugadorDetalle() {
       {/* Player card with Points or Elo */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0">
-            {initials(player.name)}
-          </div>
+          {player.profileImageUrl ? (
+            <img
+              src={player.profileImageUrl}
+              alt={player.name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-primary/30 flex-shrink-0 bg-muted"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0">
+              {initials(player.name)}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold">{player.name}</h2>
             {player.nickname && (
               <p className="text-muted-foreground text-sm">&quot;{player.nickname}&quot;</p>
+            )}
+            {player.email && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <Mail size={12} className="text-primary/80" />
+                <span className="truncate">{player.email}</span>
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
               {t("jugadores.memberSince", {
@@ -175,6 +189,45 @@ export default function JugadorDetalle() {
             </div>
           )}
         </div>
+
+        {/* Informative strip: Phone, WhatsApp, Dominant Hand, Court Side / Position */}
+        {(player.phone || player.waId || player.dominantHand || player.courtSide || (player.categories && player.categories.length > 0)) && (
+          <div className="mt-4 pt-3 border-t border-border/60 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {player.phone && (
+              <a
+                href={`tel:${player.phone}`}
+                className="flex items-center gap-1 hover:text-foreground transition-colors bg-muted/40 px-2.5 py-1 rounded-md border border-border/40"
+              >
+                <Phone size={12} className="text-primary" />
+                <span>{player.phone}</span>
+              </a>
+            )}
+            {player.waId && (
+              <a
+                href={`https://wa.me/${player.phone?.replace(/[^0-9]/g, "") || player.waId.replace(/[^0-9]/g, "")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors bg-green-500/10 px-2.5 py-1 rounded-md border border-green-500/20"
+              >
+                <MessageSquare size={12} />
+                <span>WhatsApp: {player.waId}</span>
+              </a>
+            )}
+            {!isFootball && (player.dominantHand || player.courtSide) && (
+              <div className="flex items-center gap-1 bg-muted/40 px-2.5 py-1 rounded-md border border-border/40">
+                <Activity size={12} className="text-muted-foreground" />
+                <span className="capitalize">
+                  {player.dominantHand || "Diestro"} • {player.courtSide === "drive" ? "Drive" : player.courtSide === "reves" ? "Revés" : player.courtSide || "Ambos lados"}
+                </span>
+              </div>
+            )}
+            {Array.isArray(player.categories) && player.categories.map((c: any) => (
+              <span key={c.id} className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full text-[11px] font-semibold">
+                {c.name}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Win rate bar */}
         {stats && stats.totalMatches > 0 && (

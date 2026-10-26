@@ -157,7 +157,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     }
 
     const bodyData = req.body.data ?? req.body;
-    const { title, dateTime, location, maxSpots, notes, playerIds, durationMinutes, courtsAvailable } = bodyData;
+    const { title, dateTime, location, maxSpots, notes, playerIds, durationMinutes, courtsAvailable, sportId, formato } = bodyData;
 
     const [created] = await db
       .insert(encuentrosTable)
@@ -168,6 +168,8 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         maxSpots: maxSpots ? parseInt(maxSpots, 10) : null,
         durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
         courtsAvailable: courtsAvailable ? parseInt(courtsAvailable, 10) : 1,
+        sportId: sportId ? parseInt(sportId, 10) : null,
+        formato: formato || "americana",
         notes: notes || null,
         clubId: user.clubId || null,
         organizerId: user.id ? String(user.id) : null,
@@ -213,6 +215,100 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       ...formattedEncuentro,
       encuentro: formattedEncuentro,
       asistencia,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH /api/encuentros/:id
+router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
+    const rawId = req.params.id;
+    const id = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
+    const [e] = await db.select().from(encuentrosTable).where(eq(encuentrosTable.id, id));
+    if (!e) {
+      res.status(404).json({ message: "Encuentro no encontrado" });
+      return;
+    }
+
+    const isOrganizer =
+      String(user.id) === String(e.organizerId) ||
+      Boolean(user.isAdmin) ||
+      Boolean(user.isClubAdmin && user.isClubAdmin > 0) ||
+      (user.playerId && String(user.playerId) === String(e.organizerId));
+    if (!isOrganizer) {
+      res.status(403).json({ message: "Solo el organizador o administrador puede editar este encuentro." });
+      return;
+    }
+
+    const bodyData = req.body.data ?? req.body;
+    const updates: Record<string, any> = {};
+
+    if (bodyData.title !== undefined) updates.title = bodyData.title.trim();
+    if (bodyData.dateTime !== undefined) updates.dateTime = new Date(bodyData.dateTime);
+    if (bodyData.location !== undefined) updates.location = bodyData.location.trim();
+    if (bodyData.maxSpots !== undefined) {
+      updates.maxSpots = bodyData.maxSpots ? parseInt(bodyData.maxSpots, 10) : null;
+    }
+    if (bodyData.durationMinutes !== undefined) {
+      updates.durationMinutes = bodyData.durationMinutes ? parseInt(bodyData.durationMinutes, 10) : 90;
+    }
+    if (bodyData.courtsAvailable !== undefined) {
+      updates.courtsAvailable = bodyData.courtsAvailable ? parseInt(bodyData.courtsAvailable, 10) : 1;
+    }
+    if (bodyData.notes !== undefined) updates.notes = bodyData.notes ? bodyData.notes.trim() : null;
+    if (bodyData.sportId !== undefined) updates.sportId = bodyData.sportId ? parseInt(bodyData.sportId, 10) : null;
+    if (bodyData.formato !== undefined) updates.formato = bodyData.formato;
+
+    const [updated] = await db
+      .update(encuentrosTable)
+      .set(updates)
+      .where(eq(encuentrosTable.id, id))
+      .returning();
+
+    // Si se modificó maxSpots, reajustar lista de confirmados vs reserva
+    if (updates.maxSpots !== undefined) {
+      const asistenciaActual = await getAsistenciaList(id);
+      const limit = updates.maxSpots;
+      if (limit && limit > 0) {
+        const confirmados = asistenciaActual.filter((a) => a.status === "confirmed");
+        if (confirmados.length > limit) {
+          const excedent = confirmados.slice(limit);
+          for (const exc of excedent) {
+            await db
+              .update(asistenciaTable)
+              .set({ status: "waitlist" })
+              .where(and(eq(asistenciaTable.encuentroId, id), eq(asistenciaTable.playerId, exc.playerId)));
+          }
+        } else if (confirmados.length < limit) {
+          const enReserva = asistenciaActual.filter((a) => a.status === "waitlist" || a.status === "reserva");
+          const slots = limit - confirmados.length;
+          const aPromover = enReserva.slice(0, slots);
+          for (const prom of aPromover) {
+            await db
+              .update(asistenciaTable)
+              .set({ status: "confirmed" })
+              .where(and(eq(asistenciaTable.encuentroId, id), eq(asistenciaTable.playerId, prom.playerId)));
+          }
+        }
+      }
+    }
+
+    const asistenciaFinal = await getAsistenciaList(id);
+    res.json({
+      encuentro: {
+        ...updated,
+        dateTime: updated.dateTime instanceof Date ? updated.dateTime.toISOString() : String(updated.dateTime),
+        createdAt: updated.createdAt instanceof Date ? updated.createdAt.toISOString() : String(updated.createdAt),
+      },
+      asistencia: asistenciaFinal,
     });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -583,20 +679,29 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
     const asistencia = await getAsistenciaList(encuentroId);
     const confirmados = asistencia.filter((a) => a.status === "confirmed");
 
-    const idDeDeporte = sportId ? Number(sportId) : 1;
-    const sizePorEquipo = teamSize ? Number(teamSize) : (idDeDeporte === 2 ? 5 : 2);
+    const [encuentroDb] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+
+    // Deportes: 1 = Pádel, 2 = Tenis, 3 = Fútbol
+    const idDeDeporte = sportId ? Number(sportId) : (encuentroDb?.sportId ? Number(encuentroDb.sportId) : 1);
+    const isFootball = idDeDeporte === 3;
+    const sizePorEquipo = teamSize ? Number(teamSize) : (isFootball ? 5 : 2);
+    const minJugadores = sizePorEquipo * 2;
+
     const modalityRows = await db
       .select()
       .from(sportModalitiesTable)
       .where(eq(sportModalitiesTable.sportId, idDeDeporte));
-    const modality = modalityId
+
+    let modality = modalityId
       ? modalityRows.find((row) => row.id === Number(modalityId))
       : modalityRows.find((row) => row.teamSize === sizePorEquipo && row.active);
-    if (!modality) {
-      res.status(400).json({ message: "No existe una modalidad válida para el deporte seleccionado." });
-      return;
+
+    if (!modality && modalityRows.length > 0) {
+      modality = modalityRows[0];
     }
-    const minJugadores = sizePorEquipo * 2;
 
     if (confirmados.length < minJugadores) {
       res.status(400).json({

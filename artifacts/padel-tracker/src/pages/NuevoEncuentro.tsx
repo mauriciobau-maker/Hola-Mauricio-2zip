@@ -8,9 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, CalendarDays, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, isValid } from "date-fns";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { cn } from "@/lib/utils";
 
 const TRANSLATIONS = {
   es: {
@@ -87,12 +88,50 @@ export function NuevoEncuentro() {
     format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm")
   );
   const [location, setLocation] = useState("");
-  const [maxSpots, setMaxSpots] = useState<string>("");
+  const [maxSpots, setMaxSpots] = useState<string>("4");
   const [durationMinutes, setDurationMinutes] = useState<string>("90");
   const [courtsAvailable, setCourtsAvailable] = useState<string>("1");
   const [notes, setNotes] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [sports, setSports] = useState<Array<{ id: number; name: string; slug: string; teamSize: number }>>([]);
+  const [selectedSportId, setSelectedSportId] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      if (saved) return Number(saved);
+    }
+    return 1;
+  });
+  const [formato, setFormato] = useState<string>("americana");
+
+  useEffect(() => {
+    fetch("/api/sports", { credentials: "include" })
+      .then((r) => r.json())
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setSports(list);
+          const saved = typeof window !== "undefined" ? localStorage.getItem("selected_sport_id") : null;
+          if (saved && list.some((s: any) => s.id === Number(saved))) {
+            setSelectedSportId(Number(saved));
+          } else if (list.length > 0) {
+            setSelectedSportId(list[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSelectSport = (sp: { id: number; name: string; slug: string }) => {
+    setSelectedSportId(sp.id);
+    if (sp.slug === "futbol") {
+      setMaxSpots("10");
+      setFormato("parejas_fijas");
+    } else {
+      if (maxSpots === "10") setMaxSpots("4");
+      setFormato("americana");
+    }
+  };
 
   if (!user) {
     return (
@@ -135,9 +174,11 @@ export function NuevoEncuentro() {
           title: title.trim(),
           dateTime: isoDateTime,
           location: location.trim(),
-          maxSpots: maxSpots ? parseInt(maxSpots, 10) : undefined,
+          maxSpots: maxSpots ? parseInt(maxSpots, 10) : 4,
           durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
           courtsAvailable: courtsAvailable ? parseInt(courtsAvailable, 10) : 1,
+          sportId: selectedSportId,
+          formato,
           notes: notes.trim() || undefined,
           playerIds: selectedPlayers.size > 0 ? Array.from(selectedPlayers).map(Number) : undefined,
         } as any,
@@ -176,6 +217,32 @@ export function NuevoEncuentro() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {sports.length > 0 && (
+          <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Deporte del Encuentro
+            </Label>
+            <div className="flex gap-2 flex-wrap pt-1">
+              {sports.map((sp) => (
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => handleSelectSport(sp)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5",
+                    selectedSportId === sp.id
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                  )}
+                >
+                  <span>{sp.slug === "futbol" ? "⚽" : "🎾"}</span>
+                  <span>{sp.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label htmlFor="title">{t.fieldTitle}</Label>
           <Input
@@ -211,7 +278,12 @@ export function NuevoEncuentro() {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="maxSpots">{t.fieldMaxSpots}</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="maxSpots">{t.fieldMaxSpots}</Label>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {selectedSportId === 3 ? "10 para F5" : "4 para dobles"}
+              </span>
+            </div>
             <Input
               id="maxSpots"
               type="number"
@@ -219,6 +291,7 @@ export function NuevoEncuentro() {
               value={maxSpots}
               onChange={(e) => setMaxSpots(e.target.value)}
               placeholder="4"
+              required
             />
           </div>
           <div className="space-y-1.5">

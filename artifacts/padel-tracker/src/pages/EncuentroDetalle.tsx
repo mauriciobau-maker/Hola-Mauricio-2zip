@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   CalendarDays, MapPin, Users, Check, X, Clock,
-  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle, Crown, RotateCcw, Info, Printer
+  Trash2, ArrowLeft, Shuffle, Plus, Minus, ExternalLink, Swords, MessageCircle, Send, CheckSquare, Square, AlertCircle, Crown, RotateCcw, Info, Printer, Pencil
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { format } from "date-fns";
@@ -17,6 +17,9 @@ import { useLanguage, Language } from "@/context/LanguageContext";
 import { ParrynAssistant } from "@/components/ParrynAssistant";
 import { Bot, Sparkles, ShieldCheck } from "lucide-react";
 import { PrintFixtureModal } from "@/components/PrintFixtureModal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const LOCALES = {
   es: es,
@@ -319,8 +322,12 @@ interface EncuentroDetailsData {
     location: string;
     notes?: string;
     estado?: "abierto" | "en_curso" | "finalizado";
-    maxSpots?: number;
-    organizerId?: number;
+    maxSpots?: number | null;
+    organizerId?: number | string;
+    sportId?: number | null;
+    courtsAvailable?: number | null;
+    durationMinutes?: number | null;
+    formato?: string | null;
   };
   asistencia: AsistenciaEntry[];
 }
@@ -376,6 +383,17 @@ export function EncuentroDetalle() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  // Estado para la edición de parámetros del encuentro (organizador)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDateTime, setEditDateTime] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editMaxSpots, setEditMaxSpots] = useState("");
+  const [editCourts, setEditCourts] = useState("1");
+  const [editSportId, setEditSportId] = useState<number | null>(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [savingEncuentro, setSavingEncuentro] = useState(false);
+
   // Estado para la edición de resultados por sets
   const [editingMatchId, setEditingMatchId] = useState<number | null>(null);
   const [editSets, setEditSets] = useState<SetScore[]>([{ team1: 0, team2: 0 }]);
@@ -413,6 +431,21 @@ export function EncuentroDetalle() {
     return Array.from(map.entries()).sort(([a], [b]) => a - b);
   }, [matches]);
 
+  // Sincronizar parámetros del encuentro (deporte, canchas asignadas, formato)
+  useEffect(() => {
+    if (data?.encuentro) {
+      if (data.encuentro.sportId) {
+        setSelectedSportId(data.encuentro.sportId);
+      }
+      if (data.encuentro.courtsAvailable) {
+        setCanchas(data.encuentro.courtsAvailable);
+      }
+      if (data.encuentro.formato) {
+        setFormato(data.encuentro.formato as any);
+      }
+    }
+  }, [data?.encuentro?.id, data?.encuentro?.sportId, data?.encuentro?.courtsAvailable, data?.encuentro?.formato]);
+
   useEffect(() => {
     if (confirmedCount >= 4) {
       const recCanchas = Math.max(1, Math.floor(confirmedCount / 4));
@@ -438,7 +471,13 @@ export function EncuentroDetalle() {
       .then((r) => r.json())
       .then((resData: Sport[]) => {
         setSports(resData);
-        if (resData.length > 0) setSelectedSportId(resData[0].id);
+        setSelectedSportId((prev) => {
+          if (prev) return prev;
+          if (data?.encuentro?.sportId) return data.encuentro.sportId;
+          const saved = typeof window !== "undefined" ? localStorage.getItem("selected_sport_id") : null;
+          if (saved && resData.some((s) => s.id === Number(saved))) return Number(saved);
+          return resData.length > 0 ? resData[0].id : null;
+        });
       })
       .catch((err) => console.error("Error al cargar deportes:", err));
   }, [id]);
@@ -491,6 +530,56 @@ export function EncuentroDetalle() {
     await queryClient.invalidateQueries({ queryKey: [`/api/encuentros/${id}`] });
     await queryClient.invalidateQueries({ queryKey: [`/encuentros/${id}`] });
     await queryClient.invalidateQueries({ queryKey: ["/api/encuentros"] });
+  };
+
+  const handleOpenEditModal = () => {
+    if (!encuentro) return;
+    setEditTitle(encuentro.title || "");
+    try {
+      const dt = new Date(encuentro.dateTime);
+      setEditDateTime(format(dt, "yyyy-MM-dd'T'HH:mm"));
+    } catch {
+      setEditDateTime("");
+    }
+    setEditLocation(encuentro.location || "");
+    setEditMaxSpots(encuentro.maxSpots ? String(encuentro.maxSpots) : "4");
+    setEditCourts(encuentro.courtsAvailable ? String(encuentro.courtsAvailable) : "1");
+    setEditSportId(encuentro.sportId || selectedSportId || (sports[0]?.id ?? 1));
+    setEditNotes(encuentro.notes || "");
+    setShowEditModal(true);
+  };
+
+  const handleSaveEncuentro = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEncuentro(true);
+    setRsvpError(null);
+    try {
+      const res = await fetch(`/api/encuentros/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          dateTime: editDateTime ? new Date(editDateTime).toISOString() : undefined,
+          location: editLocation.trim(),
+          maxSpots: editMaxSpots ? parseInt(editMaxSpots, 10) : null,
+          courtsAvailable: editCourts ? parseInt(editCourts, 10) : 1,
+          sportId: editSportId ? Number(editSportId) : undefined,
+          notes: editNotes.trim() || undefined,
+        }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setRsvpError(resData.message || "Error al actualizar el encuentro");
+      } else {
+        setShowEditModal(false);
+        await refreshEncuentroData();
+      }
+    } catch {
+      setRsvpError("Error de conexión al guardar los cambios del encuentro");
+    } finally {
+      setSavingEncuentro(false);
+    }
   };
 
   async function handleRsvp(status: "confirmed" | "declined" | "pending" | "waitlist") {
@@ -886,6 +975,12 @@ export function EncuentroDetalle() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold truncate">{encuentro.title}</h1>
+            {sports.find((s) => s.id === (encuentro.sportId || selectedSportId)) && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/20">
+                {sports.find((s) => s.id === (encuentro.sportId || selectedSportId))?.slug === "futbol" ? "⚽" : "🎾"}{" "}
+                {sports.find((s) => s.id === (encuentro.sportId || selectedSportId))?.name}
+              </span>
+            )}
             {encuentro.estado && (
               <span
                 className={cn(
@@ -925,6 +1020,11 @@ export function EncuentroDetalle() {
               <span className="flex items-center gap-1.5">
                 <Users className="h-4 w-4" />
                 {t.maxPlayers(encuentro.maxSpots)}
+              </span>
+            )}
+            {encuentro.courtsAvailable && (
+              <span className="flex items-center gap-1.5">
+                🏟️ {encuentro.courtsAvailable} {encuentro.courtsAvailable === 1 ? "pista" : "pistas"}
               </span>
             )}
           </div>
@@ -996,14 +1096,27 @@ export function EncuentroDetalle() {
         </div>
 
         {isOrganizer && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            className="text-destructive hover:text-destructive shrink-0"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenEditModal}
+              className="text-xs h-8 border-border hover:bg-muted gap-1.5 font-medium"
+              title="Editar parámetros del encuentro"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              className="text-destructive hover:text-destructive h-8 w-8"
+              title="Eliminar encuentro"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1047,7 +1160,7 @@ export function EncuentroDetalle() {
             </div>
           </CardContent>
         </Card>
-      ) : user && !user.playerId ? (
+      ) : user && !user.playerId && !isOrganizer ? (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="py-3 px-4 text-sm text-amber-400">
             {t.linkAccountMsg}{" "}
@@ -1573,6 +1686,14 @@ export function EncuentroDetalle() {
                 </div>
               </div>
 
+              {rsvpError && (
+                <div className="p-3 bg-red-500/15 border border-red-500/40 rounded-xl text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                  <span className="flex-1 font-medium">{rsvpError}</span>
+                  <button onClick={() => setRsvpError(null)} className="hover:underline font-bold px-1">✕</button>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-2 pt-1">
                 <Button
                   onClick={handlePreviewMatches}
@@ -1954,6 +2075,159 @@ export function EncuentroDetalle() {
           <div className="text-center py-8 text-muted-foreground text-sm">
             <Swords size={24} className="mx-auto mb-2 opacity-30" />
             <p>{t.noMatchesYet}</p>
+          </div>
+        )}
+
+        {/* Modal de Edición de Parámetros del Encuentro */}
+        {showEditModal && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <Pencil size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base">Editar Encuentro</h3>
+                    <p className="text-xs text-muted-foreground">Modifica cupos, pistas, deporte o detalles generales</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 rounded-lg hover:bg-muted"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEncuentro} className="space-y-4">
+                {sports.length > 0 && (
+                  <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Deporte
+                    </Label>
+                    <div className="flex gap-2 flex-wrap pt-1">
+                      {sports.map((sp) => (
+                        <button
+                          key={sp.id}
+                          type="button"
+                          onClick={() => setEditSportId(sp.id)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5",
+                            editSportId === sp.id
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                              : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                          )}
+                        >
+                          <span>{sp.slug === "futbol" ? "⚽" : "🎾"}</span>
+                          <span>{sp.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-title" className="text-xs font-medium">Título del encuentro</Label>
+                  <Input
+                    id="edit-title"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-datetime" className="text-xs font-medium">Fecha y hora</Label>
+                  <Input
+                    id="edit-datetime"
+                    type="datetime-local"
+                    value={editDateTime}
+                    onChange={(e) => setEditDateTime(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-location" className="text-xs font-medium">Ubicación / Pista</Label>
+                  <Input
+                    id="edit-location"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-maxspots" className="text-xs font-medium">Cupo Máximo</Label>
+                      <span className="text-[10px] text-muted-foreground">Plazas fijas</span>
+                    </div>
+                    <Input
+                      id="edit-maxspots"
+                      type="number"
+                      min={1}
+                      value={editMaxSpots}
+                      onChange={(e) => setEditMaxSpots(e.target.value)}
+                      placeholder="4"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      💡 El exceso pasará automáticamente a Reserva.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-courts" className="text-xs font-medium">Pistas Asignadas</Label>
+                      <span className="text-[10px] text-muted-foreground">Canchas</span>
+                    </div>
+                    <Input
+                      id="edit-courts"
+                      type="number"
+                      min={1}
+                      value={editCourts}
+                      onChange={(e) => setEditCourts(e.target.value)}
+                      placeholder="1"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Determina cuántos partidos simultáneos se jugarán.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-notes" className="text-xs font-medium">Notas adicionales (opcional)</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Instrucciones, indumentaria, etc."
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 text-xs"
+                    disabled={savingEncuentro}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-primary text-primary-foreground text-xs font-semibold"
+                    disabled={savingEncuentro || !editTitle.trim() || !editLocation.trim()}
+                  >
+                    {savingEncuentro ? "Guardando..." : "Guardar Cambios"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
