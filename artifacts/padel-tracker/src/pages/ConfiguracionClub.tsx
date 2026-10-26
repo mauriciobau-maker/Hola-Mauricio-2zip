@@ -14,6 +14,10 @@ import {
   Loader2,
   ArrowLeft,
   ExternalLink,
+  Camera,
+  Upload,
+  Trash2,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +89,58 @@ export default function ConfiguracionClub() {
       title: "Copiado al portapapeles",
       description: "Listo para compartir con tus jugadores por WhatsApp.",
     });
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Archivo no válido",
+        description: "Por favor selecciona un archivo de imagen (JPG, PNG o WebP).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setLogoUrl(compressedDataUrl);
+          toast({
+            title: "Escudo o foto cargada",
+            description: "Imagen lista. Haz clic en 'Guardar Cambios' para aplicarla.",
+          });
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -239,19 +295,88 @@ export default function ConfiguracionClub() {
               />
             </div>
 
-            {/* URL del Logotipo */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">Foto o Enlace del Logotipo (URL)</label>
-              <Input
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://ejemplo.com/mifoto.png"
-                className="h-10 text-foreground font-medium"
-              />
-              <span className="text-[11px] text-foreground/80 block font-medium">
-                Pega la URL de la imagen de tu club o escudo.
-              </span>
+            {/* Foto o Escudo del Club */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                <span>Escudo / Logotipo del Club</span>
+                <span className="text-[11px] font-normal text-muted-foreground">JPG, PNG o WebP</span>
+              </label>
+
+              <div className="flex items-center gap-4 p-3 bg-muted/30 border border-border/80 rounded-xl">
+                {/* Vista previa */}
+                <div className="relative group shrink-0">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={clubName || "Escudo"}
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-primary/50 shadow-sm bg-background"
+                      onError={() => {}}
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center text-primary">
+                      <Building2 className="w-7 h-7 opacity-70" />
+                    </div>
+                  )}
+                  <label
+                    className="absolute -bottom-1 -right-1 p-1 bg-primary text-primary-foreground rounded-full shadow cursor-pointer hover:opacity-90 transition-opacity"
+                    title="Seleccionar foto"
+                  >
+                    <Camera size={12} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Acciones de subida */}
+                <div className="flex-1 space-y-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary cursor-pointer transition-colors shadow-xs">
+                      <Upload size={13} />
+                      <span>Subir desde dispositivo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setLogoUrl("")}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-medium text-destructive transition-colors cursor-pointer"
+                        title="Quitar escudo"
+                      >
+                        <Trash2 size={12} />
+                        <span>Quitar</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    Sube el escudo desde tu teléfono o computador.
+                  </p>
+                </div>
+              </div>
+
+              {/* Opción de pegar URL directa */}
+              <div className="space-y-1 pt-1">
+                <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                  <ImageIcon size={11} />
+                  <span>O pega una URL de imagen:</span>
+                </label>
+                <Input
+                  type="url"
+                  value={logoUrl.startsWith("data:") ? "" : logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/mifoto.png"
+                  className="h-8 text-xs text-foreground font-medium"
+                />
+              </div>
             </div>
           </div>
 
