@@ -420,36 +420,34 @@ router.post(
           restParsedData.elo;
       }
 
-      if (
-        restParsedData.phone !==
-        undefined
-      ) {
-        insertValues.phone =
-          restParsedData.phone;
+      const phoneVal = restParsedData.phone ?? bodyData.phone;
+      if (phoneVal !== undefined) {
+        insertValues.phone = typeof phoneVal === "string" && phoneVal.trim() ? phoneVal.trim() : null;
       }
 
-      if (
-        restParsedData.waId !==
-        undefined
-      ) {
-        insertValues.waId =
-          restParsedData.waId;
+      const waIdVal = restParsedData.waId ?? bodyData.waId;
+      if (waIdVal !== undefined) {
+        insertValues.waId = typeof waIdVal === "string" && waIdVal.trim() ? waIdVal.trim() : null;
       }
 
-      if (
-        restParsedData.wspConsent !==
-        undefined
-      ) {
-        insertValues.wspConsent =
-          restParsedData.wspConsent;
+      const wspVal = restParsedData.wspConsent ?? bodyData.wspConsent;
+      if (wspVal !== undefined) {
+        insertValues.wspConsent = Boolean(wspVal);
       }
 
-      if (
-        restParsedData.language !==
-        undefined
-      ) {
-        insertValues.language =
-          restParsedData.language;
+      const langVal = restParsedData.language ?? bodyData.language;
+      if (langVal !== undefined) {
+        insertValues.language = langVal;
+      }
+
+      const domHandVal = restParsedData.dominantHand ?? bodyData.dominantHand;
+      if (domHandVal !== undefined) {
+        insertValues.dominantHand = typeof domHandVal === "string" && domHandVal.trim() ? domHandVal.trim() : null;
+      }
+
+      const courtSideVal = restParsedData.courtSide ?? bodyData.courtSide;
+      if (courtSideVal !== undefined) {
+        insertValues.courtSide = typeof courtSideVal === "string" && courtSideVal.trim() ? courtSideVal.trim() : null;
       }
 
       const [player] =

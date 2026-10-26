@@ -13,6 +13,8 @@ import {
   Globe,
   Tag,
   Building2,
+  Activity,
+  Trophy,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useLanguage } from "@/context/LanguageContext";
@@ -31,21 +33,34 @@ const labels: Record<string, Record<string, string>> = {
     phone: "Teléfono",
     waId: "WhatsApp ID / Usuario",
     consent:
-      "Autoriza el envío de notificantes y confirmación de partidos por WhatsApp.",
+      "Autoriza el envío de notificaciones y confirmación de partidos por WhatsApp.",
     submit: "Crear Jugador",
     creating: "Creando...",
     errorMsg: "Error al crear el jugador. Intenta de nuevo.",
     errorNameRequired: "El nombre es obligatorio.",
     courtPosition: "Posición en Cancha",
+    courtPositionFootball: "Posición en Cancha (Fútbol)",
     drive: "Drive (Derecha)",
     backhand: "Revés (Izquierda)",
     bothSides: "Ambos Lados",
     dominantHand: "Mano Hábil",
     rightHanded: "Diestro",
     leftHanded: "Zurdo",
+    dominantFoot: "Pie Hábil",
+    rightFooted: "Derecho",
+    leftFooted: "Zurdo",
+    ambidextrous: "Ambidiestro",
+    posForward: "Delantero / Atacante",
+    posMidfielder: "Mediocampista / Volante",
+    posDefender: "Defensa / Zaguero",
+    posGoalkeeper: "Arquero / Portero",
+    posVersatile: "Polifuncional / Rotativo",
     clubCodeLabel: "Código de Club",
     placeholderName: "Ej: Carlos López",
     placeholderNickname: "Ej: El Rayo",
+    placeholderNicknameFootball: "Ej: El Tanque o El Rayo",
+    placeholderWaPadel: "Ej: @carlos_padel",
+    placeholderWaFootball: "Ej: +56912345678 o @jugador",
   },
   en: {
     title: "New Player",
@@ -65,15 +80,28 @@ const labels: Record<string, Record<string, string>> = {
     errorMsg: "Error creating player. Please try again.",
     errorNameRequired: "Name is required.",
     courtPosition: "Court Position",
+    courtPositionFootball: "Position on Field (Soccer)",
     drive: "Drive (Right)",
     backhand: "Backhand (Left)",
     bothSides: "Both Sides",
     dominantHand: "Dominant Hand",
     rightHanded: "Right-handed",
     leftHanded: "Left-handed",
+    dominantFoot: "Preferred Foot",
+    rightFooted: "Right",
+    leftFooted: "Left",
+    ambidextrous: "Ambidextrous",
+    posForward: "Forward / Striker",
+    posMidfielder: "Midfielder",
+    posDefender: "Defender",
+    posGoalkeeper: "Goalkeeper",
+    posVersatile: "Utility / Versatile",
     clubCodeLabel: "Club Code",
     placeholderName: "e.g. Charlie Smith",
     placeholderNickname: "e.g. Lightning",
+    placeholderNicknameFootball: "e.g. The Striker",
+    placeholderWaPadel: "e.g. @charlie_padel",
+    placeholderWaFootball: "e.g. +1234567890 or @player",
   },
   pt: {
     title: "Novo Jogador",
@@ -93,15 +121,28 @@ const labels: Record<string, Record<string, string>> = {
     errorMsg: "Erro ao criar jogador. Tente novamente.",
     errorNameRequired: "O nome é obrigatório.",
     courtPosition: "Posição em Quadra",
+    courtPositionFootball: "Posição em Campo (Futebol)",
     drive: "Drive (Direita)",
     backhand: "Revés (Esquerda)",
     bothSides: "Ambos os Lados",
     dominantHand: "Mão Hábil",
     rightHanded: "Destro",
     leftHanded: "Canhoto",
+    dominantFoot: "Pé Hábil",
+    rightFooted: "Destro",
+    leftFooted: "Canhoto",
+    ambidextrous: "Ambidestro",
+    posForward: "Atacante",
+    posMidfielder: "Meio-campista / Volante",
+    posDefender: "Zagueiro / Defensor",
+    posGoalkeeper: "Goleiro",
+    posVersatile: "Polivalente",
     clubCodeLabel: "Código do Clube",
     placeholderName: "Ex: Carlos Silva",
     placeholderNickname: "Ex: O Raio",
+    placeholderNicknameFootball: "Ex: O Artilheiro",
+    placeholderWaPadel: "Ex: @carlos_padel",
+    placeholderWaFootball: "Ex: +5511999999999 ou @jogador",
   },
 };
 
@@ -114,12 +155,84 @@ export default function NuevoJugador() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
+  // Detección de Club y Deporte Activo
+  const [club, setClub] = useState<any>(null);
+  const [selectedSportId, setSelectedSportId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("selected_sport_id");
+      return saved ? Number(saved) : null;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setClub(d);
+          if (!selectedSportId && d.sports?.length > 0) {
+            const savedSportId = localStorage.getItem("selected_sport_id");
+            const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+            setSelectedSportId(found ? found.id : d.sports[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+
+    const handleSportChange = (e?: any) => {
+      const id =
+        e?.detail ??
+        (localStorage.getItem("selected_sport_id")
+          ? Number(localStorage.getItem("selected_sport_id"))
+          : null);
+      if (id) setSelectedSportId(id);
+    };
+
+    window.addEventListener("sport_changed", handleSportChange);
+    return () => window.removeEventListener("sport_changed", handleSportChange);
+  }, []);
+
+  const activeSport =
+    club?.sports?.find((s: any) => s.id === selectedSportId) ||
+    club?.sports?.[0];
+
+  const isFootball = Boolean(
+    selectedSportId === 3 ||
+      activeSport?.slug === "futbol" ||
+      activeSport?.name?.toLowerCase().includes("fútbol") ||
+      activeSport?.name?.toLowerCase().includes("futbol") ||
+      club?.isFootball ||
+      (club?.sports?.length === 1 &&
+        (club.sports[0].slug === "futbol" ||
+          club.sports[0].name?.toLowerCase().includes("fútbol")))
+  );
+
   // Datos básicos del jugador
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [courtSide, setCourtSide] = useState<string>("ambos");
-  const [dominantHand, setDominantHand] = useState<string>("diestro");
+  const [courtSide, setCourtSide] = useState<string>(isFootball ? "Delantero" : "ambos");
+  const [dominantHand, setDominantHand] = useState<string>(isFootball ? "derecho" : "diestro");
   const [error, setError] = useState("");
+
+  // Sincronizar posición y mano/pie por defecto según el deporte activo
+  useEffect(() => {
+    if (isFootball) {
+      if (["ambos", "drive", "reves"].includes(courtSide)) {
+        setCourtSide("Delantero");
+      }
+      if (dominantHand === "diestro") {
+        setDominantHand("derecho");
+      }
+    } else {
+      if (["Delantero", "Mediocampista", "Defensa", "Arquero", "Polifuncional"].includes(courtSide)) {
+        setCourtSide("ambos");
+      }
+      if (dominantHand === "derecho") {
+        setDominantHand("diestro");
+      }
+    }
+  }, [isFootball]);
 
   const { language: activeAppLanguage } = useLanguage();
 
@@ -143,7 +256,7 @@ export default function NuevoJugador() {
 
   // Código de club (para Super Admin cuando crea desde el panel global)
   const [clubCode, setClubCode] = useState("");
-  const isSuperAdmin = true; // Control de rol para mostrar el campo de club
+  const isSuperAdmin = true;
 
   // Textos traducidos dinámicamente según la app activa
   const t = labels[activeAppLanguage] || labels.es;
@@ -215,13 +328,24 @@ export default function NuevoJugador() {
         >
           <ArrowLeft size={18} />
         </Link>
-        <div>
-          <h1 className="text-xl font-bold">{t.title}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold">{t.title}</h1>
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                isFootball
+                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                  : "bg-primary/15 text-primary border border-primary/30"
+              }`}
+            >
+              {isFootball ? "⚽ Fútbol" : "🎾 Pádel"}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center">
             <User size={28} className="text-primary" />
@@ -256,41 +380,81 @@ export default function NuevoJugador() {
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder={t.placeholderNickname || "Ej: El Rayo"}
+              placeholder={
+                isFootball
+                  ? t.placeholderNicknameFootball || "Ej: El Tanque o El Rayo"
+                  : t.placeholderNickname || "Ej: El Rayo"
+              }
               className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
             />
           </div>
 
-          {/* Posición en Pista y Mano Hábil */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
-                {t.courtPosition}
-              </label>
-              <select
-                value={courtSide}
-                onChange={(e) => setCourtSide(e.target.value)}
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="drive">{t.drive}</option>
-                <option value="reves">{t.backhand}</option>
-                <option value="ambos">{t.bothSides}</option>
-              </select>
+          {/* Posición en Cancha y Mano / Pie Hábil */}
+          {isFootball ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Activity size={14} className="text-emerald-500" />
+                  <span>{t.courtPositionFootball || "Posición en Cancha"}</span>
+                </label>
+                <select
+                  value={courtSide}
+                  onChange={(e) => setCourtSide(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-medium text-foreground"
+                >
+                  <option value="Delantero">{t.posForward || "Delantero / Atacante"}</option>
+                  <option value="Mediocampista">{t.posMidfielder || "Mediocampista / Volante"}</option>
+                  <option value="Defensa">{t.posDefender || "Defensa / Zaguero"}</option>
+                  <option value="Arquero">{t.posGoalkeeper || "Arquero / Portero"}</option>
+                  <option value="Polifuncional">{t.posVersatile || "Polifuncional"}</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <span>{t.dominantFoot || "Pie Hábil"}</span>
+                </label>
+                <select
+                  value={dominantHand}
+                  onChange={(e) => setDominantHand(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-medium text-foreground"
+                >
+                  <option value="derecho">{t.rightFooted || "Derecho"}</option>
+                  <option value="zurdo">{t.leftFooted || "Zurdo"}</option>
+                  <option value="ambidiestro">{t.ambidextrous || "Ambidiestro"}</option>
+                </select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
-                {t.dominantHand}
-              </label>
-              <select
-                value={dominantHand}
-                onChange={(e) => setDominantHand(e.target.value)}
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="diestro">{t.rightHanded}</option>
-                <option value="zurdo">{t.leftHanded}</option>
-              </select>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  {t.courtPosition}
+                </label>
+                <select
+                  value={courtSide}
+                  onChange={(e) => setCourtSide(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-medium text-foreground"
+                >
+                  <option value="drive">{t.drive}</option>
+                  <option value="reves">{t.backhand}</option>
+                  <option value="ambos">{t.bothSides}</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  {t.dominantHand}
+                </label>
+                <select
+                  value={dominantHand}
+                  onChange={(e) => setDominantHand(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-medium text-foreground"
+                >
+                  <option value="diestro">{t.rightHanded}</option>
+                  <option value="zurdo">{t.leftHanded}</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Selector de Categorías / Deportes */}
           {availableCategories.length > 0 && (
@@ -397,7 +561,11 @@ export default function NuevoJugador() {
                 type="text"
                 value={waId}
                 onChange={(e) => setWaId(e.target.value)}
-                placeholder="Ej: @carlos_padel"
+                placeholder={
+                  isFootball
+                    ? t.placeholderWaFootball || "Ej: +56912345678 o @jugador"
+                    : t.placeholderWaPadel || "Ej: @carlos_padel"
+                }
                 className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
               />
             </div>
@@ -425,7 +593,7 @@ export default function NuevoJugador() {
           <button
             type="submit"
             disabled={createMutation.isPending || !name.trim()}
-            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2 shadow"
           >
             {createMutation.isPending ? t.creating : t.submit}
           </button>

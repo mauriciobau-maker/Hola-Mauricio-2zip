@@ -160,7 +160,9 @@ export default function Jugadores() {
                     <p className="font-semibold text-sm truncate">{player.name}</p>
                     {player.nickname && <p className="text-[11px] text-muted-foreground uppercase tracking-wide">&quot;{player.nickname}&quot;</p>}
                     {isFootball && (
-                      <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">
+                        {player.courtSide && <span className="text-emerald-400 font-semibold">{player.courtSide} · </span>}
+                        {player.dominantHand && <span>Pie {player.dominantHand === "derecho" || player.dominantHand === "diestro" ? "Derecho" : player.dominantHand === "zurdo" ? "Zurdo" : player.dominantHand === "ambidiestro" ? "Ambidiestro" : player.dominantHand} · </span>}
                         {player.wins ?? 0}PG · {player.draws ?? 0}PE · {player.losses ?? 0}PP · Dif: {diff > 0 ? `+${diff}` : diff}
                       </p>
                     )}

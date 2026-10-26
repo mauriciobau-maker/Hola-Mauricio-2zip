@@ -14,16 +14,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isProduction = process.env.NODE_ENV === "production";
-const PORT = isProduction ? (Number(process.env.PORT) || 3000) : 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 async function startServer() {
-  try {
-    await seedSports();
-    logger.info("Sports table initialized");
-  } catch (err: any) {
-    logger.warn({ msg: err?.message }, "Sports seed skipped (database offline or unconfigured)");
-  }
-
   if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -54,6 +47,14 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server listening on http://0.0.0.0:${PORT}`);
+    // Non-blocking initialization so the server is immediately accessible
+    seedSports()
+      .then(() => {
+        logger.info("Sports table initialized");
+      })
+      .catch((err: any) => {
+        logger.warn({ msg: err?.message }, "Sports seed skipped (database offline or unconfigured)");
+      });
   });
 }
 

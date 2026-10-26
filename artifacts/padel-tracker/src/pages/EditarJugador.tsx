@@ -448,22 +448,38 @@ export default function EditarJugador() {
 
           {/* Posición / Mano según deporte */}
           {isFootball ? (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <Activity size={14} className="text-muted-foreground" />
-                <span>Posición en Cancha (Fútbol)</span>
-              </label>
-              <select
-                value={courtSide}
-                onChange={(e) => setCourtSide(e.target.value)}
-                className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
-              >
-                <option value="Delantero">Delantero / Atacante</option>
-                <option value="Mediocampista">Mediocampista / Volante</option>
-                <option value="Defensa">Defensa / Zaguero</option>
-                <option value="Arquero">Arquero / Guardameta</option>
-                <option value="Polifuncional">Polifuncional / Rotativo</option>
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Activity size={14} className="text-emerald-500" />
+                  <span>Posición en Cancha</span>
+                </label>
+                <select
+                  value={courtSide}
+                  onChange={(e) => setCourtSide(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-medium"
+                >
+                  <option value="Delantero">Delantero / Atacante</option>
+                  <option value="Mediocampista">Mediocampista / Volante</option>
+                  <option value="Defensa">Defensa / Zaguero</option>
+                  <option value="Arquero">Arquero / Portero</option>
+                  <option value="Polifuncional">Polifuncional</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <span>Pie Hábil</span>
+                </label>
+                <select
+                  value={dominantHand}
+                  onChange={(e) => setDominantHand(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-medium"
+                >
+                  <option value="derecho">Derecho</option>
+                  <option value="zurdo">Zurdo</option>
+                  <option value="ambidiestro">Ambidiestro</option>
+                </select>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -603,7 +619,7 @@ export default function EditarJugador() {
                 type="text"
                 value={waId}
                 onChange={(e) => setWaId(e.target.value)}
-                placeholder="Ej: @carlos_padel"
+                placeholder={isFootball ? "Ej: +56912345678 o @jugador" : "Ej: @carlos_padel"}
                 className="w-full bg-background border border-input rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
               />
             </div>

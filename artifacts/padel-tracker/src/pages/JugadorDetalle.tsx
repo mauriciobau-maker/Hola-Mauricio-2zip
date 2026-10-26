@@ -221,6 +221,15 @@ export default function JugadorDetalle() {
                 </span>
               </div>
             )}
+            {isFootball && (player.courtSide || player.dominantHand) && (
+              <div className="flex items-center gap-1 bg-muted/40 px-2.5 py-1 rounded-md border border-border/40">
+                <Activity size={12} className="text-emerald-400" />
+                <span>
+                  {player.courtSide ? `${player.courtSide}` : "Polifuncional"}
+                  {player.dominantHand ? ` • Pie ${player.dominantHand === "derecho" || player.dominantHand === "diestro" ? "Derecho" : player.dominantHand === "zurdo" ? "Zurdo" : player.dominantHand === "ambidiestro" ? "Ambidiestro" : player.dominantHand}` : ""}
+                </span>
+              </div>
+            )}
             {Array.isArray(player.categories) && player.categories.map((c: any) => (
               <span key={c.id} className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full text-[11px] font-semibold">
                 {c.name}

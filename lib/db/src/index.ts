@@ -13,6 +13,7 @@ export const pool = new Pool({
   ssl: connectionString?.includes("sslmode=require") || connectionString?.includes("neon.tech") || connectionString?.includes("render.com")
     ? { rejectUnauthorized: false }
     : undefined,
+  connectionTimeoutMillis: 5000,
 });
 
 export const db = drizzle(pool, { schema });
