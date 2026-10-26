@@ -933,9 +933,6 @@ router.post(
     // ----------------------------------------------------------
     // Reglas de Seguridad Fair Play: Validación Cruzada
     // ----------------------------------------------------------
-    const user = req.user as any;
-    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
-
     if (!isStaff) {
       const userPlayerId = user?.playerId;
       if (!userPlayerId) {
