@@ -284,7 +284,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     ? "bg-primary/20 text-primary border border-primary/40 font-bold"
                     : "text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border/80"
                 )}
-                title="Personalizar mi club, colores y foto"
+                title={language === "en" ? "Customize my club, branding and colors" : language === "pt" ? "Personalizar meu clube, cores e foto" : "Personalizar mi club, colores y foto"}
               >
                 <Building2 size={13} className="text-primary" />
                 <span>{t("myClub")}</span>
@@ -322,7 +322,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 href="/landing"
                 className="text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 transition-colors flex items-center gap-1 shrink-0 ml-1"
-                title="Página comercial de presentación para captación de clubes"
+                title={language === "en" ? "Public club showcase page" : language === "pt" ? "Página comercial de apresentação" : "Página comercial de presentación para captación de clubes"}
               >
                 <span>{t("publicLanding")}</span>
               </Link>
@@ -335,7 +335,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="md:hidden border-t border-border bg-background px-4 py-3 flex flex-col gap-2 shadow-lg">
             {activeSports.length > 1 && (
               <div className="p-2 bg-muted/40 rounded-lg border border-border space-y-1 mb-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Deporte Activo</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  {language === "en" ? "Active Sport" : language === "pt" ? "Esporte Ativo" : "Deporte Activo"}
+                </span>
                 <div className="grid grid-cols-3 gap-1">
                   {activeSports.map((s: any) => {
                     const isSelected = currentSport?.id === s.id;
@@ -353,7 +355,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         <span>{icon}</span>
-                        <span className="truncate">{s.name}</span>
+                        <span className="truncate">{formatSportName(s.name, language)}</span>
                       </button>
                     );
                   })}

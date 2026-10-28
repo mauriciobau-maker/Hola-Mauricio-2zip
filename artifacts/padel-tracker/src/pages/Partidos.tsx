@@ -134,7 +134,7 @@ export default function Partidos() {
                   selectedSport === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Todos
+                {language === "en" ? "All" : "Todos"}
               </button>
               {club.sports.map((s: any) => {
                 const isFut = s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol");
@@ -149,7 +149,7 @@ export default function Partidos() {
                     )}
                   >
                     <span>{isFut ? "⚽" : "🎾"}</span>
-                    <span>{s.name}</span>
+                    <span>{formatSportName(s.name, language)}</span>
                   </button>
                 );
               })}
@@ -177,11 +177,17 @@ export default function Partidos() {
           </div>
           <div>
             <p className="font-semibold">
-              {selectedSport === "futbol" ? "Sin partidos de fútbol registrados" : t("partidos.noMatches")}
+              {selectedSport === "futbol"
+                ? (language === "en" ? "No football matches recorded yet" : language === "pt" ? "Nenhuma partida de futebol registrada" : "Sin partidos de fútbol registrados")
+                : t("partidos.noMatches")}
             </p>
             <p className="text-sm text-muted-foreground">
               {selectedSport === "futbol"
-                ? "Registra el primer partido de fútbol (amistoso interno o contra un rival externo) para calcular la tabla de posiciones."
+                ? (language === "en"
+                    ? "Record the first football match (internal friendly or against an external rival) to calculate standings."
+                    : language === "pt"
+                    ? "Registre a primeira partida de futebol (amistoso interno ou contra rival externo) para calcular a classificação."
+                    : "Registra el primer partido de fútbol (amistoso interno o contra un rival externo) para calcular la tabla de posiciones.")
                 : t("partidos.noMatchesDesc")}
             </p>
           </div>
@@ -234,7 +240,7 @@ export default function Partidos() {
                   )}
                   {isRival && (
                     <span className="text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full border border-purple-500/20">
-                      vs Rival
+                      vs {language === "en" ? "Opponent" : "Rival"}
                     </span>
                   )}
                 </div>
@@ -251,13 +257,19 @@ export default function Partidos() {
                           {team1Won ? t("partidos.winnerBadge") : isDraw ? t("partidos.drawBadge") : t("partidos.loserBadge")}
                         </span>
                         <p className="text-sm font-medium truncate">
-                          {isRival && <span className="text-xs font-semibold text-primary mr-1">[Nuestro Club]</span>}
+                          {isRival && (
+                            <span className="text-xs font-semibold text-primary mr-1">
+                              [{language === "en" ? "Our Club" : language === "pt" ? "Nosso Clube" : "Nuestro Club"}]
+                            </span>
+                          )}
                           {team1Players.map((p) => p.name).join(" / ") || "—"}
                         </p>
                       </div>
                       {team1Substitutes.length > 0 && (
                         <p className="text-[11px] text-muted-foreground truncate pl-6 mt-0.5">
-                          <span className="font-semibold text-muted-foreground/80">Banca:</span> {team1Substitutes.map((s) => s.name).join(", ")}
+                          <span className="font-semibold text-muted-foreground/80">
+                            {language === "en" ? "Bench:" : language === "pt" ? "Banco:" : "Banca:"}
+                          </span> {team1Substitutes.map((s) => s.name).join(", ")}
                         </p>
                       )}
                     </div>
@@ -274,7 +286,7 @@ export default function Partidos() {
                         <p className="text-sm font-medium truncate">
                           {isRival ? (
                             <span className="font-semibold text-foreground">
-                              🛡️ {m.rivalTeamName || "Equipo Rival"}
+                              🛡️ {m.rivalTeamName || (language === "en" ? "Opponent Team" : language === "pt" ? "Time Rival" : "Equipo Rival")}
                             </span>
                           ) : (
                             team2Players.map((p) => p.name).join(" / ") || "—"
@@ -283,7 +295,9 @@ export default function Partidos() {
                       </div>
                       {!isRival && team2Substitutes.length > 0 && (
                         <p className="text-[11px] text-muted-foreground truncate pl-6 mt-0.5">
-                          <span className="font-semibold text-muted-foreground/80">Banca:</span> {team2Substitutes.map((s) => s.name).join(", ")}
+                          <span className="font-semibold text-muted-foreground/80">
+                            {language === "en" ? "Bench:" : language === "pt" ? "Banco:" : "Banca:"}
+                          </span> {team2Substitutes.map((s) => s.name).join(", ")}
                         </p>
                       )}
                     </div>
@@ -302,7 +316,7 @@ export default function Partidos() {
                         </span>
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {sets && sets.length > 0 ? "sets" : "goles"}
+                        {sets && sets.length > 0 ? "sets" : (language === "en" ? "goals" : language === "pt" ? "gols" : "goles")}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -310,7 +324,7 @@ export default function Partidos() {
                         <Link
                           href={`/partidos/${m.id}/editar`}
                           className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                          title="Editar marcador del partido"
+                          title={language === "en" ? "Edit match score" : language === "pt" ? "Editar placar do jogo" : "Editar marcador del partido"}
                         >
                           <Pencil size={14} />
                         </Link>
@@ -320,7 +334,7 @@ export default function Partidos() {
                           onClick={() => handleDelete(m.id)}
                           className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                           disabled={deleteMutation.isPending}
-                          title="Eliminar partido (Solo Administrador)"
+                          title={language === "en" ? "Delete match (Admin only)" : language === "pt" ? "Excluir partida (Apenas Admin)" : "Eliminar partido (Solo Administrador)"}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -359,19 +373,19 @@ export default function Partidos() {
                     return (
                       <div className="mt-2.5 pt-2.5 border-t border-border flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <span className="font-semibold text-muted-foreground flex items-center gap-1">
-                          ⚽ Puntos de Liga:
+                          ⚽ {language === "en" ? "League Points:" : language === "pt" ? "Pontos da Liga:" : "Puntos de Liga:"}
                         </span>
                         {isDraw ? (
                           <span className="bg-yellow-500/15 text-yellow-400 font-semibold px-2 py-0.5 rounded text-[11px]">
-                            +1 pto cada equipo (Empate)
+                            {language === "en" ? "+1 pt each (Draw)" : language === "pt" ? "+1 pt cada equipe (Empate)" : "+1 pto cada equipo (Empate)"}
                           </span>
                         ) : isT1Win ? (
                           <span className="bg-green-500/15 text-green-400 font-semibold px-2 py-0.5 rounded text-[11px]">
-                            +3 pts {m.matchType === "rival" ? "Nuestro Club" : "Equipo 1"} (Victoria) · 0 pts {m.matchType === "rival" ? (m.rivalTeamName || "Rival") : "Equipo 2"}
+                            +3 pts {m.matchType === "rival" ? (language === "en" ? "Our Club" : language === "pt" ? "Nosso Clube" : "Nuestro Club") : (language === "en" ? "Team 1" : language === "pt" ? "Time 1" : "Equipo 1")} ({language === "en" ? "Win" : language === "pt" ? "Vitória" : "Victoria"}) · 0 pts {m.matchType === "rival" ? (m.rivalTeamName || (language === "en" ? "Opponent" : "Rival")) : (language === "en" ? "Team 2" : language === "pt" ? "Time 2" : "Equipo 2")}
                           </span>
                         ) : isT2Win ? (
                           <span className="bg-green-500/15 text-green-400 font-semibold px-2 py-0.5 rounded text-[11px]">
-                            +3 pts {m.matchType === "rival" ? (m.rivalTeamName || "Rival") : "Equipo 2"} · 0 pts {m.matchType === "rival" ? "Nuestro Club" : "Equipo 1"}
+                            +3 pts {m.matchType === "rival" ? (m.rivalTeamName || (language === "en" ? "Opponent" : "Rival")) : (language === "en" ? "Team 2" : language === "pt" ? "Time 2" : "Equipo 2")} · 0 pts {m.matchType === "rival" ? (language === "en" ? "Our Club" : language === "pt" ? "Nosso Clube" : "Nuestro Club") : (language === "en" ? "Team 1" : language === "pt" ? "Time 1" : "Equipo 1")}
                           </span>
                         ) : null}
                       </div>
@@ -401,7 +415,11 @@ export default function Partidos() {
                         ⚖️ Fair Play:
                       </span>
                       <span className="text-muted-foreground ml-1">
-                        {m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para validar los puntos en la tabla de posiciones.
+                        {language === "en"
+                          ? `${m.submittedByPlayerName ? `Proposed by ${m.submittedByPlayerName}.` : "Proposed score."} Requires opponent or admin confirmation to update official standings.`
+                          : language === "pt"
+                          ? `${m.submittedByPlayerName ? `Proposto por ${m.submittedByPlayerName}.` : "Placar proposto."} Requer confirmação do adversário ou administrador para validar os pontos na tabela.`
+                          : `${m.submittedByPlayerName ? `Propuesto por ${m.submittedByPlayerName}.` : "Marcador propuesto."} Requiere confirmación del rival o del administrador para validar los puntos en la tabla de posiciones.`}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -419,10 +437,10 @@ export default function Partidos() {
                           return (
                             <button
                               onClick={() => handleConfirmMatch(m.id)}
-                              className="px-2.5 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium flex items-center gap-1"
+                              className="px-2.5 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium flex items-center gap-1 cursor-pointer"
                             >
                               <ShieldCheck size={13} />
-                              {t("adminApprove") || "Aprobar como Admin"}
+                              {language === "en" ? "Approve as Admin" : language === "pt" ? "Aprovar como Admin" : "Aprobar como Admin"}
                             </button>
                           );
                         }
@@ -431,18 +449,18 @@ export default function Partidos() {
                           return (
                             <button
                               onClick={() => handleConfirmMatch(m.id)}
-                              className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium flex items-center gap-1"
+                              className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium flex items-center gap-1 cursor-pointer"
                             >
                               <Check size={13} />
-                              {t("approveResult") || "Aprobar como Rival"}
+                              {language === "en" ? "Confirm as Opponent" : language === "pt" ? "Confirmar como Adversário" : "Aprobar como Rival"}
                             </button>
                           );
                         }
 
                         if (userInT1 || userInT2) {
                           return (
-                            <span className="text-[11px] text-amber-500">
-                              {t("partidos.waitingRival")}
+                            <span className="text-[11px] text-amber-500 font-medium">
+                              {language === "en" ? "Waiting for opponent confirmation..." : language === "pt" ? "Aguardando confirmação do adversário..." : t("partidos.waitingRival")}
                             </span>
                           );
                         }

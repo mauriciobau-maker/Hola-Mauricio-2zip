@@ -247,20 +247,24 @@ export function SecretarioParryn() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Secretaría Deportiva
+              {t("dashboard.secretaryTitle")}
             </h1>
             <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-md">
-              Asistencia Operativa
+              {language === "en" ? "Operations Assistance" : language === "pt" ? "Assistência Operacional" : "Asistencia Operativa"}
             </span>
           </div>
           <p className="text-muted-foreground text-sm mt-1">
-            Gestión de convocatorias, asignación de pistas y monitoreo meteorológico del club.
+            {language === "en"
+              ? "Match call-ups, court allocation, and live club weather monitoring."
+              : language === "pt"
+              ? "Gestão de convocações, alocação de quadras e monitoramento meteorológico do clube."
+              : "Gestión de convocatorias, asignación de pistas y monitoreo meteorológico del club."}
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
           <span className="flex items-center gap-1.5 bg-muted/50 border border-border px-3 py-1.5 rounded-lg font-medium">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
-            Convocatorias WhatsApp & Clima
+            {language === "en" ? "WhatsApp Call-ups & Weather" : language === "pt" ? "Convocações WhatsApp & Clima" : "Convocatorias WhatsApp & Clima"}
           </span>
         </div>
       </div>
@@ -432,7 +436,11 @@ export function SecretarioParryn() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
                   isFutbolClub
-                    ? "Escribe a Parryn (ej: 'Convoca para fútbol 7 este viernes con 14 cupos')..."
+                    ? (language === "en"
+                        ? "Message Parryn (e.g., 'Call up for 7-a-side football this Friday with 14 spots')..."
+                        : language === "pt"
+                        ? "Escreva para Parryn (ex: 'Convocar para futebol 7 nesta sexta com 14 vagas')..."
+                        : "Escribe a Parryn (ej: 'Convoca para fútbol 7 este viernes con 14 cupos')...")
                     : t("parryn.chatPlaceholder")
                 }
                 className="flex-1"
@@ -550,7 +558,11 @@ export function SecretarioParryn() {
             </CardTitle>
             <CardDescription>
               {isFutbolClub
-                ? "Optimiza la distribución de canchas de fútbol, horarios de pichangas y contingencia climática."
+                ? (language === "en"
+                  ? "Optimize football pitch allocation, match schedules, and weather contingency."
+                  : language === "pt"
+                  ? "Otimize a distribuição de quadras, horários e planos para chuva."
+                  : "Optimiza la distribución de canchas de fútbol, horarios de pichangas y contingencia climática.")
                 : t("parryn.courtDesc")}
             </CardDescription>
           </CardHeader>
@@ -558,7 +570,9 @@ export function SecretarioParryn() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">
-                  {isFutbolClub ? "Canchas Techadas / Sintéticas" : t("parryn.coveredCourts")}
+                  {isFutbolClub
+                    ? (language === "en" ? "Covered / Turf Pitches" : language === "pt" ? "Quadras Cobertas / Sintéticas" : "Canchas Techadas / Sintéticas")
+                    : t("parryn.coveredCourts")}
                 </label>
                 <Input
                   type="number"
@@ -569,7 +583,9 @@ export function SecretarioParryn() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">
-                  {isFutbolClub ? "Canchas al Aire Libre" : t("parryn.openCourts")}
+                  {isFutbolClub
+                    ? (language === "en" ? "Outdoor Pitches" : language === "pt" ? "Quadras Descobertas" : "Canchas al Aire Libre")
+                    : t("parryn.openCourts")}
                 </label>
                 <Input
                   type="number"
@@ -597,10 +613,18 @@ export function SecretarioParryn() {
                   <span className="text-base">{weatherData.icon}</span>
                   <div>
                     <span className="font-semibold text-foreground">
-                      Clima detectado en {weatherData.city}: {weatherData.temperature}°C, {weatherData.condition}
+                      {language === "en"
+                        ? `Weather detected in ${weatherData.city}: ${weatherData.temperature}°C, ${weatherData.condition}`
+                        : language === "pt"
+                        ? `Clima detectado em ${weatherData.city}: ${weatherData.temperature}°C, ${weatherData.condition}`
+                        : `Clima detectado en ${weatherData.city}: ${weatherData.temperature}°C, ${weatherData.condition}`}
                     </span>
                     <span className="text-muted-foreground ml-2">
-                      (Prob. lluvia máx: {weatherData.maxRainNextHours}%, Viento: {weatherData.windSpeed} km/h)
+                      ({language === "en"
+                        ? `Max rain prob: ${weatherData.maxRainNextHours}%, Wind: ${weatherData.windSpeed} km/h`
+                        : language === "pt"
+                        ? `Prob. chuva máx: ${weatherData.maxRainNextHours}%, Vento: ${weatherData.windSpeed} km/h`
+                        : `Prob. lluvia máx: ${weatherData.maxRainNextHours}%, Viento: ${weatherData.windSpeed} km/h`})
                     </span>
                   </div>
                 </div>
@@ -609,7 +633,7 @@ export function SecretarioParryn() {
                   onClick={() => setActiveTab("clima")}
                   className="text-primary hover:underline font-semibold text-[11px] cursor-pointer"
                 >
-                  Ver pronóstico completo →
+                  {language === "en" ? "View full weather forecast →" : language === "pt" ? "Ver previsão completa →" : "Ver pronóstico completo →"}
                 </button>
               </div>
             )}
@@ -640,11 +664,19 @@ export function SecretarioParryn() {
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <CloudRain className="w-5 h-5 text-blue-500" />
-                  Pronóstico Meteorológico y Alertas Deportivas
+                  {language === "en"
+                    ? "Weather Forecast & Sports Alerts"
+                    : language === "pt"
+                    ? "Previsão Meteorológica e Alertas Esportivos"
+                    : "Pronóstico Meteorológico y Alertas Deportivas"}
                 </CardTitle>
                 <CardDescription>
                   {weatherData
-                    ? `Monitoreo meteorológico en tiempo real para ${weatherData.city}, ${weatherData.country}`
+                    ? (language === "en"
+                        ? `Real-time weather monitoring for ${weatherData.city}, ${weatherData.country}`
+                        : language === "pt"
+                        ? `Monitoramento meteorológico em tempo real para ${weatherData.city}, ${weatherData.country}`
+                        : `Monitoreo meteorológico en tiempo real para ${weatherData.city}, ${weatherData.country}`)
                     : t("parryn.weatherDesc")}
                 </CardDescription>
               </div>
@@ -655,7 +687,9 @@ export function SecretarioParryn() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/50 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer w-fit"
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", loadingWeather && "animate-spin text-primary")} />
-                {loadingWeather ? "Actualizando..." : "Actualizar Clima"}
+                {loadingWeather
+                  ? (language === "en" ? "Updating..." : language === "pt" ? "Atualizando..." : "Actualizando...")
+                  : (language === "en" ? "Update Weather" : language === "pt" ? "Atualizar Clima" : "Actualizar Clima")}
               </button>
             </div>
           </CardHeader>
@@ -673,7 +707,7 @@ export function SecretarioParryn() {
                         <div className="text-4xl font-black text-foreground mt-1 flex items-baseline gap-1">
                           {weatherData.temperature}°C
                           <span className="text-xs font-medium text-muted-foreground">
-                            / Sens. {weatherData.apparentTemperature}°C
+                            / {language === "en" ? "Feels like" : "Sens."} {weatherData.apparentTemperature}°C
                           </span>
                         </div>
                       </div>
@@ -689,47 +723,55 @@ export function SecretarioParryn() {
                     <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
                         <CloudRain className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Prob. Lluvia</span>
+                        <span>{language === "en" ? "Rain Prob." : language === "pt" ? "Prob. Chuva" : "Prob. Lluvia"}</span>
                       </div>
                       <div className="text-xl font-bold text-foreground mt-2">
                         {weatherData.maxRainNextHours}%
                       </div>
-                      <span className="text-[10px] text-muted-foreground">próximas horas</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {language === "en" ? "next hours" : language === "pt" ? "próximas horas" : "próximas horas"}
+                      </span>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
                         <Wind className="w-3.5 h-3.5 text-teal-500" />
-                        <span>Viento</span>
+                        <span>{language === "en" ? "Wind" : language === "pt" ? "Vento" : "Viento"}</span>
                       </div>
                       <div className="text-xl font-bold text-foreground mt-2">
                         {weatherData.windSpeed} <span className="text-xs font-normal">km/h</span>
                       </div>
                       <span className="text-[10px] text-muted-foreground">
-                        {weatherData.windSpeed > 25 ? "Viento moderado" : "Viento calmo"}
+                        {weatherData.windSpeed > 25
+                          ? (language === "en" ? "Moderate wind" : language === "pt" ? "Vento moderado" : "Viento moderado")
+                          : (language === "en" ? "Calm wind" : language === "pt" ? "Vento calmo" : "Viento calmo")}
                       </span>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
                         <Droplets className="w-3.5 h-3.5 text-cyan-500" />
-                        <span>Humedad</span>
+                        <span>{language === "en" ? "Humidity" : language === "pt" ? "Umidade" : "Humedad"}</span>
                       </div>
                       <div className="text-xl font-bold text-foreground mt-2">
                         {weatherData.humidity}%
                       </div>
-                      <span className="text-[10px] text-muted-foreground">relativa</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {language === "en" ? "relative" : language === "pt" ? "relativa" : "relativa"}
+                      </span>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
                         <Thermometer className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Precipitación</span>
+                        <span>{language === "en" ? "Precipitation" : language === "pt" ? "Precipitação" : "Precipitación"}</span>
                       </div>
                       <div className="text-xl font-bold text-foreground mt-2">
                         {weatherData.precipitationMm} <span className="text-xs font-normal">mm</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">acumulada hoy</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {language === "en" ? "accumulated today" : language === "pt" ? "acumulada hoje" : "acumulada hoy"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -756,7 +798,11 @@ export function SecretarioParryn() {
                       )}
                       <div>
                         <span className="text-xs font-black uppercase tracking-wider">
-                          Semáforo Deportivo Parryn:
+                          {language === "en"
+                            ? "Parryn Sports Status:"
+                            : language === "pt"
+                            ? "Semáforo Esportivo Parryn:"
+                            : "Semáforo Deportivo Parryn:"}
                         </span>
                         <h4 className="text-base font-extrabold">
                           {weatherData.sportSuitability.badge}
@@ -769,12 +815,20 @@ export function SecretarioParryn() {
                       onClick={() => {
                         setActiveTab("chat");
                         setQuery(
-                          `Redacta un aviso de WhatsApp para los socios sobre las condiciones climáticas de hoy (${weatherData.condition}, ${weatherData.temperature}°C, prob. lluvia ${weatherData.maxRainNextHours}%) informando la asignación de canchas.`
+                          language === "en"
+                            ? `Draft a WhatsApp notification for players regarding today's weather conditions (${weatherData.condition}, ${weatherData.temperature}°C, rain prob ${weatherData.maxRainNextHours}%) informing pitch assignment.`
+                            : language === "pt"
+                            ? `Redija um aviso de WhatsApp para os membros sobre as condições de hoje (${weatherData.condition}, ${weatherData.temperature}°C, prob. chuva ${weatherData.maxRainNextHours}%) informando a distribuição de quadras.`
+                            : `Redacta un aviso de WhatsApp para los socios sobre las condiciones climáticas de hoy (${weatherData.condition}, ${weatherData.temperature}°C, prob. lluvia ${weatherData.maxRainNextHours}%) informando la asignación de canchas.`
                         );
                       }}
                       className="px-3.5 py-1.5 rounded-xl bg-background/80 hover:bg-background border border-current text-xs font-bold transition-all shadow-xs cursor-pointer w-fit"
                     >
-                      💬 Redactar Aviso WhatsApp con Parryn
+                      {language === "en"
+                        ? "💬 Draft WhatsApp Notice with Parryn"
+                        : language === "pt"
+                        ? "💬 Redigir Aviso WhatsApp com Parryn"
+                        : "💬 Redactar Aviso WhatsApp con Parryn"}
                     </button>
                   </div>
 
@@ -787,7 +841,7 @@ export function SecretarioParryn() {
                 {(weatherData.hourly ?? []).length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Evolución Próximas Horas
+                      {language === "en" ? "Hourly Evolution" : language === "pt" ? "Evolução Próximas Horas" : "Evolución Próximas Horas"}
                     </h4>
                     <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 overflow-x-auto pb-1">
                       {weatherData.hourly.map((h: any, idx: number) => (
@@ -818,7 +872,7 @@ export function SecretarioParryn() {
                 {(weatherData.daily ?? []).length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Pronóstico Próximos 3 Días
+                      {language === "en" ? "3-Day Forecast" : language === "pt" ? "Previsão Próximos 3 Dias" : "Pronóstico Próximos 3 Días"}
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {weatherData.daily.map((d: any, idx: number) => (
@@ -850,7 +904,11 @@ export function SecretarioParryn() {
             ) : (
               <div className="p-8 text-center text-sm text-foreground/80 font-medium">
                 <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin text-primary" />
-                Obteniendo pronóstico meteorológico en tiempo real...
+                {language === "en"
+                  ? "Fetching real-time weather forecast..."
+                  : language === "pt"
+                  ? "Obtendo previsão meteorológica em tempo real..."
+                  : "Obteniendo pronóstico meteorológico en tiempo real..."}
               </div>
             )}
 

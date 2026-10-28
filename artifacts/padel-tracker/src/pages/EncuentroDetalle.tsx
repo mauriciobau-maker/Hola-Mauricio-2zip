@@ -1218,11 +1218,17 @@ export function EncuentroDetalle() {
           </div>
           <div className="text-xs space-y-1">
             <p className="font-semibold text-foreground flex items-center gap-1.5">
-              👑 Modo Organizador del Encuentro
-              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">Tú eres el creador</span>
+              👑 {lang === "en" ? "Event Organizer Mode" : lang === "pt" ? "Modo Organizador do Encontro" : "Modo Organizador del Encuentro"}
+              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">
+                {lang === "en" ? "You are the creator" : lang === "pt" ? "Você é o criador" : "Tú eres el creador"}
+              </span>
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              Como creador de este evento, tienes la facultad de gestionar la asistencia de todos los jugadores (confirmar o dar de baja si te avisan por WhatsApp) y generar los cruces de partidos. Los jugadores invitados solo pueden responder por su propia cuenta.
+              {lang === "en"
+                ? "As the creator of this event, you can manage attendance for all players (confirm or decline on their behalf if they notify via WhatsApp) and generate match fixtures. Invited players can only respond for themselves."
+                : lang === "pt"
+                ? "Como criador deste evento, você pode gerenciar a presença de todos os jogadores (confirmar ou cancelar se avisarem por WhatsApp) e gerar os confrontos. Convidados só podem responder por si mesmos."
+                : "Como creador de este evento, tienes la facultad de gestionar la asistencia de todos los jugadores (confirmar o dar de baja si te avisan por WhatsApp) y generar los cruces de partidos. Los jugadores invitados solo pueden responder por su propia cuenta."}
             </p>
           </div>
         </div>
@@ -1460,15 +1466,19 @@ export function EncuentroDetalle() {
                 <div>
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <Shuffle className="w-4 h-4 text-primary" />
-                    Configurar Fixture y Generar Partidos
+                    {lang === "en" ? "Configure Fixture & Generate Matches" : lang === "pt" ? "Configurar Chaveamento e Gerar Partidas" : "Configurar Fixture y Generar Partidos"}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Define la modalidad, pistas disponibles y cantidad de rondas a disputar.
+                    {lang === "en"
+                      ? "Define game format, available courts, and number of rounds to play."
+                      : lang === "pt"
+                      ? "Defina o formato de jogo, quadras disponíveis e quantidade de rodadas."
+                      : "Define la modalidad, pistas disponibles y cantidad de rondas a disputar."}
                   </p>
                 </div>
                 {matches.length > 0 && (
                   <span className="text-[11px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
-                    ⚠️ Reemplazará los partidos existentes
+                    ⚠️ {lang === "en" ? "Will replace existing matches" : lang === "pt" ? "Substituirá as partidas existentes" : "Reemplazará los partidos existentes"}
                   </span>
                 )}
               </div>
@@ -1477,7 +1487,7 @@ export function EncuentroDetalle() {
               {/* Formato */}
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  1. Formato de Juego
+                  {lang === "en" ? "1. Game Format" : lang === "pt" ? "1. Formato de Jogo" : "1. Formato de Juego"}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
@@ -1491,10 +1501,14 @@ export function EncuentroDetalle() {
                     )}
                   >
                     <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
-                      🎾 Americana (Rotación)
+                      🎾 {lang === "en" ? "Americano (Rotation)" : lang === "pt" ? "Americano (Rotação)" : "Americana (Rotación)"}
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Individual: rotas de compañero y rivales en cada ronda sumando puntos.
+                      {lang === "en"
+                        ? "Individual: rotate partners and opponents each round while accumulating points."
+                        : lang === "pt"
+                        ? "Individual: alterne parceiros e adversários a cada rodada acumulando pontos."
+                        : "Individual: rotas de compañero y rivales en cada ronda sumando puntos."}
                     </p>
                   </button>
 
@@ -1509,10 +1523,14 @@ export function EncuentroDetalle() {
                     )}
                   >
                     <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
-                      👥 Parejas Fijas (Liguilla)
+                      👥 {lang === "en" ? "Fixed Pairs (Round Robin)" : lang === "pt" ? "Duplas Fixas (Torneio)" : "Parejas Fijas (Liguilla)"}
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Parejas estables balanceadas por Elo jugando todos contra todos.
+                      {lang === "en"
+                        ? "Stable pairs balanced by Elo playing round-robin against all other pairs."
+                        : lang === "pt"
+                        ? "Duplas fixas equilibradas por Elo jogando todas contra todas."
+                        : "Parejas estables balanceadas por Elo jugando todos contra todos."}
                     </p>
                   </button>
 
@@ -1530,10 +1548,14 @@ export function EncuentroDetalle() {
                     )}
                   >
                     <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
-                      ⚡ Desafío (1 Partido)
+                      ⚡ {lang === "en" ? "Challenge (1 Match)" : lang === "pt" ? "Desafio (1 Partida)" : "Desafío (1 Partido)"}
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      1 solo partido competitivo por cada pista disponible.
+                      {lang === "en"
+                        ? "1 single competitive match per available court."
+                        : lang === "pt"
+                        ? "1 única partida competitiva por quadra disponível."
+                        : "1 solo partido competitivo por cada pista disponible."}
                     </p>
                   </button>
                 </div>
@@ -1544,9 +1566,11 @@ export function EncuentroDetalle() {
                 {/* Canchas */}
                 <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold">2. Pistas / Canchas Disponibles</span>
+                    <span className="text-xs font-semibold">
+                      {lang === "en" ? "2. Available Courts" : lang === "pt" ? "2. Quadras Disponíveis" : "2. Pistas / Canchas Disponibles"}
+                    </span>
                     <span className="text-xs text-muted-foreground font-mono">
-                      Máx. {Math.max(1, Math.floor(confirmedCount / 4))}
+                      {lang === "en" ? "Max" : "Máx."} {Math.max(1, Math.floor(confirmedCount / 4))}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1561,7 +1585,7 @@ export function EncuentroDetalle() {
                       <Minus size={14} />
                     </Button>
                     <span className="font-bold text-sm min-w-16 text-center tabular-nums">
-                      {canchas} {canchas === 1 ? "Pista" : "Pistas"}
+                      {canchas} {canchas === 1 ? (lang === "en" ? "Court" : lang === "pt" ? "Quadra" : "Pista") : (lang === "en" ? "Courts" : lang === "pt" ? "Quadras" : "Pistas")}
                     </span>
                     <Button
                       type="button"
@@ -1579,12 +1603,14 @@ export function EncuentroDetalle() {
                     </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {canchas * 4} jugadores en simultáneo •{" "}
+                    {canchas * 4} {lang === "en" ? "players active" : lang === "pt" ? "jogadores em quadra" : "jugadores en simultáneo"} •{" "}
                     {Math.max(0, confirmedCount - canchas * 4) === 0 ? (
-                      <span className="text-emerald-500 font-medium">0 descansan</span>
+                      <span className="text-emerald-500 font-medium">
+                        {lang === "en" ? "0 resting" : lang === "pt" ? "0 descansam" : "0 descansan"}
+                      </span>
                     ) : (
                       <span className="text-amber-500 font-medium">
-                        {confirmedCount - canchas * 4} descansan por ronda (rotación)
+                        {confirmedCount - canchas * 4} {lang === "en" ? "resting per round (rotation)" : lang === "pt" ? "descansam por rodada (rotação)" : "descansan por ronda (rotación)"}
                       </span>
                     )}
                   </p>
@@ -1593,9 +1619,11 @@ export function EncuentroDetalle() {
                 {/* Rondas */}
                 <div className="space-y-1.5 bg-muted/20 p-3 rounded-xl border border-border/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold">3. Rondas a Disputar</span>
+                    <span className="text-xs font-semibold">
+                      {lang === "en" ? "3. Rounds to Play" : lang === "pt" ? "3. Rodadas a Disputar" : "3. Rondas a Disputar"}
+                    </span>
                     <span className="text-xs text-muted-foreground font-mono">
-                      {canchas * rondas} partidos tot.
+                      {canchas * rondas} {lang === "en" ? "matches tot." : lang === "pt" ? "jogos tot." : "partidos tot."}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1610,7 +1638,7 @@ export function EncuentroDetalle() {
                       <Minus size={14} />
                     </Button>
                     <span className="font-bold text-sm min-w-16 text-center tabular-nums">
-                      {rondas} {rondas === 1 ? "Ronda" : "Rondas"}
+                      {rondas} {rondas === 1 ? (lang === "en" ? "Round" : lang === "pt" ? "Rodada" : "Ronda") : (lang === "en" ? "Rounds" : lang === "pt" ? "Rodadas" : "Rondas")}
                     </span>
                     <Button
                       type="button"
@@ -1626,9 +1654,14 @@ export function EncuentroDetalle() {
                   {/* Presets rápidos */}
                   <div className="flex gap-1.5 flex-wrap pt-1">
                     {[
-                      { r: 3, label: "3 rondas (Recomendado)" },
-                      ...(confirmedCount >= 8 ? [{ r: 4, label: "4 rondas" }, { r: 7, label: "7 rondas (Completa)" }] : []),
-                      ...(confirmedCount === 5 ? [{ r: 5, label: "5 rondas (1 descanso c/u)" }] : []),
+                      { r: 3, label: lang === "en" ? "3 rounds (Recommended)" : lang === "pt" ? "3 rodadas (Recomendado)" : "3 rondas (Recomendado)" },
+                      ...(confirmedCount >= 8 ? [
+                        { r: 4, label: lang === "en" ? "4 rounds" : lang === "pt" ? "4 rodadas" : "4 rondas" },
+                        { r: 7, label: lang === "en" ? "7 rounds (Full)" : lang === "pt" ? "7 rodadas (Completa)" : "7 rondas (Completa)" }
+                      ] : []),
+                      ...(confirmedCount === 5 ? [
+                        { r: 5, label: lang === "en" ? "5 rounds (1 bye each)" : lang === "pt" ? "5 rodadas (1 descanso cada)" : "5 rondas (1 descanso c/u)" }
+                      ] : []),
                     ].map((preset) => (
                       <button
                         key={preset.r}
@@ -1652,7 +1685,7 @@ export function EncuentroDetalle() {
               {sports.length > 1 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Deporte
+                    {lang === "en" ? "Sport" : lang === "pt" ? "Esporte" : "Deporte"}
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {sports.map((sport) => (
@@ -1678,36 +1711,50 @@ export function EncuentroDetalle() {
               <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-primary">
                   <span className="flex items-center gap-1.5">
-                    <Info size={14} /> Planificación y División del Encuentro
+                    <Info size={14} /> {lang === "en" ? "Event Schedule & Breakdown" : lang === "pt" ? "Planejamento e Divisão do Encontro" : "Planificación y División del Encuentro"}
                   </span>
                   <span className="text-[11px] font-normal text-muted-foreground">
-                    {confirmedCount < 4 ? "Mínimo 4 jugadores" : "Paridad deportiva con Elo"}
+                    {confirmedCount < 4
+                      ? (lang === "en" ? "Minimum 4 players required" : lang === "pt" ? "Mínimo 4 jogadores" : "Mínimo 4 jugadores")
+                      : (lang === "en" ? "Elo-based balance" : lang === "pt" ? "Equilíbrio por Elo" : "Paridad deportiva con Elo")}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div className="bg-background/90 p-2 rounded-lg border">
-                    <span className="text-muted-foreground block text-[10px]">Jugadores</span>
-                    <span className="font-bold text-sm text-foreground">{confirmedCount} confirmados</span>
+                    <span className="text-muted-foreground block text-[10px]">{lang === "en" ? "Players" : lang === "pt" ? "Jogadores" : "Jugadores"}</span>
+                    <span className="font-bold text-sm text-foreground">
+                      {confirmedCount} {lang === "en" ? "confirmed" : lang === "pt" ? "confirmados" : "confirmados"}
+                    </span>
                   </div>
                   <div className="bg-background/90 p-2 rounded-lg border">
-                    <span className="text-muted-foreground block text-[10px]">Pistas simultáneas</span>
-                    <span className="font-bold text-sm text-foreground">{canchas} pista{canchas > 1 ? "s" : ""}</span>
+                    <span className="text-muted-foreground block text-[10px]">{lang === "en" ? "Courts" : lang === "pt" ? "Quadras simultâneas" : "Pistas simultáneas"}</span>
+                    <span className="font-bold text-sm text-foreground">
+                      {canchas} {canchas === 1 ? (lang === "en" ? "court" : lang === "pt" ? "quadra" : "pista") : (lang === "en" ? "courts" : lang === "pt" ? "quadras" : "pistas")}
+                    </span>
                   </div>
                   <div className="bg-background/90 p-2 rounded-lg border">
-                    <span className="text-muted-foreground block text-[10px]">Rondas de juego</span>
-                    <span className="font-bold text-sm text-foreground">{rondas} ronda{rondas > 1 ? "s" : ""}</span>
+                    <span className="text-muted-foreground block text-[10px]">{lang === "en" ? "Rounds" : lang === "pt" ? "Rodadas" : "Rondas de juego"}</span>
+                    <span className="font-bold text-sm text-foreground">
+                      {rondas} {rondas === 1 ? (lang === "en" ? "round" : lang === "pt" ? "rodada" : "ronda") : (lang === "en" ? "rounds" : lang === "pt" ? "rodadas" : "rondas")}
+                    </span>
                   </div>
                   <div className="bg-background/90 p-2 rounded-lg border">
-                    <span className="text-muted-foreground block text-[10px]">Total Partidos</span>
-                    <span className="font-bold text-sm text-primary">{canchas * rondas} partidos</span>
+                    <span className="text-muted-foreground block text-[10px]">{lang === "en" ? "Total Matches" : lang === "pt" ? "Total de Jogos" : "Total Partidos"}</span>
+                    <span className="font-bold text-sm text-primary">
+                      {canchas * rondas} {lang === "en" ? "matches" : lang === "pt" ? "partidas" : "partidos"}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
-                  <span>⏱️ Tiempo estimado: ~{rondas * 30} minutos</span>
+                  <span>⏱️ {lang === "en" ? `Estimated time: ~${rondas * 30} minutes` : lang === "pt" ? `Tempo estimado: ~${rondas * 30} minutos` : `Tiempo estimado: ~${rondas * 30} minutos`}</span>
                   <span>
                     {confirmedCount - canchas * 4 > 0
-                      ? `☕ ${confirmedCount - canchas * 4} jugador(es) descansan por ronda en rotación`
-                      : "✓ Todos los jugadores juegan simultáneamente"}
+                      ? (lang === "en"
+                          ? `☕ ${confirmedCount - canchas * 4} player(s) rest per round in rotation`
+                          : lang === "pt"
+                          ? `☕ ${confirmedCount - canchas * 4} jogador(es) descansam por rodada em rotação`
+                          : `☕ ${confirmedCount - canchas * 4} jugador(es) descansan por ronda en rotación`)
+                      : (lang === "en" ? "✓ All players play simultaneously" : lang === "pt" ? "✓ Todos os jogadores jogam simultaneamente" : "✓ Todos los jugadores juegan simultáneamente")}
                   </span>
                 </div>
               </div>
@@ -1728,7 +1775,9 @@ export function EncuentroDetalle() {
                   className="flex-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 text-xs font-semibold gap-1.5"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  {previewLoading ? "Calculando equilibrio..." : "Simular Cruces Equilibrados ✨"}
+                  {previewLoading
+                    ? (lang === "en" ? "Calculating balance..." : lang === "pt" ? "Calculando equilíbrio..." : "Calculando equilibrio...")
+                    : (lang === "en" ? "Simulate Balanced Fixture ✨" : lang === "pt" ? "Simular Chaveamento Equilibrado ✨" : "Simular Cruces Equilibrados ✨")}
                 </Button>
                 <Button
                   onClick={handleGenerateMatches}
@@ -1736,7 +1785,13 @@ export function EncuentroDetalle() {
                   className="flex-1 bg-primary text-primary-foreground text-xs font-semibold gap-1.5 hover:opacity-90"
                 >
                   <Swords size={13} />
-                  {generating ? "Generando..." : `⚔️ Generar ${canchas * rondas} Partidos Oficiales`}
+                  {generating
+                    ? (lang === "en" ? "Generating..." : lang === "pt" ? "Gerando..." : "Generando...")
+                    : (lang === "en"
+                        ? `⚔️ Generate ${canchas * rondas} Official Matches`
+                        : lang === "pt"
+                        ? `⚔️ Gerar ${canchas * rondas} Partidas Oficiais`
+                        : `⚔️ Generar ${canchas * rondas} Partidos Oficiales`)}
                 </Button>
                 <Button
                   variant="ghost"

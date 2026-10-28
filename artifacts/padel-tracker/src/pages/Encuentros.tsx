@@ -40,6 +40,13 @@ const TRANSLATIONS = {
     parrynPromptExample: '"Hazme una convocatoria para mañana a las 19:00 para 12 jugadores en 3 canchas en Star Padel"',
     parrynPromptSuffix: " y lo programará automáticamente con el mensaje para WhatsApp listo.",
     parrynButton: "Organizar con Parryn IA",
+    assistantBadge: "Asistente de Convocatorias",
+    assistantTitle: "¿Quieres programar un encuentro rápido por chat?",
+    assistantDesc: "Describe fecha, cupos y pistas (ej: \"Convocatoria para mañana a las 19:00 para 12 jugadores en 3 canchas\") y el asistente generará el evento y el mensaje listo para WhatsApp.",
+    assistantBtn: "Programar con Asistente",
+    tbdDate: "Fecha a confirmar",
+    tbdLocation: "Lugar a confirmar",
+    untitled: "Encuentro sin título",
   },
   en: {
     title: "Matches & Events",
@@ -57,6 +64,13 @@ const TRANSLATIONS = {
     parrynPromptExample: '"Create a match for tomorrow at 19:00 for 12 players across 3 courts at Star Padel"',
     parrynPromptSuffix: " and it will automatically schedule it with the WhatsApp message ready.",
     parrynButton: "Organize with Parryn AI",
+    assistantBadge: "AI Matchday Assistant",
+    assistantTitle: "Want to schedule a match quickly via chat?",
+    assistantDesc: "Specify date, spots, and courts (e.g., \"Match for tomorrow at 19:00 for 12 players across 3 courts\") and the assistant will create the event and ready-to-share WhatsApp message.",
+    assistantBtn: "Schedule with AI Assistant",
+    tbdDate: "Date to be confirmed",
+    tbdLocation: "Location to be confirmed",
+    untitled: "Untitled Match",
   },
   pt: {
     title: "Encontros",
@@ -74,6 +88,13 @@ const TRANSLATIONS = {
     parrynPromptExample: '"Crie uma convocatória para amanhã às 19:00 para 12 jogadores em 3 quadras no Star Padel"',
     parrynPromptSuffix: " e ele programará automaticamente com a mensagem para WhatsApp pronta.",
     parrynButton: "Organizar com Parryn IA",
+    assistantBadge: "Assistente de Convocatórias",
+    assistantTitle: "Quer agendar uma partida rápido pelo chat?",
+    assistantDesc: "Descreva data, vagas e quadras (ex: \"Convocatória para amanhã às 19:00 para 12 jogadores em 3 quadras\") e o assistente criará o evento e a mensagem pronta para WhatsApp.",
+    assistantBtn: "Agendar com Assistente",
+    tbdDate: "Data a confirmar",
+    tbdLocation: "Local a confirmar",
+    untitled: "Encontro sem título",
   },
 };
 
@@ -229,14 +250,14 @@ export function Encuentros() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="p-1 rounded-md bg-primary/10 text-primary font-semibold text-xs flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Asistente de Convocatorias
+                <Sparkles className="w-3.5 h-3.5" /> {t.assistantBadge}
               </span>
             </div>
             <h3 className="font-semibold text-sm sm:text-base text-foreground">
-              ¿Quieres programar un encuentro rápido por chat?
+              {t.assistantTitle}
             </h3>
             <p className="text-xs text-muted-foreground max-w-xl">
-              Describe fecha, cupos y pistas (ej: <em>"Convocatoria para mañana a las 19:00 para 12 jugadores en 3 canchas"</em>) y el asistente generará el evento y el mensaje listo para WhatsApp.
+              {t.assistantDesc}
             </p>
           </div>
           <Button
@@ -245,7 +266,7 @@ export function Encuentros() {
             className="shrink-0 font-semibold text-xs gap-1.5 shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Programar con Asistente
+            {t.assistantBtn}
           </Button>
         </div>
       </div>
@@ -326,7 +347,7 @@ function EncuentroCard({
         })
       : encuentro.dateTime
         ? String(encuentro.dateTime)
-        : "Fecha a confirmar";
+        : t.tbdDate;
 
   return (
     <Card

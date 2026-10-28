@@ -270,7 +270,7 @@ export default function Ranking() {
                           </div>
                           <div className="col-span-1 text-center">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-muted/60 border border-border text-foreground/80">
-                              {entry.category ?? "4ª Cat"}
+                              {entry.category ?? (language === "en" ? "4th Cat" : "4ª Cat")}
                             </span>
                           </div>
                           <div className="col-span-1 text-center">
@@ -316,9 +316,19 @@ export default function Ranking() {
               <div className="flex items-center gap-2">
                 <span className="text-lg">⚽</span>
                 <div>
-                  <h3 className="text-sm font-semibold">Sistema Tradicional de Puntuación de Fútbol (3-1-0)</h3>
+                  <h3 className="text-sm font-semibold">
+                    {language === "en"
+                      ? "Traditional Football Scoring System (3-1-0)"
+                      : language === "pt"
+                      ? "Sistema Tradicional de Pontuação de Futebol (3-1-0)"
+                      : "Sistema Tradicional de Puntuación de Fútbol (3-1-0)"}
+                  </h3>
                   <p className="text-xs text-muted-foreground">
-                    Cálculo oficial de puntos y posiciones para la nómina del club en partidos internos y contra rivales externos.
+                    {language === "en"
+                      ? "Official points and standings calculation for the club squad in internal and external matches."
+                      : language === "pt"
+                      ? "Cálculo oficial de pontos e classificação para o elenco do clube em jogos internos e contra rivais."
+                      : "Cálculo oficial de puntos y posiciones para la nómina del club en partidos internos y contra rivales externos."}
                   </p>
                 </div>
               </div>
@@ -326,37 +336,68 @@ export default function Ranking() {
                 <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
                   <span className="w-2.5 h-2.5 rounded-full bg-green-400 mt-1 flex-shrink-0" />
                   <div>
-                    <strong className="text-foreground block mb-0.5">Victoria (+3 PTS)</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Win (+3 PTS)" : language === "pt" ? "Vitória (+3 PTS)" : "Victoria (+3 PTS)"}
+                    </strong>
                     <span>
-                      Otorga 3 puntos a los jugadores convocados tanto en triunfos ante rivales externos como al equipo ganador en partidos internos.
+                      {language === "en"
+                        ? "Awards 3 points for official wins in both internal matches and against external opponents."
+                        : language === "pt"
+                        ? "Concede 3 pontos para vitórias em partidas internas e contra equipes adversárias."
+                        : "Otorga 3 puntos a los jugadores convocados tanto en triunfos ante rivales externos como al equipo ganador en partidos internos."}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
                   <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 mt-1 flex-shrink-0" />
                   <div>
-                    <strong className="text-foreground block mb-0.5">Empate (+1 PTO)</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Draw (+1 PT)" : language === "pt" ? "Empate (+1 PTO)" : "Empate (+1 PTO)"}
+                    </strong>
                     <span>
-                      Otorga 1 punto en empates oficiales, premiando la paridad deportiva en partidos internos y contra rivales externos.
+                      {language === "en"
+                        ? "Awards 1 point for official draws, rewarding sporting balance in all matches."
+                        : language === "pt"
+                        ? "Concede 1 ponto em empates oficiais, premiando o equilíbrio esportivo."
+                        : "Otorga 1 punto en empates oficiales, premiando la paridad deportiva en partidos internos y contra rivales externos."}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-400 mt-1 flex-shrink-0" />
                   <div>
-                    <strong className="text-foreground block mb-0.5">Derrota (0 PTS)</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Loss (0 PTS)" : language === "pt" ? "Derrota (0 PTS)" : "Derrota (0 PTS)"}
+                    </strong>
                     <span>
-                      0 puntos. Se contabilizan los goles a favor (GF), en contra (GC) y la diferencia de goles (DG) para el desempate.
+                      {language === "en"
+                        ? "0 points. Goals for (GF), goals against (GA), and goal difference (GD) are computed for tiebreakers."
+                        : language === "pt"
+                        ? "0 pontos. Gols pró (GP), gols contra (GC) e saldo de gols (SG) são computados para desempate."
+                        : "0 puntos. Se contabilizan los goles a favor (GF), en contra (GC) y la diferencia de goles (DG) para el desempate."}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="pt-2 text-xs text-muted-foreground border-t border-border/40 flex flex-wrap gap-x-5 gap-y-1.5">
-                <span><strong className="text-foreground">Criterios de Desempate:</strong> 1° Puntos (PTS)</span>
-                <span>2° Diferencia de Goles (DG = GF - GC)</span>
-                <span>3° Goles a Favor (GF)</span>
-                <span>4° Partidos Ganados (PG)</span>
-                <span>5° % Efectividad</span>
+                <span>
+                  <strong className="text-foreground">
+                    {language === "en" ? "Tiebreaker Criteria:" : language === "pt" ? "Critérios de Desempate:" : "Criterios de Desempate:"}
+                  </strong>{" "}
+                  1° {language === "en" ? "Points (PTS)" : language === "pt" ? "Pontos (PTS)" : "Puntos (PTS)"}
+                </span>
+                <span>
+                  2° {language === "en" ? "Goal Difference (GD = GF - GA)" : language === "pt" ? "Saldo de Gols (SG = GP - GC)" : "Diferencia de Goles (DG = GF - GC)"}
+                </span>
+                <span>
+                  3° {language === "en" ? "Goals For (GF)" : language === "pt" ? "Gols Pró (GP)" : "Goles a Favor (GF)"}
+                </span>
+                <span>
+                  4° {language === "en" ? "Matches Won (W)" : language === "pt" ? "Partidas Ganhas (V)" : "Partidos Ganados (PG)"}
+                </span>
+                <span>
+                  5° {language === "en" ? "Win %" : language === "pt" ? "% Eficácia" : "% Efectividad"}
+                </span>
               </div>
             </div>
           ) : (
@@ -366,7 +407,11 @@ export default function Ranking() {
                 <div>
                   <h3 className="text-sm font-semibold">{t("ranking.howEloWorks")}</h3>
                   <p className="text-xs text-muted-foreground">
-                    Cálculo oficial de puntuación Elo individual para Pádel y Tenis por cada set y partido disputado.
+                    {language === "en"
+                      ? "Official individual Elo rating calculation for Padel and Tennis for every set and match played."
+                      : language === "pt"
+                      ? "Cálculo oficial de pontuação Elo individual para Pádel e Tênis por cada set e partida disputada."
+                      : "Cálculo oficial de puntuación Elo individual para Pádel y Tenis por cada set y partido disputado."}
                   </p>
                 </div>
               </div>
@@ -374,14 +419,18 @@ export default function Ranking() {
                 <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
                   <TrendingUp size={16} className="text-green-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <strong className="text-foreground block mb-0.5">Victoria y Nivel de Rival</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Win & Opponent Rating" : language === "pt" ? "Vitória e Nível do Rival" : "Victoria y Nivel de Rival"}
+                    </strong>
                     <span>{t("ranking.eloWinLossRule")}</span>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 bg-muted/20 p-3 rounded-lg border border-border/40">
                   <TrendingDown size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <strong className="text-foreground block mb-0.5">Derrota y Rendimiento</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Loss & Performance" : language === "pt" ? "Derrota e Desempenho" : "Derrota y Rendimiento"}
+                    </strong>
                     <span>{t("ranking.eloDrawRule")}</span>
                   </div>
                 </div>
@@ -390,18 +439,25 @@ export default function Ranking() {
                     ⚡
                   </span>
                   <div>
-                    <strong className="text-foreground block mb-0.5">Puntuación Base y Categorías</strong>
+                    <strong className="text-foreground block mb-0.5">
+                      {language === "en" ? "Base Rating & Categories" : language === "pt" ? "Pontuação Base e Categorias" : "Puntuación Base y Categorías"}
+                    </strong>
                     <span>{t("ranking.eloBaseRule")}</span>
                   </div>
                 </div>
               </div>
               <div className="pt-2 text-xs text-muted-foreground border-t border-border/40 flex flex-wrap gap-x-5 gap-y-1.5">
-                <span><strong className="text-foreground">Categorías Oficiales:</strong> 1ª Cat (1800+ Elo)</span>
-                <span>2ª Cat (1650-1799)</span>
-                <span>3ª Cat (1520-1649)</span>
-                <span>4ª Cat (1400-1519)</span>
-                <span>5ª Cat (1250-1399)</span>
-                <span>6ª Cat (&lt;1250)</span>
+                <span>
+                  <strong className="text-foreground">
+                    {language === "en" ? "Official Categories:" : language === "pt" ? "Categorias Oficiais:" : "Categorías Oficiales:"}
+                  </strong>{" "}
+                  {language === "en" ? "1st Cat" : "1ª Cat"} (1800+ Elo)
+                </span>
+                <span>{language === "en" ? "2nd Cat" : "2ª Cat"} (1650-1799)</span>
+                <span>{language === "en" ? "3rd Cat" : "3ª Cat"} (1520-1649)</span>
+                <span>{language === "en" ? "4th Cat" : "4ª Cat"} (1400-1519)</span>
+                <span>{language === "en" ? "5th Cat" : "5ª Cat"} (1250-1399)</span>
+                <span>{language === "en" ? "6th Cat" : "6ª Cat"} (&lt;1250)</span>
               </div>
             </div>
           )}
@@ -484,7 +540,7 @@ function PodiumCard({ entry, isFirst = false, isFootball = false }: { entry: any
           {isFootball ? `${entry.points ?? 0} pts` : entry.elo}
         </span>
         <span className="text-[11px] text-muted-foreground font-medium">
-          {isFootball ? "Puntos Liga" : entry.category ?? "4ª Cat"}
+          {isFootball ? (language === "en" ? "League Points" : language === "pt" ? "Pontos da Liga" : "Puntos Liga") : (entry.category ?? (language === "en" ? "4th Cat" : "4ª Cat"))}
         </span>
       </div>
     </Link>
