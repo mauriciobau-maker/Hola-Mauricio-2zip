@@ -205,6 +205,12 @@ export default function Dashboard() {
             >
               {t("dashboard.actionCheckTable")}
             </Link>
+            <Link
+              href="/manual"
+              className="bg-primary/10 hover:bg-primary/20 border border-primary/30 px-2.5 py-1 rounded-md text-primary transition-all flex items-center gap-1.5 text-xs font-semibold"
+            >
+              📖 {language === "en" ? "User Guide" : language === "pt" ? "Manual de Uso" : "Manual de Uso"}
+            </Link>
           </div>
         </div>
       </div>

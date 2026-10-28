@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Handshake, CalendarDays, Shield, MapPin, DollarSign, Globe, Bot, Sparkles, Building2, BookOpen } from "lucide-react";
 import { cn, hexToHslChannels } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -290,6 +290,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span>{t("myClub")}</span>
               </Link>
 
+              <Link
+                href="/manual"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0",
+                  location === "/manual"
+                    ? "bg-primary/20 text-primary border border-primary/40 font-bold"
+                    : "text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border/80"
+                )}
+                title={language === "en" ? "App User Guide & Instructions" : language === "pt" ? "Manual de Uso do App" : "Manual de Uso de la App"}
+              >
+                <BookOpen size={13} className="text-primary" />
+                <span>{language === "en" ? "User Guide" : language === "pt" ? "Manual" : "Manual de Uso"}</span>
+              </Link>
+
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -374,6 +388,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <Building2 size={16} className="text-primary" />
               <span>Configuración de Mi Club</span>
+            </Link>
+
+            <Link
+              href="/manual"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-colors",
+                location === "/manual"
+                  ? "bg-primary/15 text-primary"
+                  : "text-foreground hover:bg-muted/50"
+              )}
+            >
+              <BookOpen size={16} className="text-primary" />
+              <span>{language === "en" ? "User Guide & Manual" : language === "pt" ? "Manual de Uso" : "Manual de Uso"}</span>
             </Link>
 
             {isAdmin && (

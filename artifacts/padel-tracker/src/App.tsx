@@ -28,6 +28,7 @@ import { SecretarioParryn } from "@/pages/SecretarioParryn";
 import LandingPage from "@/pages/LandingPage";
 import CrearClub from "@/pages/CrearClub";
 import ConfiguracionClub from "@/pages/ConfiguracionClub";
+import Manual from "@/pages/Manual";
 
 import { LanguageProvider } from "./context/LanguageContext";
 
@@ -130,6 +131,7 @@ function Router() {
             <Route path="/onboarding" component={Onboarding} />
             <Route path="/vincular" component={VincularJugador} />
             <Route path="/mi-club" component={ConfiguracionClub} />
+            <Route path="/manual" component={Manual} />
             <Route path="/admin" component={Admin} />
             <Route path="/club/:slug" component={PublicClub} />
             <Route path="/c/:slug" component={PublicClub} />
