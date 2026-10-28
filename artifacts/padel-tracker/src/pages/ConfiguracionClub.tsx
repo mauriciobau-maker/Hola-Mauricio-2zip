@@ -18,10 +18,12 @@ import {
   Upload,
   Trash2,
   ImageIcon,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/context/LanguageContext";
 
 const PRESET_COLORS = [
   { name: "Verde Pádel", hex: "#10b981", bgClass: "bg-[#10b981]" },
@@ -34,6 +36,7 @@ const PRESET_COLORS = [
 
 export default function ConfiguracionClub() {
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -47,6 +50,7 @@ export default function ConfiguracionClub() {
   const [country, setCountry] = useState("Chile");
   const [address, setAddress] = useState("");
   const [mapUrl, setMapUrl] = useState("");
+  const [defaultLanguage, setDefaultLanguage] = useState<string>("es");
 
   const loadClub = async () => {
     try {
@@ -63,6 +67,7 @@ export default function ConfiguracionClub() {
           setCountry(data.country || "Chile");
           setAddress(data.address || "");
           setMapUrl(data.mapUrl || "");
+          setDefaultLanguage(data.defaultLanguage || "es");
         }
       }
     } catch (e) {
@@ -161,6 +166,7 @@ export default function ConfiguracionClub() {
           country: country.trim(),
           address: address.trim(),
           mapUrl: mapUrl.trim(),
+          defaultLanguage,
         }),
       });
 
@@ -470,6 +476,45 @@ export default function ConfiguracionClub() {
                 className="h-10 text-foreground font-medium"
               />
             </div>
+          </div>
+        </div>
+
+        {/* 4. Idioma Predeterminado del Club */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-foreground font-bold text-base">
+            <Globe className="w-5 h-5 text-primary" />
+            <span>Idioma Predeterminado del Club</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Define el idioma en que se mostrará la interfaz por defecto a nuevos miembros y visitantes públicos del club.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            {[
+              { code: "es", label: "Español", flag: "🇪🇸", sub: "Predeterminado en Latinoamérica y España" },
+              { code: "en", label: "English", flag: "🇬🇧", sub: "Default for international members" },
+              { code: "pt", label: "Português", flag: "🇧🇷", sub: "Padrão para Brasil e Portugal" },
+            ].map((langOpt) => (
+              <button
+                type="button"
+                key={langOpt.code}
+                onClick={() => setDefaultLanguage(langOpt.code)}
+                className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  defaultLanguage === langOpt.code
+                    ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                    : "border-border bg-muted/20 hover:bg-muted/40"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1 w-full">
+                  <span className="text-lg">{langOpt.flag}</span>
+                  <span className="text-sm font-bold text-foreground">{langOpt.label}</span>
+                  {defaultLanguage === langOpt.code && (
+                    <Check className="w-4 h-4 text-primary ml-auto" />
+                  )}
+                </div>
+                <span className="text-[11px] text-muted-foreground leading-tight">{langOpt.sub}</span>
+              </button>
+            ))}
           </div>
         </div>
 

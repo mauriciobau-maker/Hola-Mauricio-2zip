@@ -12,6 +12,7 @@ import {
   Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
 function initials(name: string) {
   return name
@@ -217,6 +218,7 @@ function MatchCard({
 }
 
 export default function ParejaDetalle() {
+  const { t, language } = useLanguage();
   const params = useParams<{ player1Id: string; player2Id: string }>();
   const pid1 = parseInt(params.player1Id ?? "0", 10);
   const pid2 = parseInt(params.player2Id ?? "0", 10);
@@ -251,7 +253,7 @@ export default function ParejaDetalle() {
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft size={15} />
-        Volver a Parejas
+        {t("common.back")} · {t("pairs.title") || "Parejas"}
       </Link>
 
       {isLoading ? (

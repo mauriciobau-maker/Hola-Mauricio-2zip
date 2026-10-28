@@ -78,12 +78,12 @@ export default function Ranking() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {isFootball ? "Tabla de Posiciones" : "Ranking Oficial del Club"}
+            {isFootball ? t("ranking.footballTitle") : t("ranking.title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {isFootball
-              ? "Clasificación oficial de fútbol: 3 pts victoria, 1 pto empate, 0 pts derrota y estadísticas de gol."
-              : "Clasificación por sistema Elo dinámico según nivel de rivales, sets y games disputados."}
+              ? t("ranking.footballSubtitle")
+              : t("ranking.subtitle")}
           </p>
         </div>
 
@@ -160,14 +160,14 @@ export default function Ranking() {
                     <div className="col-span-1 text-center">{t("ranking.pos")}</div>
                     <div className="col-span-3">{t("ranking.player")}</div>
                     <div className="col-span-1 text-center text-primary font-bold">PTS</div>
-                    <div className="col-span-1 text-center">PJ</div>
-                    <div className="col-span-1 text-center text-green-400">PG</div>
+                    <div className="col-span-1 text-center">{t("ranking.matches")}</div>
+                    <div className="col-span-1 text-center text-green-400">{t("ranking.wins")}</div>
                     <div className="col-span-1 text-center text-yellow-400">PE</div>
-                    <div className="col-span-1 text-center text-red-400">PP</div>
+                    <div className="col-span-1 text-center text-red-400">{t("ranking.losses")}</div>
                     <div className="col-span-1 text-center font-mono">GF</div>
                     <div className="col-span-1 text-center font-mono">GC</div>
                     <div className="col-span-1 text-center font-mono">DG</div>
-                    <div className="col-span-1 text-center">% Ef.</div>
+                    <div className="col-span-1 text-center">{t("ranking.winRate")}</div>
                   </div>
                   <div className="divide-y divide-border">
                     {ranking.map((entry: any) => {
@@ -234,15 +234,15 @@ export default function Ranking() {
                   <div className="grid grid-cols-12 gap-1 px-4 py-2.5 border-b border-border bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider items-center">
                     <div className="col-span-1 text-center">{t("ranking.pos")}</div>
                     <div className="col-span-3">{t("ranking.player")}</div>
-                    <div className="col-span-1 text-center">Cat.</div>
+                    <div className="col-span-1 text-center">{t("ranking.category")}</div>
                     <div className="col-span-1 text-center text-primary font-bold">Elo</div>
-                    <div className="col-span-1 text-center">PJ</div>
-                    <div className="col-span-1 text-center text-green-400 font-semibold">PG</div>
-                    <div className="col-span-1 text-center text-red-400 font-medium">PP</div>
-                    <div className="col-span-1 text-center font-mono">Sets</div>
-                    <div className="col-span-1 text-center font-mono">Games</div>
-                    <div className="col-span-1 text-center">Racha</div>
-                    <div className="col-span-1 text-center">% Ef.</div>
+                    <div className="col-span-1 text-center">{t("ranking.matches")}</div>
+                    <div className="col-span-1 text-center text-green-400 font-semibold">{t("ranking.wins")}</div>
+                    <div className="col-span-1 text-center text-red-400 font-medium">{t("ranking.losses")}</div>
+                    <div className="col-span-1 text-center font-mono">{t("ranking.sets")}</div>
+                    <div className="col-span-1 text-center font-mono">{t("ranking.games")}</div>
+                    <div className="col-span-1 text-center">{t("ranking.streak")}</div>
+                    <div className="col-span-1 text-center">{t("ranking.winRate")}</div>
                   </div>
                   <div className="divide-y divide-border">
                     {ranking.map((entry: any) => {

@@ -60,18 +60,30 @@ export default function LandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-muted/50 border border-border px-2 py-1 rounded-lg text-xs">
+              <Globe size={13} className="text-muted-foreground" />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any, true)}
+                className="bg-transparent text-foreground text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="es" className="bg-background text-foreground">ES</option>
+                <option value="en" className="bg-background text-foreground">EN</option>
+                <option value="pt" className="bg-background text-foreground">PT</option>
+              </select>
+            </div>
             <Link
               href="/"
               className="text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground px-3 py-1.5 transition-colors"
             >
-              Iniciar Sesión
+              {language === "en" ? "Log In" : language === "pt" ? "Entrar" : "Iniciar Sesión"}
             </Link>
             <Link
               href="/crear-club"
               className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold px-3.5 py-1.5 rounded-lg shadow-sm transition-all"
             >
-              Crear mi Club Gratis
+              {language === "en" ? "Create Free Club" : language === "pt" ? "Criar Clube Grátis" : "Crear mi Club Gratis"}
             </Link>
           </div>
         </div>

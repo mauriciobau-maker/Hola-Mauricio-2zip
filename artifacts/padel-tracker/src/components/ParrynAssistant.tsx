@@ -19,11 +19,11 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
   const [error, setError] = useState<string | null>(null);
 
   const defaultLabels = {
-    convocatoria: language === "en" ? "Redactar WhatsApp ✨" : language === "pt" ? "Redigir WhatsApp ✨" : "Redactar Convocatoria WhatsApp ✨",
-    matchmaking: language === "en" ? "Analizar Cruces ✨" : language === "pt" ? "Analisar Jogos ✨" : "Analizar Equilibrio de Cruces ✨",
-    cierre: language === "en" ? "Crónica de la Jornada ✨" : language === "pt" ? "Crônica da Rodada ✨" : "Redactar Crónica Oficial ✨",
-    "recordatorio-cobro": language === "en" ? "Recordatorio de Cobro ✨" : language === "pt" ? "Lembrete de Cobrança ✨" : "Recordatorio Amable de Cobro ✨",
-    general: language === "en" ? "Asistente Deportivo ✨" : language === "pt" ? "Assistente Esportivo ✨" : "Consultar Asistente Deportivo ✨",
+    convocatoria: language === "en" ? "Draft WhatsApp Call-up ✨" : language === "pt" ? "Convocatória WhatsApp ✨" : "Redactar Convocatoria WhatsApp ✨",
+    matchmaking: language === "en" ? "Analyze Matchups ✨" : language === "pt" ? "Analisar Cruzamentos ✨" : "Analizar Equilibrio de Cruces ✨",
+    cierre: language === "en" ? "Matchday Recap ✨" : language === "pt" ? "Crônica da Rodada ✨" : "Redactar Crónica Oficial ✨",
+    "recordatorio-cobro": language === "en" ? "Payment Reminder ✨" : language === "pt" ? "Lembrete de Cobrança ✨" : "Recordatorio Amable de Cobro ✨",
+    general: language === "en" ? "Ask Sports Secretary ✨" : language === "pt" ? "Assistente Esportivo ✨" : "Consultar Asistente Deportivo ✨",
   };
 
   const handleGenerate = async () => {

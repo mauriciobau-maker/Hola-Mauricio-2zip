@@ -605,8 +605,68 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
         hour12: false,
       });
 
-      const whatsappMessage = isFutbol
-        ? `⚽ *CONVOCATORIA: ${title.toUpperCase()}*
+      let whatsappMessage = "";
+      let answer = "";
+
+      if (targetLang === "en") {
+        whatsappMessage = isFutbol
+          ? `⚽ *MATCH CALL-UP: ${title.toUpperCase()}*
+📍 *Location:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "pitch" : "pitches"})
+⏰ *Time:* ${dateStr} at ${timeStr}
+👥 *Spots:* Max ${maxSpots} players (2 teams of ${Math.floor(maxSpots / 2)})
+
+⚡ *Mode:* Football Match without waiting
+
+👉 *Sign up and secure your spot here:*
+${eventUrl}
+
+_Organized with Parryn Sport Hub AI_`
+          : `🎾 *MATCH CALL-UP: ${title.toUpperCase()}*
+📍 *Location:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "court" : "courts"})
+⏰ *Time:* ${dateStr} at ${timeStr}
+👥 *Spots:* Max ${maxSpots} players
+
+⚡ *Format:* Americano Tournament (${courtsAvailable} courts x 4 players = continuous rotation)
+
+👉 *Sign up and secure your spot here:*
+${eventUrl}
+
+_Organized with Parryn Sport Hub AI_`;
+
+        answer = isFutbol
+          ? `⚽ **All set! Football match created successfully in the system.**\n\nScheduled for **${dateStr} at ${timeStr}** with **${maxSpots} spots** on **${courtsAvailable} pitch(es)** at **${location}**.\n\nHere is your ready-to-share WhatsApp message:`
+          : `🎾 **All set! Tournament call-up created successfully in the system.**\n\nScheduled for **${dateStr} at ${timeStr}** with **${maxSpots} spots** on **${courtsAvailable} court(s)** at **${location}**.\n\nHere is your ready-to-share WhatsApp message:`;
+      } else if (targetLang === "pt") {
+        whatsappMessage = isFutbol
+          ? `⚽ *CONVOCAÇÃO: ${title.toUpperCase()}*
+📍 *Local:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "campo" : "campos"})
+⏰ *Horário:* ${dateStr} às ${timeStr}
+👥 *Vagas:* Máximo ${maxSpots} jogadores (2 times de ${Math.floor(maxSpots / 2)})
+
+⚡ *Modalidade:* Pelada de Futebol sem espera
+
+👉 *Inscreva-se e garanta sua vaga aqui:*
+${eventUrl}
+
+_Organizado com Parryn Sport Hub IA_`
+          : `🎾 *CONVOCAÇÃO: ${title.toUpperCase()}*
+📍 *Local:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "quadra" : "quadras"})
+⏰ *Horário:* ${dateStr} às ${timeStr}
+👥 *Vagas:* Máximo ${maxSpots} jogadores
+
+⚡ *Formato:* Torneio Americano (${courtsAvailable} quadras x 4 jogadores = rotação contínua)
+
+👉 *Inscreva-se e garanta sua vaga aqui:*
+${eventUrl}
+
+_Organizado com Parryn Sport Hub IA_`;
+
+        answer = isFutbol
+          ? `⚽ **Pronto! Partida de futebol criada com sucesso no sistema.**\n\nProgramada para **${dateStr} às ${timeStr}** com **${maxSpots} vagas** em **${courtsAvailable} campo(s)** em **${location}**.\n\nAbaixo está a mensagem pronta para compartilhar no WhatsApp:`
+          : `🎾 **Pronto! Convocatória criada com sucesso no sistema.**\n\nProgramada para **${dateStr} às ${timeStr}** com **${maxSpots} vagas** em **${courtsAvailable} quadra(s)** em **${location}**.\n\nAbaixo está a mensagem pronta para compartilhar no WhatsApp:`;
+      } else {
+        whatsappMessage = isFutbol
+          ? `⚽ *CONVOCATORIA: ${title.toUpperCase()}*
 📍 *Lugar:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "cancha sintética" : "canchas"})
 ⏰ *Horario:* ${dateStr} a las ${timeStr} hrs
 👥 *Cupos:* Máximo ${maxSpots} jugadores (2 equipos de ${Math.floor(maxSpots / 2)})
@@ -617,7 +677,7 @@ router.post("/asistente", requireAuth, async (req: Request, res: Response): Prom
 ${eventUrl}
 
 _Organizado con Parryn Sport Hub IA_`
-        : `🎾 *CONVOCATORIA: ${title.toUpperCase()}*
+          : `🎾 *CONVOCATORIA: ${title.toUpperCase()}*
 📍 *Lugar:* ${location} (${courtsAvailable} ${courtsAvailable === 1 ? "cancha" : "canchas"})
 ⏰ *Horario:* ${dateStr} a las ${timeStr} hrs
 👥 *Cupos:* Máximo ${maxSpots} jugadores
@@ -629,17 +689,18 @@ ${eventUrl}
 
 _Organizado con Parryn Sport Hub IA_`;
 
-      const answer = isFutbol
-        ? `⚽ **¡Listo! Partido de fútbol creado con éxito en el sistema.**
+        answer = isFutbol
+          ? `⚽ **¡Listo! Partido de fútbol creado con éxito en el sistema.**
 
 He programado el encuentro para el **${dateStr} a las ${timeStr} hrs** con **${maxSpots} cupos** en **${courtsAvailable} cancha(s)** en **${location}**.
 
 A continuación tienes el mensaje listo para compartir al grupo de WhatsApp:`
-        : `🎾 **¡Listo! Convocatoria creada con éxito en el sistema.**
+          : `🎾 **¡Listo! Convocatoria creada con éxito en el sistema.**
 
 He programado el encuentro para el **${dateStr} a las ${timeStr} hrs** con **${maxSpots} cupos** en **${courtsAvailable} canchas** en **${location}**.
 
 A continuación tienes la ficha del torneo y el mensaje listo para compartir al grupo de WhatsApp:`;
+      }
 
       res.json({
         answer,

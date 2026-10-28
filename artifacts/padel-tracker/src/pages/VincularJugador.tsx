@@ -7,9 +7,11 @@ import { Link, Shield } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function VincularJugador() {
   const { user, isLoading: authLoading } = useAuth();
+  const { t } = useLanguage();
   const { data: players, isLoading: playersLoading } = useListPlayers();
   const [, navigate] = useLocation();
   const [linking, setLinking] = useState(false);

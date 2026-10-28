@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth, updateStoredUser } from "@workspace/replit-auth-web";
 import { Building2, ArrowRight, UserPlus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Step = "club" | "jugador" | "done";
 
@@ -22,6 +23,7 @@ interface Player {
 export function Onboarding() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>("club");
   const [inviteCode, setInviteCode] = useState(() => {
     return new URLSearchParams(window.location.search).get("code") || "";

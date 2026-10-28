@@ -5,7 +5,7 @@ import { cn, hexToHslChannels } from "@/lib/utils";
 import { AuthButton } from "@/components/AuthButton";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLanguage } from "../context/LanguageContext";
-import { TranslationKey } from "../lib/translations";
+import { TranslationKey, formatSportName } from "../lib/translations";
 
 interface ClubBranding {
   name: string;
@@ -191,7 +191,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {club?.name || "Club Pádel"}
                 </span>
                 <span className="hidden sm:inline-flex text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-                  Secretario IA
+                  {language === "en" ? "AI Secretary" : language === "pt" ? "Secretário IA" : "Secretario IA"}
                 </span>
               </div>
               <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
@@ -222,7 +222,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       title={`Cambiar a ${s.name}`}
                     >
                       <span>{icon}</span>
-                      <span className="hidden sm:inline">{s.name}</span>
+                      <span className="hidden sm:inline">{formatSportName(s.name, language)}</span>
                     </button>
                   );
                 })}
@@ -273,7 +273,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <Sparkles size={13} className="text-primary/70" />
-                <span>Secretaría</span>
+                <span>{t("secretaryNav")}</span>
               </Link>
 
               <Link
@@ -287,7 +287,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 title="Personalizar mi club, colores y foto"
               >
                 <Building2 size={13} className="text-primary" />
-                <span>Mi Club</span>
+                <span>{t("myClub")}</span>
               </Link>
 
               {isAdmin && (
@@ -310,7 +310,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className="text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 transition-colors flex items-center gap-1 shrink-0 ml-1"
                 title="Página comercial de presentación para captación de clubes"
               >
-                <span>Landing Pública</span>
+                <span>{t("publicLanding")}</span>
               </Link>
             </div>
           </div>

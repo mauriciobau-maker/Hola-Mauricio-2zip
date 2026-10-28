@@ -234,7 +234,7 @@ router.patch("/club/settings", async (req, res): Promise<void> => {
   try {
     const user = req.user as any;
     const clubId = Number(req.body.clubId) || user?.clubId || 1;
-    const { name, logoUrl, primaryColor, secondaryColor, city, country, address, mapUrl } = req.body;
+    const { name, logoUrl, primaryColor, secondaryColor, city, country, address, mapUrl, defaultLanguage } = req.body;
 
     const updateData: Record<string, any> = {};
     if (name) updateData.name = String(name).trim();
@@ -245,6 +245,9 @@ router.patch("/club/settings", async (req, res): Promise<void> => {
     if (country) updateData.country = String(country).trim();
     if (address !== undefined) updateData.address = address ? String(address).trim() : null;
     if (mapUrl !== undefined) updateData.mapUrl = mapUrl ? String(mapUrl).trim() : null;
+    if (defaultLanguage && ["es", "en", "pt"].includes(String(defaultLanguage))) {
+      updateData.defaultLanguage = String(defaultLanguage).trim();
+    }
 
     if (Object.keys(updateData).length === 0) {
       res.status(400).json({ error: "No se proporcionaron datos para actualizar" });

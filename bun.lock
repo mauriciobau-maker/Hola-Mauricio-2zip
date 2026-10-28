@@ -24,8 +24,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@types/nodemailer": "^8.0.1",
-        "@workspace/api-zod": "workspace:*",
-        "@workspace/db": "workspace:*",
+        "@workspace/api-zod": "*",
+        "@workspace/db": "*",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.6",
         "drizzle-orm": "0.45.2",
@@ -90,8 +90,8 @@
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
         "@vitejs/plugin-react": "^5.0.4",
-        "@workspace/api-client-react": "workspace:*",
-        "@workspace/replit-auth-web": "workspace:*",
+        "@workspace/api-client-react": "*",
+        "@workspace/replit-auth-web": "*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -161,7 +161,7 @@
       "name": "@workspace/replit-auth-web",
       "version": "0.0.0",
       "dependencies": {
-        "@workspace/api-client-react": "workspace:*",
+        "@workspace/api-client-react": "*",
       },
       "devDependencies": {
         "@types/react": "^19.2.0",

@@ -352,7 +352,7 @@ export function SecretarioParryn() {
                             </div>
                           </div>
                           <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-                            ✓ Guardado en BBDD
+                            ✓ {language === "en" ? "Saved to DB" : language === "pt" ? "Salvo no BD" : "Guardado en BBDD"}
                           </span>
                         </div>
 
@@ -364,7 +364,7 @@ export function SecretarioParryn() {
                             className="text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
                           >
                             <Trophy size={13} />
-                            Ver Encuentro
+                            {language === "en" ? "View Event" : language === "pt" ? "Ver Encontro" : "Ver Encuentro"}
                           </Button>
 
                           {msg.whatsappMessage && (
@@ -375,7 +375,7 @@ export function SecretarioParryn() {
                               className="inline-flex items-center text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold gap-1.5 shadow-sm px-3 py-1.5 rounded-md transition-colors"
                             >
                               <PhoneCall size={13} />
-                              Enviar a WhatsApp
+                              {language === "en" ? "Send to WhatsApp" : language === "pt" ? "Enviar para WhatsApp" : "Enviar a WhatsApp"}
                             </a>
                           )}
 
@@ -391,7 +391,9 @@ export function SecretarioParryn() {
                               className="text-xs gap-1 text-muted-foreground hover:text-foreground"
                             >
                               {copiedIndex === idx ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                              {copiedIndex === idx ? "¡Copiado!" : "Copiar Texto"}
+                              {copiedIndex === idx
+                                ? (language === "en" ? "Copied!" : language === "pt" ? "Copiado!" : "¡Copiado!")
+                                : (language === "en" ? "Copy Text" : language === "pt" ? "Copiar Texto" : "Copiar Texto")}
                             </Button>
                           )}
                         </div>
@@ -444,40 +446,92 @@ export function SecretarioParryn() {
 
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
               <span className="text-[11px] text-muted-foreground font-semibold">
-                {isFutbolClub ? "Ejemplos rápidos (Fútbol):" : "Ejemplos rápidos:"}
+                {language === "en"
+                  ? (isFutbolClub ? "Quick Examples (Football):" : "Quick Examples:")
+                  : language === "pt"
+                  ? (isFutbolClub ? "Exemplos rápidos (Futebol):" : "Exemplos rápidos:")
+                  : (isFutbolClub ? "Ejemplos rápidos (Fútbol):" : "Ejemplos rápidos:")}
               </span>
               {isFutbolClub ? (
                 <>
                   <button
                     type="button"
-                    onClick={() => setQuery("Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética")}
+                    onClick={() =>
+                      setQuery(
+                        language === "en"
+                          ? "Create a call-up for this Friday at 8:00 PM for 14 players on turf pitch"
+                          : language === "pt"
+                          ? "Crie uma convocação para esta sexta às 20h para 14 jogadores no campo sintético"
+                          : "Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética"
+                      )
+                    }
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
                   >
-                    ⚽ "Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética"
+                    ⚽ {language === "en"
+                      ? '"Create a call-up for Friday 8:00 PM for 14 players"'
+                      : language === "pt"
+                      ? '"Crie uma convocação para sexta às 20h para 14 jogadores"'
+                      : '"Hazme una convocatoria para este viernes a las 20:00 para 14 jugadores en cancha sintética"'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setQuery("Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5")}
+                    onClick={() =>
+                      setQuery(
+                        language === "en"
+                          ? "Build two balanced teams (Team A and B) for a 5-a-side match"
+                          : language === "pt"
+                          ? "Monte dois times equilibrados (Time A e B) para o futebol 5"
+                          : "Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5"
+                      )
+                    }
                     className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
                   >
-                    🥅 "Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5"
+                    🥅 {language === "en"
+                      ? '"Build two balanced teams for 5-a-side match"'
+                      : language === "pt"
+                      ? '"Monte dois times equilibrados para o futebol 5"'
+                      : '"Arma los dos equipos parejos (Equipo A y B) para la pichanga de fútbol 5"'}
                   </button>
                 </>
               ) : (
                 <>
                   <button
                     type="button"
-                    onClick={() => setQuery("Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel")}
+                    onClick={() =>
+                      setQuery(
+                        language === "en"
+                          ? "Create a tournament call-up for tomorrow at 7:00 PM for 12 players across 3 courts"
+                          : language === "pt"
+                          ? "Crie uma convocatória para amanhã às 19:00 para 12 jogadores em 3 quadras"
+                          : "Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"
+                      )
+                    }
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all text-[11px] text-left cursor-pointer"
                   >
-                    🎾 "Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"
+                    🎾 {language === "en"
+                      ? '"Create a tournament call-up for tomorrow at 7:00 PM for 12 players across 3 courts"'
+                      : language === "pt"
+                      ? '"Crie uma convocatória para amanhã às 19:00 para 12 jogadores em 3 quadras"'
+                      : '"Hazme una convocatoria para mañana a las 19:00 horas para 12 jugadores en tres canchas en el club starpadel"'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setQuery("Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas")}
+                    onClick={() =>
+                      setQuery(
+                        language === "en"
+                          ? "Organize an Americano tournament this Friday at 8:00 PM for 8 players on 2 courts"
+                          : language === "pt"
+                          ? "Organize um torneio americano nesta sexta às 20:00 para 8 jogadores em 2 quadras"
+                          : "Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas"
+                      )
+                    }
                     className="px-2.5 py-1 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-all text-[11px] text-left cursor-pointer"
                   >
-                    ⚡ "Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas"
+                    ⚡ {language === "en"
+                      ? '"Organize an Americano tournament this Friday at 8:00 PM for 8 players on 2 courts"'
+                      : language === "pt"
+                      ? '"Organize um torneio americano nesta sexta às 20:00 para 8 jogadores em 2 quadras"'
+                      : '"Arma un torneo americano este viernes a las 20:00 para 8 jugadores en 2 canchas"'}
                   </button>
                 </>
               )}
