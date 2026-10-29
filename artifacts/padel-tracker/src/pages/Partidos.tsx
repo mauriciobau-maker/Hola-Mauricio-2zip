@@ -102,6 +102,8 @@ export default function Partidos() {
   };
 
   const filteredMatches = (matches ?? []).filter((m: any) => {
+    if (club?.id && m.clubId && Number(m.clubId) !== Number(club.id)) return false;
+
     if (selectedSport === "all") return true;
     if (selectedSport === "futbol") {
       return m.sportSlug === "futbol" || m.sportName?.toLowerCase().includes("fútbol") || m.sportId === 3;

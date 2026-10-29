@@ -59,6 +59,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         .then((data) => {
           if (data) {
             setClub(data);
+            try {
+              localStorage.setItem("active_club_id", String(data.id));
+            } catch {}
             if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
           } else setClub(null);
         })
@@ -66,13 +69,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const activeClubId = (user as any)?.clubId;
+    const savedClubId = typeof window !== "undefined" ? localStorage.getItem("active_club_id") : null;
+    const activeClubId = savedClubId ? Number(savedClubId) : (user as any)?.clubId;
     const url = activeClubId ? `/api/clubs/current?clubId=${activeClubId}` : "/api/clubs/current";
     fetch(url)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
           setClub(data);
+          try {
+            localStorage.setItem("active_club_id", String(data.id));
+          } catch {}
           if (data.defaultLanguage) setClubDefaultLanguage(data.defaultLanguage);
         } else {
           setClub(null);
@@ -389,7 +396,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             >
               <Building2 size={16} className="text-primary" />
-              <span>Configuración de Mi Club</span>
+              <span>{t("clubSettings")}</span>
             </Link>
 
             <Link
@@ -429,7 +436,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <footer className="mt-auto border-t border-border bg-muted/30 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • Plataforma de Gestión Deportiva.</p>
+          <p>© {new Date().getFullYear()} {club?.name || "Club Pádel"} • {language === "en" ? "Sports Management Platform" : language === "pt" ? "Plataforma de Gestão Esportiva" : "Plataforma de Gestión Deportiva"}.</p>
           {club?.address && <span className="flex items-center gap-1 font-medium bg-background border border-border px-2 py-1 rounded-md shadow-sm"><MapPin size={12} className="text-primary" /> {club.address}</span>}
         </div>
       </footer>

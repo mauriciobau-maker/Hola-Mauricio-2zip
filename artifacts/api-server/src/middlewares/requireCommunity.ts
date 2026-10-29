@@ -3,17 +3,26 @@ import { db, clubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export async function resolveEffectiveClubId(req: Request): Promise<number | null> {
-  // 1. Authenticated user clubId
-  const userClubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
-  if (userClubId) return userClubId;
-
-  // 2. Query param ?clubId=
+  // 1. Explicit query param ?clubId=
   if (req.query.clubId) {
     const parsed = Number(req.query.clubId);
     if (!isNaN(parsed) && parsed > 0) return parsed;
   }
 
-  // 3. Query param ?club= (slug)
+  // 2. Explicit header x-club-id
+  const headerClubId = req.headers["x-club-id"];
+  if (headerClubId) {
+    const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Explicit body clubId
+  if (req.body && typeof req.body === "object" && (req.body as any).clubId) {
+    const parsed = Number((req.body as any).clubId);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 4. Query param ?club= (slug)
   if (typeof req.query.club === "string" && req.query.club.trim()) {
     try {
       const [found] = await db
@@ -25,7 +34,11 @@ export async function resolveEffectiveClubId(req: Request): Promise<number | nul
     } catch {}
   }
 
-  // 4. Default: first active club in DB
+  // 5. Authenticated user clubId
+  const userClubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
+  if (userClubId) return userClubId;
+
+  // 6. Default: first active club in DB
   try {
     const [firstActive] = await db
       .select({ id: clubsTable.id })

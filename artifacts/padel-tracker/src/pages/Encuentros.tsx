@@ -124,7 +124,7 @@ function normalizeEncuentro(raw: any): NormalizedEncuentro {
       item?.nombre ??
       item?.name ??
       raw?.title ??
-      "Encuentro sin título",
+      "",
 
     dateTime:
       item?.dateTime ??
@@ -139,7 +139,7 @@ function normalizeEncuentro(raw: any): NormalizedEncuentro {
       item?.ubicacion ??
       item?.lugar ??
       raw?.location ??
-      "Lugar a confirmar",
+      "",
 
     maxSpots:
       item?.maxSpots ??
@@ -360,7 +360,7 @@ function EncuentroCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base truncate">
-              {encuentro.title}
+              {encuentro.title || t.untitled}
             </CardTitle>
 
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
@@ -371,7 +371,7 @@ function EncuentroCard({
 
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
-                {encuentro.location}
+                {encuentro.location || t.tbdLocation}
               </span>
 
               {encuentro.maxSpots !== null &&

@@ -358,6 +358,16 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Attach active club ID header for multi-tenant isolation
+  if (typeof window !== "undefined" && !headers.has("x-club-id")) {
+    try {
+      const activeClubId = localStorage.getItem("active_club_id");
+      if (activeClubId) {
+        headers.set("x-club-id", activeClubId);
+      }
+    } catch {}
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

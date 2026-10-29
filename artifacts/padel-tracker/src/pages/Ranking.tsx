@@ -52,15 +52,20 @@ export default function Ranking() {
 
   useEffect(() => {
     setIsLoading(true);
-    const url = selectedSportId ? `/api/ranking?sportId=${selectedSportId}` : "/api/ranking";
-    fetch(url)
+    const queryParams = new URLSearchParams();
+    if (selectedSportId) queryParams.set("sportId", String(selectedSportId));
+    if (club?.id) queryParams.set("clubId", String(club.id));
+    const url = `/api/ranking${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+    fetch(url, {
+      headers: club?.id ? { "x-club-id": String(club.id) } : {},
+    })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         setRanking(Array.isArray(data) ? data : []);
       })
       .catch(() => setRanking([]))
       .finally(() => setIsLoading(false));
-  }, [selectedSportId]);
+  }, [selectedSportId, club?.id]);
 
   const activeSport = club?.sports?.find((s: any) => s.id === selectedSportId) || club?.sports?.[0];
   const isFootball =

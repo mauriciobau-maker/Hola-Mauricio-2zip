@@ -26,8 +26,13 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return !!localStorage.getItem("app_language");
   });
 
-  // 👈 3. NUEVO: Si el usuario inició sesión/se inscribió y tiene un idioma en su perfil, se aplica globalmente
+  // 👈 3. NUEVO: Si el usuario inició sesión y NO tiene preferencia manual guardada, usar la de su perfil
   useEffect(() => {
+    const saved = localStorage.getItem("app_language") as Language;
+    if (saved && (saved === "es" || saved === "en" || saved === "pt")) {
+      setLanguageState(saved);
+      return;
+    }
     const playerLang = (user as any)?.playerLanguage || (user as any)?.language;
     if (playerLang && (playerLang === "es" || playerLang === "en" || playerLang === "pt")) {
       setLanguageState(playerLang as Language);
@@ -39,6 +44,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (userInitiated) {
       localStorage.setItem("app_language", lang);
       setHasUserPreference(true);
+      window.dispatchEvent(new CustomEvent("language_changed", { detail: lang }));
     }
   };
 

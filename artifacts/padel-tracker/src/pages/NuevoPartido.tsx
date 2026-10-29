@@ -77,9 +77,12 @@ const TRANSLATIONS = {
   es: {
     title: "Registrar Partido",
     needPlayers: "Necesitas jugadores registrados",
+    needPlayersDesc: "Registra primero a los jugadores del club para armar la nómina del partido.",
     createPlayers: "Crear jugadores",
     sport: "Deporte",
     modality: "Modalidad de juego",
+    playersPerTeam: "jugadores por equipo",
+    loadingSports: "Cargando deportes...",
     matchTypeTitle: "Tipo de Partido",
     vsRival: "vs Rival Externo",
     vsRivalDesc: "Nuestro equipo compite contra otro club",
@@ -93,13 +96,17 @@ const TRANSLATIONS = {
     team1: "Equipo 1",
     team2: "Equipo 2",
     ourTeam: "Nuestro Club / Convocatoria",
+    ourClubShort: "Nuestro Club",
     startersTitle: "Titulares",
     substitutesTitle: "Banca y Suplentes",
+    subBadge: "Suplente:",
+    noSubstitutes: "No hay suplentes convocados. Puedes añadir suplentes si tu equipo tiene cambios.",
     addSub: "Agregar Suplente",
     selectOption: "Seleccionar jugador...",
     balanceButton: "Balancear equipos",
     balancedTitle: "Equipos balanceados",
     reshuffle: "Mezclar de nuevo",
+    level: "Nivel",
     eloDiff: "Diferencia de nivel promedio:",
     setsPlayed: "Sets jugados",
     addSet: "Agregar set",
@@ -113,13 +120,17 @@ const TRANSLATIONS = {
     errorSave: "Error al registrar el partido. Inténtalo de nuevo.",
     selectPlayers: "Seleccionar Jugadores Convocados",
     playerIdx: (n: number) => `Titular #${n}`,
+    rivalDefault: "Rival",
   },
   en: {
     title: "Register Match",
     needPlayers: "Registered players required",
+    needPlayersDesc: "First register club players to build the match roster.",
     createPlayers: "Create players",
     sport: "Sport",
     modality: "Game Modality",
+    playersPerTeam: "players per team",
+    loadingSports: "Loading sports...",
     matchTypeTitle: "Match Type",
     vsRival: "vs External Rival",
     vsRivalDesc: "Our team plays against another club",
@@ -133,13 +144,17 @@ const TRANSLATIONS = {
     team1: "Team 1",
     team2: "Team 2",
     ourTeam: "Our Club / Squad",
+    ourClubShort: "Our Club",
     startersTitle: "Starting Lineup",
     substitutesTitle: "Bench & Substitutes",
+    subBadge: "Sub:",
+    noSubstitutes: "No substitutes called up. You can add substitutes if your team makes changes.",
     addSub: "Add Substitute",
     selectOption: "Select player...",
     balanceButton: "Balance teams",
     balancedTitle: "Balanced Teams",
     reshuffle: "Reshuffle",
+    level: "Level",
     eloDiff: "Avg level difference:",
     setsPlayed: "Sets played",
     addSet: "Add set",
@@ -153,13 +168,17 @@ const TRANSLATIONS = {
     errorSave: "Error registering match. Please try again.",
     selectPlayers: "Select Squad Players",
     playerIdx: (n: number) => `Starter #${n}`,
+    rivalDefault: "Opponent",
   },
   pt: {
     title: "Registrar Partida",
     needPlayers: "Jogadores registrados necessários",
+    needPlayersDesc: "Cadastre primeiro os jogadores do clube para montar a lista da partida.",
     createPlayers: "Criar jogadores",
     sport: "Esporte",
     modality: "Modalidade de jogo",
+    playersPerTeam: "jogadores por equipe",
+    loadingSports: "Carregando esportes...",
     matchTypeTitle: "Tipo de Partida",
     vsRival: "vs Rival Externo",
     vsRivalDesc: "Nossa equipe joga contra outro clube",
@@ -173,13 +192,17 @@ const TRANSLATIONS = {
     team1: "Equipe 1",
     team2: "Equipe 2",
     ourTeam: "Nosso Clube / Convocação",
+    ourClubShort: "Nosso Clube",
     startersTitle: "Titulares",
     substitutesTitle: "Banco e Reservas",
+    subBadge: "Reserva:",
+    noSubstitutes: "Nenhum reserva convocado. Você pode adicionar reservas se sua equipe tiver substituições.",
     addSub: "Adicionar Reserva",
     selectOption: "Selecionar jogador...",
     balanceButton: "Balancear equipes",
     balancedTitle: "Equipes balanceadas",
     reshuffle: "Embaralhar novamente",
+    level: "Nível",
     eloDiff: "Diferença média de nível:",
     setsPlayed: "Sets jogados",
     addSet: "Adicionar set",
@@ -193,6 +216,7 @@ const TRANSLATIONS = {
     errorSave: "Erro ao registrar a partida. Tente novamente.",
     selectPlayers: "Selecionar Jogadores Convocados",
     playerIdx: (n: number) => `Titular #${n}`,
+    rivalDefault: "Rival",
   },
 };
 
@@ -242,6 +266,15 @@ export default function NuevoPartido() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [club, setClub] = useState<any>(null);
+
+  // 0. Load current active club
+  useEffect(() => {
+    fetch("/api/clubs/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClub(d))
+      .catch(() => {});
+  }, []);
 
   // 1. Initial load of sports
   useEffect(() => {
@@ -447,7 +480,11 @@ export default function NuevoPartido() {
       const minRequired = selectedModality?.minTeamSize || teamSize;
       if (t1Starters.length < minRequired) {
         setError(
-          `Debes seleccionar al menos ${minRequired} titulares de nuestro equipo (actual: ${t1Starters.length}/${teamSize}).`
+          language === "en"
+            ? `You must select at least ${minRequired} starters for our team (current: ${t1Starters.length}/${teamSize}).`
+            : language === "pt"
+            ? `Você deve selecionar pelo menos ${minRequired} titulares do nosso time (atual: ${t1Starters.length}/${teamSize}).`
+            : `Debes seleccionar al menos ${minRequired} titulares de nuestro equipo (actual: ${t1Starters.length}/${teamSize}).`
         );
         return;
       }
@@ -458,13 +495,23 @@ export default function NuevoPartido() {
         const minRequired = selectedModality?.minTeamSize || teamSize;
         if (t1Starters.length < minRequired || t2Starters.length < minRequired) {
           setError(
-            `Debes seleccionar al menos ${minRequired} titulares para cada equipo.`
+            language === "en"
+              ? `You must select at least ${minRequired} starters for each team.`
+              : language === "pt"
+              ? `Você deve selecionar pelo menos ${minRequired} titulares para cada equipe.`
+              : `Debes seleccionar al menos ${minRequired} titulares para cada equipo.`
           );
           return;
         }
       } else {
         if (!balanceConfirmed || balancedTeam1.length === 0) {
-          setError("Primero balancea los equipos.");
+          setError(
+            language === "en"
+              ? "Please balance teams first."
+              : language === "pt"
+              ? "Primeiro equilibre as equipes."
+              : "Primero balancea los equipos."
+          );
           return;
         }
         t1Starters = balancedTeam1.map((p) => p.id);
@@ -481,6 +528,7 @@ export default function NuevoPartido() {
       const payload = {
         sportId: selectedSport?.id,
         modalityId: selectedModality?.id,
+        clubId: club?.id ? Number(club.id) : undefined,
         matchType,
         rivalTeamName: matchType === "rival" ? rivalTeamName.trim() : null,
         team1PlayerIds: t1Starters,
@@ -498,6 +546,7 @@ export default function NuevoPartido() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(club?.id ? { "x-club-id": String(club.id) } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -521,7 +570,7 @@ export default function NuevoPartido() {
   if (!sportsLoaded) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-        Cargando deportes...
+        {t.loadingSports}
       </div>
     );
   }
@@ -563,7 +612,7 @@ export default function NuevoPartido() {
           <div>
             <p className="text-base font-semibold">{t.needPlayers}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Registra primero a los jugadores del club para armar la nómina del partido.
+              {t.needPlayersDesc}
             </p>
           </div>
           <Link
@@ -608,7 +657,7 @@ export default function NuevoPartido() {
                   {t.modality}
                 </label>
                 <span className="text-xs font-medium text-primary">
-                  {selectedModality?.teamSize} jugadores por equipo
+                  {selectedModality?.teamSize} {t.playersPerTeam}
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -791,7 +840,7 @@ export default function NuevoPartido() {
 
                 {team1Substitutes.length === 0 ? (
                   <p className="text-xs text-muted-foreground/70 italic py-1">
-                    No hay suplentes convocados. Puedes añadir suplentes si tu equipo tiene cambios.
+                    {t.noSubstitutes}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2 pt-1">
@@ -802,7 +851,7 @@ export default function NuevoPartido() {
                           key={subId}
                           className="flex items-center gap-1.5 bg-muted/60 border border-border rounded-lg px-2.5 py-1 text-xs font-medium"
                         >
-                          <span className="text-muted-foreground">Suplente:</span>
+                          <span className="text-muted-foreground">{t.subBadge}</span>
                           <span className="font-semibold text-foreground">
                             {player?.name ?? `ID ${subId}`}
                           </span>
@@ -974,7 +1023,7 @@ export default function NuevoPartido() {
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-xs font-semibold text-primary">{t.team1}</p>
                             <span className="text-xs text-muted-foreground font-mono">
-                              Nivel ~{eloAvg(balancedTeam1)} pts
+                              {t.level} ~{eloAvg(balancedTeam1)} pts
                             </span>
                           </div>
                           {balancedTeam1.map((p) => (
@@ -990,7 +1039,7 @@ export default function NuevoPartido() {
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-xs font-semibold text-accent">{t.team2}</p>
                             <span className="text-xs text-muted-foreground font-mono">
-                              Nivel ~{eloAvg(balancedTeam2)} pts
+                              {t.level} ~{eloAvg(balancedTeam2)} pts
                             </span>
                           </div>
                           {balancedTeam2.map((p) => (
@@ -1078,7 +1127,7 @@ export default function NuevoPartido() {
               <div className="flex items-center justify-center gap-6 py-2">
                 <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[160px]">
                   <span className="text-xs font-semibold text-primary truncate">
-                    {matchType === "rival" ? "Nuestro Club" : t.team1}
+                    {matchType === "rival" ? t.ourClubShort : t.team1}
                   </span>
                   <GamesInput
                     value={team1Score}
@@ -1090,7 +1139,7 @@ export default function NuevoPartido() {
                 <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[160px]">
                   <span className="text-xs font-semibold text-accent truncate">
                     {matchType === "rival"
-                      ? rivalTeamName.trim() || "Rival"
+                      ? rivalTeamName.trim() || t.rivalDefault
                       : t.team2}
                   </span>
                   <GamesInput
