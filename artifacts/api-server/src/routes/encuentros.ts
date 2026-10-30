@@ -159,6 +159,12 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     const bodyData = req.body.data ?? req.body;
     const { title, dateTime, location, maxSpots, notes, playerIds, durationMinutes, courtsAvailable, sportId, formato } = bodyData;
 
+    const effectiveClubId = bodyData.clubId
+      ? Number(bodyData.clubId)
+      : req.headers["x-club-id"]
+      ? Number(req.headers["x-club-id"])
+      : (user.clubId || null);
+
     const [created] = await db
       .insert(encuentrosTable)
       .values({
@@ -169,9 +175,9 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
         courtsAvailable: courtsAvailable ? parseInt(courtsAvailable, 10) : 1,
         sportId: sportId ? parseInt(sportId, 10) : null,
-        formato: formato || "americana",
+        formato: formato || (sportId === 3 ? "pichanga" : "americana"),
         notes: notes || null,
-        clubId: user.clubId || null,
+        clubId: effectiveClubId,
         organizerId: user.id ? String(user.id) : null,
       })
       .returning();
@@ -705,7 +711,16 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
   try {
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    const { formato = "americana", sportId, teamSize, modalityId, courts, rounds, previewOnly } = req.body;
+    const {
+      formato = "americana",
+      sportId,
+      teamSize,
+      modalityId,
+      courts,
+      rounds,
+      previewOnly,
+      rivalTeamName,
+    } = req.body;
 
     const asistencia = await getAsistenciaList(encuentroId);
     const confirmados = asistencia.filter((a) => a.status === "confirmed");
@@ -717,9 +732,28 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
 
     // Deportes: 1 = Pádel, 2 = Tenis, 3 = Fútbol
     const idDeDeporte = sportId ? Number(sportId) : (encuentroDb?.sportId ? Number(encuentroDb.sportId) : 1);
-    const isFootball = idDeDeporte === 3;
-    const sizePorEquipo = teamSize ? Number(teamSize) : (isFootball ? 5 : 2);
-    const minJugadores = sizePorEquipo * 2;
+    const isFootball =
+      idDeDeporte === 3 ||
+      encuentroDb?.title?.toLowerCase().includes("fútbol") ||
+      encuentroDb?.title?.toLowerCase().includes("futbol") ||
+      encuentroDb?.title?.toLowerCase().includes("pichanga");
+
+    let sizePorEquipo = 2;
+    if (isFootball) {
+      if (teamSize) {
+        sizePorEquipo = Number(teamSize);
+      } else if (confirmados.length >= 22) {
+        sizePorEquipo = 11;
+      } else if (confirmados.length >= 14) {
+        sizePorEquipo = 7;
+      } else if (confirmados.length >= 10) {
+        sizePorEquipo = 5;
+      } else {
+        sizePorEquipo = Math.max(2, Math.floor(confirmados.length / 2));
+      }
+    } else {
+      sizePorEquipo = teamSize ? Number(teamSize) : 2;
+    }
 
     const modalityRows = await db
       .select()
@@ -731,12 +765,21 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       : modalityRows.find((row) => row.teamSize === sizePorEquipo && row.active);
 
     if (!modality && modalityRows.length > 0) {
-      modality = modalityRows[0];
+      modality = [...modalityRows].sort(
+        (a, b) => Math.abs(a.teamSize - sizePorEquipo) - Math.abs(b.teamSize - sizePorEquipo)
+      )[0];
     }
+    const safeModalityId = modality?.id || (modalityRows[0]?.id ?? 1);
+
+    const minJugadores = isFootball
+      ? (formato === "triangular" ? 6 : Math.min(4, sizePorEquipo * 2))
+      : sizePorEquipo * 2;
 
     if (confirmados.length < minJugadores) {
       res.status(400).json({
-        message: `Se requieren al menos ${minJugadores} jugadores confirmados para generar partidos (Tamaño por equipo requerido: ${sizePorEquipo}). Actualmente hay ${confirmados.length}.`,
+        message: isFootball
+          ? `Se requieren al menos ${minJugadores} jugadores confirmados para armar partidos de fútbol. Actualmente hay ${confirmados.length}.`
+          : `Se requieren al menos ${minJugadores} jugadores confirmados para generar partidos (Tamaño por equipo requerido: ${sizePorEquipo}). Actualmente hay ${confirmados.length}.`,
       });
       return;
     }
@@ -755,261 +798,379 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       return eloB - eloA;
     });
 
-    const maxCourts = Math.max(1, Math.floor(confirmados.length / minJugadores));
-    const canchas = courts ? Math.max(1, Math.min(Number(courts), maxCourts)) : maxCourts;
-    const jugadoresPorTurno = canchas * minJugadores;
-    const descansanPorTurno = confirmados.length - jugadoresPorTurno;
-
-    // Determinar número de rondas
-    let numRondas = 3;
-    if (rounds) {
-      numRondas = Math.max(1, Math.min(15, Number(rounds)));
-    } else {
-      if (formato === "desafio") {
-        numRondas = 1;
-      } else if (confirmados.length === 4) {
-        numRondas = 3; // 3 posibles parejas entre 4 jugadores
-      } else if (confirmados.length === 5) {
-        numRondas = 5; // cada jugador descansa exactamente 1 ronda
-      } else if (confirmados.length >= 8) {
-        numRondas = 3; // 6 partidos en 2 pistas (~90 min estándar)
-      } else {
-        numRondas = 3;
-      }
-    }
-
     type MatchFixture = {
       round: number;
       court: number;
       team1: number[];
       team2: number[];
+      team1Starters?: number[];
+      team1Subs?: number[];
+      team2Starters?: number[];
+      team2Subs?: number[];
       resting?: number[];
+      matchType?: string;
+      rivalTeamName?: string;
     };
 
     const crucesPartidos: MatchFixture[] = [];
-    const timesPlayed = new Map<number, number>();
-    const partnerHistory = new Map<string, number>();
-    const opponentHistory = new Map<string, number>();
+    let canchas = 1;
+    let numRondas = 1;
+    let jugadoresPorTurno = confirmados.length;
+    let descansanPorTurno = 0;
 
-    const getPairKey = (p1: number, p2: number) => `${Math.min(p1, p2)}-${Math.max(p1, p2)}`;
-    const recordMatch = (t1: number[], t2: number[]) => {
-      if (t1.length === 2) {
-        const k1 = getPairKey(t1[0], t1[1]);
-        partnerHistory.set(k1, (partnerHistory.get(k1) || 0) + 1);
+    if (isFootball) {
+      canchas = courts ? Math.max(1, Number(courts)) : 1;
+
+      if (formato === "triangular") {
+        numRondas = 3;
+        // Distribuir jugadores en 3 equipos equilibrados por Elo mediante snake-draft de 3 vías
+        const teamA: number[] = [];
+        const teamB: number[] = [];
+        const teamC: number[] = [];
+
+        sortedPlayers.forEach((p, idx) => {
+          const cycle = Math.floor(idx / 3);
+          const pos = idx % 3;
+          if (cycle % 2 === 0) {
+            if (pos === 0) teamA.push(p.playerId);
+            else if (pos === 1) teamB.push(p.playerId);
+            else teamC.push(p.playerId);
+          } else {
+            if (pos === 0) teamC.push(p.playerId);
+            else if (pos === 1) teamB.push(p.playerId);
+            else teamA.push(p.playerId);
+          }
+        });
+
+        crucesPartidos.push({
+          round: 1,
+          court: 1,
+          team1: teamA,
+          team2: teamB,
+          resting: teamC,
+          matchType: "internal",
+        });
+        crucesPartidos.push({
+          round: 2,
+          court: 1,
+          team1: teamB,
+          team2: teamC,
+          resting: teamA,
+          matchType: "internal",
+        });
+        crucesPartidos.push({
+          round: 3,
+          court: 1,
+          team1: teamA,
+          team2: teamC,
+          resting: teamB,
+          matchType: "internal",
+        });
+
+        jugadoresPorTurno = Math.floor((teamA.length + teamB.length) / 2) * 2;
+        descansanPorTurno = teamC.length;
+      } else if (formato === "rival") {
+        numRondas = 1;
+        const allPlayerIds = sortedPlayers.map((p) => p.playerId);
+        const startersCount = Math.min(allPlayerIds.length, sizePorEquipo);
+        const team1Starters = allPlayerIds.slice(0, startersCount);
+        const team1Subs = allPlayerIds.slice(startersCount);
+
+        crucesPartidos.push({
+          round: 1,
+          court: 1,
+          team1: allPlayerIds,
+          team2: [],
+          team1Starters,
+          team1Subs,
+          team2Starters: [],
+          team2Subs: [],
+          resting: [],
+          matchType: "rival",
+          rivalTeamName: rivalTeamName || "Rival Externo",
+        });
+
+        jugadoresPorTurno = startersCount;
+        descansanPorTurno = team1Subs.length;
+      } else {
+        // Pichanga / 2 Equipos Equilibrados (formato por defecto para fútbol)
+        numRondas = rounds ? Math.max(1, Number(rounds)) : 1;
+
+        // Distribución snake draft por Elo para paridad deportiva absoluta
+        const t1Ids: number[] = [];
+        const t2Ids: number[] = [];
+        sortedPlayers.forEach((p, idx) => {
+          const mod = idx % 4;
+          if (mod === 0 || mod === 3) {
+            t1Ids.push(p.playerId);
+          } else {
+            t2Ids.push(p.playerId);
+          }
+        });
+
+        const startersCount1 = Math.min(t1Ids.length, sizePorEquipo);
+        const startersCount2 = Math.min(t2Ids.length, sizePorEquipo);
+        const team1Starters = t1Ids.slice(0, startersCount1);
+        const team1Subs = t1Ids.slice(startersCount1);
+        const team2Starters = t2Ids.slice(0, startersCount2);
+        const team2Subs = t2Ids.slice(startersCount2);
+
+        for (let r = 1; r <= numRondas; r++) {
+          crucesPartidos.push({
+            round: r,
+            court: 1,
+            team1: t1Ids,
+            team2: t2Ids,
+            team1Starters,
+            team1Subs,
+            team2Starters,
+            team2Subs,
+            resting: [],
+            matchType: "internal",
+          });
+        }
+
+        jugadoresPorTurno = startersCount1 + startersCount2;
+        descansanPorTurno = team1Subs.length + team2Subs.length;
       }
-      if (t2.length === 2) {
-        const k2 = getPairKey(t2[0], t2[1]);
-        partnerHistory.set(k2, (partnerHistory.get(k2) || 0) + 1);
-      }
-      for (const a of t1) {
-        for (const b of t2) {
-          const ok = getPairKey(a, b);
-          opponentHistory.set(ok, (opponentHistory.get(ok) || 0) + 1);
+    } else {
+      // PÁDEL / TENIS: Formatos por parejas con canchas y rotación
+      const maxCourts = Math.max(1, Math.floor(confirmados.length / minJugadores));
+      canchas = courts ? Math.max(1, Math.min(Number(courts), maxCourts)) : maxCourts;
+      jugadoresPorTurno = canchas * minJugadores;
+      descansanPorTurno = confirmados.length - jugadoresPorTurno;
+
+      if (rounds) {
+        numRondas = Math.max(1, Math.min(15, Number(rounds)));
+      } else {
+        if (formato === "desafio") {
+          numRondas = 1;
+        } else if (confirmados.length === 4) {
+          numRondas = 3;
+        } else if (confirmados.length === 5) {
+          numRondas = 5;
+        } else if (confirmados.length >= 8) {
+          numRondas = 3;
+        } else {
+          numRondas = 3;
         }
       }
-    };
 
-    if (formato === "parejas_fijas") {
-      const parejas: Array<{ id: number; players: number[]; avgElo: number }> = [];
-      const numParejas = Math.floor(confirmados.length / 2);
-      for (let i = 0; i < numParejas; i++) {
-        const p1 = sortedPlayers[i].playerId;
-        const p2 = sortedPlayers[confirmados.length - 1 - i].playerId;
-        const avgElo = Math.round(
-          ((playerDetailMap.get(p1)?.elo || 1500) + (playerDetailMap.get(p2)?.elo || 1500)) / 2
-        );
-        parejas.push({ id: i + 1, players: [p1, p2], avgElo });
-      }
+      const timesPlayed = new Map<number, number>();
+      const partnerHistory = new Map<string, number>();
+      const opponentHistory = new Map<string, number>();
 
-      const P = parejas.length;
-      for (let r = 1; r <= numRondas; r++) {
-        const shift = (r - 1) % Math.max(1, P - 1);
-        const rotatedPairs = [
-          parejas[0],
-          ...parejas.slice(1 + shift),
-          ...parejas.slice(1, 1 + shift),
-        ];
-
-        let courtIndex = 1;
-        for (let i = 0; i < Math.floor(P / 2) && courtIndex <= canchas; i++) {
-          const pairA = rotatedPairs[i];
-          const pairB = rotatedPairs[P - 1 - i];
-          if (pairA && pairB && pairA.id !== pairB.id) {
-            crucesPartidos.push({
-              round: r,
-              court: courtIndex,
-              team1: pairA.players,
-              team2: pairB.players,
-            });
-            courtIndex++;
+      const getPairKey = (p1: number, p2: number) => `${Math.min(p1, p2)}-${Math.max(p1, p2)}`;
+      const recordMatch = (t1: number[], t2: number[]) => {
+        if (t1.length === 2) {
+          const k1 = getPairKey(t1[0], t1[1]);
+          partnerHistory.set(k1, (partnerHistory.get(k1) || 0) + 1);
+        }
+        if (t2.length === 2) {
+          const k2 = getPairKey(t2[0], t2[1]);
+          partnerHistory.set(k2, (partnerHistory.get(k2) || 0) + 1);
+        }
+        for (const a of t1) {
+          for (const b of t2) {
+            const ok = getPairKey(a, b);
+            opponentHistory.set(ok, (opponentHistory.get(ok) || 0) + 1);
           }
         }
-      }
-    } else if (formato === "desafio") {
-      for (let c = 1; c <= canchas; c++) {
-        const offset = (c - 1) * minJugadores;
-        const group = sortedPlayers.slice(offset, offset + minJugadores);
-        if (group.length === minJugadores) {
-          if (sizePorEquipo === 2) {
+      };
+
+      if (formato === "parejas_fijas") {
+        const parejas: Array<{ id: number; players: number[]; avgElo: number }> = [];
+        const numParejas = Math.floor(confirmados.length / 2);
+        for (let i = 0; i < numParejas; i++) {
+          const p1 = sortedPlayers[i].playerId;
+          const p2 = sortedPlayers[confirmados.length - 1 - i].playerId;
+          const avgElo = Math.round(
+            ((playerDetailMap.get(p1)?.elo || 1500) + (playerDetailMap.get(p2)?.elo || 1500)) / 2
+          );
+          parejas.push({ id: i + 1, players: [p1, p2], avgElo });
+        }
+
+        const P = parejas.length;
+        for (let r = 1; r <= numRondas; r++) {
+          const shift = (r - 1) % Math.max(1, P - 1);
+          const rotatedPairs = [
+            parejas[0],
+            ...parejas.slice(1 + shift),
+            ...parejas.slice(1, 1 + shift),
+          ];
+
+          let courtIndex = 1;
+          for (let i = 0; i < Math.floor(P / 2) && courtIndex <= canchas; i++) {
+            const pairA = rotatedPairs[i];
+            const pairB = rotatedPairs[P - 1 - i];
+            if (pairA && pairB && pairA.id !== pairB.id) {
+              crucesPartidos.push({
+                round: r,
+                court: courtIndex,
+                team1: pairA.players,
+                team2: pairB.players,
+              });
+              courtIndex++;
+            }
+          }
+        }
+      } else if (formato === "desafio") {
+        for (let c = 1; c <= canchas; c++) {
+          const offset = (c - 1) * minJugadores;
+          const group = sortedPlayers.slice(offset, offset + minJugadores);
+          if (group.length === minJugadores) {
             crucesPartidos.push({
               round: 1,
               court: c,
               team1: [group[0].playerId, group[3].playerId],
               team2: [group[1].playerId, group[2].playerId],
             });
-          } else {
-            crucesPartidos.push({
-              round: 1,
-              court: c,
-              team1: group.slice(0, sizePorEquipo).map((p) => p.playerId),
-              team2: group.slice(sizePorEquipo).map((p) => p.playerId),
-            });
           }
         }
-      }
-    } else {
-      // FORMATO AMERICANA (Rotación individual inteligente)
-      const canonical8Rounds: Array<Array<{ c: number; t1: number[]; t2: number[] }>> = [
-        [
-          { c: 1, t1: [0, 7], t2: [1, 6] },
-          { c: 2, t1: [2, 5], t2: [3, 4] },
-        ],
-        [
-          { c: 1, t1: [0, 1], t2: [2, 7] },
-          { c: 2, t1: [3, 6], t2: [4, 5] },
-        ],
-        [
-          { c: 1, t1: [0, 2], t2: [3, 1] },
-          { c: 2, t1: [4, 7], t2: [5, 6] },
-        ],
-        [
-          { c: 1, t1: [0, 3], t2: [4, 2] },
-          { c: 2, t1: [5, 1], t2: [6, 7] },
-        ],
-        [
-          { c: 1, t1: [0, 4], t2: [5, 3] },
-          { c: 2, t1: [6, 2], t2: [7, 1] },
-        ],
-        [
-          { c: 1, t1: [0, 5], t2: [6, 4] },
-          { c: 2, t1: [7, 3], t2: [1, 2] },
-        ],
-        [
-          { c: 1, t1: [0, 6], t2: [7, 5] },
-          { c: 2, t1: [1, 4], t2: [2, 3] },
-        ],
-      ];
+      } else {
+        // FORMATO AMERICANA (Rotación individual inteligente)
+        const canonical8Rounds: Array<Array<{ c: number; t1: number[]; t2: number[] }>> = [
+          [
+            { c: 1, t1: [0, 7], t2: [1, 6] },
+            { c: 2, t1: [2, 5], t2: [3, 4] },
+          ],
+          [
+            { c: 1, t1: [0, 1], t2: [2, 7] },
+            { c: 2, t1: [3, 6], t2: [4, 5] },
+          ],
+          [
+            { c: 1, t1: [0, 2], t2: [3, 1] },
+            { c: 2, t1: [4, 7], t2: [5, 6] },
+          ],
+          [
+            { c: 1, t1: [0, 3], t2: [4, 2] },
+            { c: 2, t1: [5, 1], t2: [6, 7] },
+          ],
+          [
+            { c: 1, t1: [0, 4], t2: [5, 3] },
+            { c: 2, t1: [6, 2], t2: [7, 1] },
+          ],
+          [
+            { c: 1, t1: [0, 5], t2: [6, 4] },
+            { c: 2, t1: [7, 3], t2: [1, 2] },
+          ],
+          [
+            { c: 1, t1: [0, 6], t2: [7, 5] },
+            { c: 2, t1: [1, 4], t2: [2, 3] },
+          ],
+        ];
 
-      const canonical4Rounds: Array<{ t1: number[]; t2: number[] }> = [
-        { t1: [0, 3], t2: [1, 2] },
-        { t1: [0, 1], t2: [2, 3] },
-        { t1: [0, 2], t2: [1, 3] },
-      ];
+        const canonical4Rounds: Array<{ t1: number[]; t2: number[] }> = [
+          { t1: [0, 3], t2: [1, 2] },
+          { t1: [0, 1], t2: [2, 3] },
+          { t1: [0, 2], t2: [1, 3] },
+        ];
 
-      for (let r = 1; r <= numRondas; r++) {
-        let activePlayers: typeof sortedPlayers = [];
-        let restingPlayerIds: number[] = [];
+        for (let r = 1; r <= numRondas; r++) {
+          let activePlayers: typeof sortedPlayers = [];
+          let restingPlayerIds: number[] = [];
 
-        if (descansanPorTurno === 0) {
-          activePlayers = [...sortedPlayers];
-        } else {
-          const sortedByGames = [...sortedPlayers].sort((a, b) => {
-            const playedA = timesPlayed.get(a.playerId) || 0;
-            const playedB = timesPlayed.get(b.playerId) || 0;
-            if (playedA !== playedB) return playedA - playedB;
-            return (a.playerId + r) % sortedPlayers.length - (b.playerId + r) % sortedPlayers.length;
+          if (descansanPorTurno === 0) {
+            activePlayers = [...sortedPlayers];
+          } else {
+            const sortedByGames = [...sortedPlayers].sort((a, b) => {
+              const playedA = timesPlayed.get(a.playerId) || 0;
+              const playedB = timesPlayed.get(b.playerId) || 0;
+              if (playedA !== playedB) return playedA - playedB;
+              return (a.playerId + r) % sortedPlayers.length - (b.playerId + r) % sortedPlayers.length;
+            });
+
+            activePlayers = sortedByGames.slice(0, jugadoresPorTurno);
+            restingPlayerIds = sortedByGames.slice(jugadoresPorTurno).map((p) => p.playerId);
+          }
+
+          for (const p of activePlayers) {
+            timesPlayed.set(p.playerId, (timesPlayed.get(p.playerId) || 0) + 1);
+          }
+
+          activePlayers.sort((a, b) => {
+            const eloA = playerDetailMap.get(a.playerId)?.elo || 1500;
+            const eloB = playerDetailMap.get(b.playerId)?.elo || 1500;
+            return eloB - eloA;
           });
 
-          activePlayers = sortedByGames.slice(0, jugadoresPorTurno);
-          restingPlayerIds = sortedByGames.slice(jugadoresPorTurno).map((p) => p.playerId);
-        }
-
-        for (const p of activePlayers) {
-          timesPlayed.set(p.playerId, (timesPlayed.get(p.playerId) || 0) + 1);
-        }
-
-        activePlayers.sort((a, b) => {
-          const eloA = playerDetailMap.get(a.playerId)?.elo || 1500;
-          const eloB = playerDetailMap.get(b.playerId)?.elo || 1500;
-          return eloB - eloA;
-        });
-
-        if (activePlayers.length === 4 && canchas === 1) {
-          const matchIdx = (r - 1) % 3;
-          const cDef = canonical4Rounds[matchIdx];
-          const t1 = [activePlayers[cDef.t1[0]].playerId, activePlayers[cDef.t1[1]].playerId];
-          const t2 = [activePlayers[cDef.t2[0]].playerId, activePlayers[cDef.t2[1]].playerId];
-          crucesPartidos.push({
-            round: r,
-            court: 1,
-            team1: t1,
-            team2: t2,
-            resting: restingPlayerIds,
-          });
-          recordMatch(t1, t2);
-        } else if (activePlayers.length === 8 && canchas === 2) {
-          const roundIdx = (r - 1) % 7;
-          const rPlan = canonical8Rounds[roundIdx];
-          for (const cMatch of rPlan) {
-            const t1 = [activePlayers[cMatch.t1[0]].playerId, activePlayers[cMatch.t1[1]].playerId];
-            const t2 = [activePlayers[cMatch.t2[0]].playerId, activePlayers[cMatch.t2[1]].playerId];
+          if (activePlayers.length === 4 && canchas === 1) {
+            const matchIdx = (r - 1) % 3;
+            const cDef = canonical4Rounds[matchIdx];
+            const t1 = [activePlayers[cDef.t1[0]].playerId, activePlayers[cDef.t1[1]].playerId];
+            const t2 = [activePlayers[cDef.t2[0]].playerId, activePlayers[cDef.t2[1]].playerId];
             crucesPartidos.push({
               round: r,
-              court: cMatch.c,
+              court: 1,
               team1: t1,
               team2: t2,
               resting: restingPlayerIds,
             });
             recordMatch(t1, t2);
-          }
-        } else {
-          for (let c = 1; c <= canchas; c++) {
-            const groupOffset = (c - 1) * minJugadores;
-            const courtGroup = activePlayers.slice(groupOffset, groupOffset + minJugadores);
-            if (courtGroup.length === minJugadores) {
-              const ids = courtGroup.map((p) => p.playerId);
-              const configs = [
-                { t1: [ids[0], ids[3]], t2: [ids[1], ids[2]] },
-                { t1: [ids[0], ids[1]], t2: [ids[2], ids[3]] },
-                { t1: [ids[0], ids[2]], t2: [ids[1], ids[3]] },
-              ];
-
-              let bestConfig = configs[0];
-              let minCost = Infinity;
-
-              for (const cfg of configs) {
-                const k1 = getPairKey(cfg.t1[0], cfg.t1[1]);
-                const k2 = getPairKey(cfg.t2[0], cfg.t2[1]);
-                const part1 = partnerHistory.get(k1) || 0;
-                const part2 = partnerHistory.get(k2) || 0;
-
-                const elo1 = Math.round(
-                  ((playerDetailMap.get(cfg.t1[0])?.elo || 1500) +
-                    (playerDetailMap.get(cfg.t1[1])?.elo || 1500)) /
-                    2
-                );
-                const elo2 = Math.round(
-                  ((playerDetailMap.get(cfg.t2[0])?.elo || 1500) +
-                    (playerDetailMap.get(cfg.t2[1])?.elo || 1500)) /
-                    2
-                );
-                const eloDiff = Math.abs(elo1 - elo2);
-
-                const cost = (part1 + part2) * 1000 + eloDiff;
-                if (cost < minCost) {
-                  minCost = cost;
-                  bestConfig = cfg;
-                }
-              }
-
+          } else if (activePlayers.length === 8 && canchas === 2) {
+            const roundIdx = (r - 1) % 7;
+            const rPlan = canonical8Rounds[roundIdx];
+            for (const cMatch of rPlan) {
+              const t1 = [activePlayers[cMatch.t1[0]].playerId, activePlayers[cMatch.t1[1]].playerId];
+              const t2 = [activePlayers[cMatch.t2[0]].playerId, activePlayers[cMatch.t2[1]].playerId];
               crucesPartidos.push({
                 round: r,
-                court: c,
-                team1: bestConfig.t1,
-                team2: bestConfig.t2,
+                court: cMatch.c,
+                team1: t1,
+                team2: t2,
                 resting: restingPlayerIds,
               });
-              recordMatch(bestConfig.t1, bestConfig.t2);
+              recordMatch(t1, t2);
+            }
+          } else {
+            for (let c = 1; c <= canchas; c++) {
+              const groupOffset = (c - 1) * minJugadores;
+              const courtGroup = activePlayers.slice(groupOffset, groupOffset + minJugadores);
+              if (courtGroup.length === minJugadores) {
+                const ids = courtGroup.map((p) => p.playerId);
+                const configs = [
+                  { t1: [ids[0], ids[3]], t2: [ids[1], ids[2]] },
+                  { t1: [ids[0], ids[1]], t2: [ids[2], ids[3]] },
+                  { t1: [ids[0], ids[2]], t2: [ids[1], ids[3]] },
+                ];
+
+                let bestConfig = configs[0];
+                let minCost = Infinity;
+
+                for (const cfg of configs) {
+                  const k1 = getPairKey(cfg.t1[0], cfg.t1[1]);
+                  const k2 = getPairKey(cfg.t2[0], cfg.t2[1]);
+                  const part1 = partnerHistory.get(k1) || 0;
+                  const part2 = partnerHistory.get(k2) || 0;
+
+                  const elo1 = Math.round(
+                    ((playerDetailMap.get(cfg.t1[0])?.elo || 1500) +
+                      (playerDetailMap.get(cfg.t1[1])?.elo || 1500)) /
+                      2
+                  );
+                  const elo2 = Math.round(
+                    ((playerDetailMap.get(cfg.t2[0])?.elo || 1500) +
+                      (playerDetailMap.get(cfg.t2[1])?.elo || 1500)) /
+                      2
+                  );
+                  const eloDiff = Math.abs(elo1 - elo2);
+
+                  const cost = (part1 + part2) * 1000 + eloDiff;
+                  if (cost < minCost) {
+                    minCost = cost;
+                    bestConfig = cfg;
+                  }
+                }
+
+                crucesPartidos.push({
+                  round: r,
+                  court: c,
+                  team1: bestConfig.t1,
+                  team2: bestConfig.t2,
+                  resting: restingPlayerIds,
+                });
+                recordMatch(bestConfig.t1, bestConfig.t2);
+              }
             }
           }
         }
@@ -1020,17 +1181,19 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       const previewCruces = crucesPartidos.map((cruce, idx) => {
         const t1 = cruce.team1.map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
         const t2 = cruce.team2.map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
-        const elo1 = Math.round(
-          cruce.team1.reduce((acc, id) => acc + (playerDetailMap.get(id)?.elo || 1500), 0) /
-            cruce.team1.length
-        );
-        const elo2 = Math.round(
-          cruce.team2.reduce((acc, id) => acc + (playerDetailMap.get(id)?.elo || 1500), 0) /
-            cruce.team2.length
-        );
+        const elo1 = cruce.team1.length > 0
+          ? Math.round(cruce.team1.reduce((acc, id) => acc + (playerDetailMap.get(id)?.elo || 1500), 0) / cruce.team1.length)
+          : 1500;
+        const elo2 = cruce.team2.length > 0
+          ? Math.round(cruce.team2.reduce((acc, id) => acc + (playerDetailMap.get(id)?.elo || 1500), 0) / cruce.team2.length)
+          : 1500;
         const restingNames = (cruce.resting || []).map(
           (id) => playerDetailMap.get(id)?.name || `Jugador ${id}`
         );
+        const team1StartersNames = (cruce.team1Starters || []).map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
+        const team1SubsNames = (cruce.team1Subs || []).map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
+        const team2StartersNames = (cruce.team2Starters || []).map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
+        const team2SubsNames = (cruce.team2Subs || []).map((id) => playerDetailMap.get(id)?.name || `Jugador ${id}`);
 
         return {
           matchIndex: idx + 1,
@@ -1038,12 +1201,28 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
           court: cruce.court,
           team1: cruce.team1,
           team2: cruce.team2,
-          team1Names: t1.join(" & "),
-          team2Names: t2.join(" & "),
+          team1Names: isFootball
+            ? (formato === "triangular"
+                ? `Equipo ${idx === 0 ? "A" : idx === 1 ? "B" : "A"}: ${t1.join(", ")}`
+                : `Equipo Blanco (${team1StartersNames.length} titulares${team1SubsNames.length > 0 ? `, ${team1SubsNames.length} suplentes` : ""}): ${t1.join(", ")}`)
+            : t1.join(" & "),
+          team2Names: isFootball
+            ? (cruce.matchType === "rival"
+                ? (cruce.rivalTeamName || "Rival Externo")
+                : (formato === "triangular"
+                    ? `Equipo ${idx === 0 ? "B" : idx === 1 ? "C" : "C"}: ${t2.join(", ")}`
+                    : `Equipo Azul (${team2StartersNames.length} titulares${team2SubsNames.length > 0 ? `, ${team2SubsNames.length} suplentes` : ""}): ${t2.join(", ")}`))
+            : t2.join(" & "),
           team1AvgElo: elo1,
           team2AvgElo: elo2,
           diffElo: Math.abs(elo1 - elo2),
           restingNames,
+          team1StartersNames,
+          team1SubsNames,
+          team2StartersNames,
+          team2SubsNames,
+          matchType: cruce.matchType || "internal",
+          rivalTeamName: cruce.rivalTeamName,
         };
       });
 
@@ -1057,9 +1236,12 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
           matchesPerRound: Math.round(crucesPartidos.length / numRondas),
           restingPerRound: descansanPorTurno,
           format: formato,
+          isFootball,
         },
         cruces: previewCruces,
-        message: `Fixture generado con ${crucesPartidos.length} partidos en ${numRondas} rondas (${canchas} pista${canchas > 1 ? "s" : ""}).`,
+        message: isFootball
+          ? `Planificación de fútbol lista: ${crucesPartidos.length} partido(s), ${jugadoresPorTurno} titulares en cancha, ${descansanPorTurno} suplentes en banca.`
+          : `Fixture generado con ${crucesPartidos.length} partidos en ${numRondas} rondas (${canchas} pista${canchas > 1 ? "s" : ""}).`,
       });
       return;
     }
@@ -1089,30 +1271,38 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
           clubId: effectiveClubId,
           encuentroId,
           sportId: idDeDeporte,
-          modalityId: modality.id,
+          modalityId: safeModalityId,
           round: cruce.round,
           court: cruce.court,
           team1Score: 0,
           team2Score: 0,
           result: "pending",
-          status: "pending",
+          status: "pending_confirmation",
+          matchType: cruce.matchType || "internal",
+          rivalTeamName: cruce.rivalTeamName || null,
           playedAt: new Date(),
         } as any)
         .returning();
 
       for (const pId of cruce.team1) {
+        const isSub = (cruce.team1Subs || []).includes(pId);
         await db.insert(matchPlayersTable).values({
           matchId: newMatch.id,
           playerId: pId,
           team: "team1",
+          isSubstitute: isSub,
+          role: isSub ? "substitute" : "starter",
         });
       }
 
       for (const pId of cruce.team2) {
+        const isSub = (cruce.team2Subs || []).includes(pId);
         await db.insert(matchPlayersTable).values({
           matchId: newMatch.id,
           playerId: pId,
           team: "team2",
+          isSubstitute: isSub,
+          role: isSub ? "substitute" : "starter",
         });
       }
 
@@ -1128,6 +1318,7 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
         courts: canchas,
         rounds: numRondas,
         totalMatches: partidosCreados.length,
+        isFootball,
       },
     });
   } catch (err: any) {

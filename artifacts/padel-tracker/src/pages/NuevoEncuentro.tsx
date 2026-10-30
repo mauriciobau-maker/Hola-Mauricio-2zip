@@ -122,11 +122,14 @@ export function NuevoEncuentro() {
       .catch(() => {});
   }, []);
 
+  const selectedSport = sports.find((s) => s.id === selectedSportId);
+  const isFootball = selectedSport?.slug === "futbol" || selectedSportId === 3;
+
   const handleSelectSport = (sp: { id: number; name: string; slug: string }) => {
     setSelectedSportId(sp.id);
     if (sp.slug === "futbol") {
       setMaxSpots("10");
-      setFormato("parejas_fijas");
+      setFormato("pichanga");
     } else {
       if (maxSpots === "10") setMaxSpots("4");
       setFormato("americana");
@@ -309,7 +312,128 @@ export function NuevoEncuentro() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="courtsAvailable">Pistas / Canchas Asignadas</Label>
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {lang === "en" ? "Game Format" : lang === "pt" ? "Formato de Jogo" : "Formato del Encuentro"}
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {isFootball ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFormato("pichanga")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "pichanga"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    ⚽ {lang === "en" ? "Pickup (2 Teams)" : lang === "pt" ? "Pelada (2 Times)" : "Pichanga (2 Equipos)"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "Auto-balance 2 squads by Elo" : lang === "pt" ? "2 times equilibrados por Elo" : "2 equipos equilibrados por Elo"}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormato("triangular")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "triangular"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    🔄 {lang === "en" ? "Triangular (3 Teams)" : lang === "pt" ? "Triangular (3 Times)" : "Triangular (3 Equipos)"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "3 teams in rotating matches" : lang === "pt" ? "3 times em partidas rotativas" : "3 equipos rotando partidos"}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormato("rival")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "rival"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    ⚡ {lang === "en" ? "vs External Rival" : lang === "pt" ? "vs Adversário" : "vs Rival Externo"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "Squad vs visiting team" : lang === "pt" ? "Elenco contra time visitante" : "Todo el plantel contra rival"}
+                  </p>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFormato("americana")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "americana"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    🎾 {lang === "en" ? "Americano (Rotation)" : lang === "pt" ? "Americano (Rotação)" : "Americana (Rotación)"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "Individual partner rotation" : lang === "pt" ? "Rotação individual de duplas" : "Rotación de parejas individual"}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormato("parejas_fijas")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "parejas_fijas"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    👥 {lang === "en" ? "Fixed Pairs" : lang === "pt" ? "Duplas Fixas" : "Parejas Fijas"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "Round-robin tournament" : lang === "pt" ? "Torneio todas contra todas" : "Liguilla todos contra todos"}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormato("desafio")}
+                  className={cn(
+                    "p-2.5 rounded-xl text-left border transition-all text-xs",
+                    formato === "desafio"
+                      ? "bg-primary/15 text-foreground border-primary ring-1 ring-primary"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    ⚡ {lang === "en" ? "Single Challenge" : lang === "pt" ? "Desafio Único" : "Desafío Único"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {lang === "en" ? "1 competitive match" : lang === "pt" ? "1 partida competitiva" : "1 partido competitivo"}
+                  </p>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="courtsAvailable">
+            {isFootball
+              ? (lang === "en" ? "Assigned Pitch(es)" : lang === "pt" ? "Campo(s) Atribuído(s)" : "Canchas de Fútbol Asignadas")
+              : (lang === "en" ? "Assigned Courts" : lang === "pt" ? "Quadras Atribuídas" : "Pistas / Canchas Asignadas")}
+          </Label>
           <Input
             id="courtsAvailable"
             type="number"
