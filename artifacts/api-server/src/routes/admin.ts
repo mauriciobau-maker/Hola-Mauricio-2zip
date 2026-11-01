@@ -82,7 +82,7 @@ const requireClubAdmin = checkRole("CLUB_ADMIN");
 // --- CURRENT CLUB ROUTE ---
 
 router.get(
-  ["/clubs/current", "/admin/clubs/current"],
+  "/admin/clubs/current",
   async (req, res): Promise<void> => {
     try {
       const user = req.user as any;

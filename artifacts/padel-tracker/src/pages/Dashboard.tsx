@@ -28,16 +28,21 @@ export default function Dashboard() {
       .then((d) => {
         setClub(d);
         if (d?.sports && d.sports.length > 0) {
+          const clubSportIds = d.sports.map((s: any) => s.id);
           const savedSportId = localStorage.getItem("selected_sport_id");
-          const found = d.sports.find((s: any) => String(s.id) === savedSportId);
+          const found = savedSportId && clubSportIds.includes(Number(savedSportId)) ? Number(savedSportId) : null;
           if (found) {
-            setSelectedSportId(found.id);
+            setSelectedSportId(found);
           } else {
             const defaultSport =
+              (d.isFootball && d.sports.find((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol"))) ||
               d.sports.find((s: any) => s.slug === "padel") ||
               d.sports.find((s: any) => s.slug === "tenis" || s.useSets) ||
               d.sports[0];
             setSelectedSportId(defaultSport.id);
+            try {
+              localStorage.setItem("selected_sport_id", String(defaultSport.id));
+            } catch {}
           }
         }
       })
@@ -54,8 +59,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
-    const dashUrl = selectedSportId ? `/api/dashboard?sportId=${selectedSportId}` : "/api/dashboard";
-    const rankUrl = selectedSportId ? `/api/ranking?sportId=${selectedSportId}` : "/api/ranking";
+    const queryParams = new URLSearchParams();
+    if (selectedSportId) queryParams.set("sportId", String(selectedSportId));
+    if (club?.id) queryParams.set("clubId", String(club.id));
+    const qs = queryParams.toString() ? `?${queryParams.toString()}` : "";
+    const dashUrl = `/api/dashboard${qs}`;
+    const rankUrl = `/api/ranking${qs}`;
 
     Promise.all([
       fetch(dashUrl).then((r) => (r.ok ? r.json() : null)),
@@ -67,10 +76,11 @@ export default function Dashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [selectedSportId]);
+  }, [selectedSportId, club?.id]);
 
   const activeSport = club?.sports?.find((s: any) => s.id === selectedSportId) || club?.sports?.[0];
   const isFootball =
+    Boolean(club?.isFootball) ||
     activeSport?.slug === "futbol" ||
     activeSport?.name?.toLowerCase().includes("fútbol");
 

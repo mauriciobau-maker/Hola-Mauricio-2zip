@@ -157,8 +157,8 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
 // GET /clubs/current — Devuelve el club actual respetando query param clubId o usuario
 router.get("/clubs/current", async (req, res): Promise<void> => {
   try {
-    const user = req.user as any;
-    const queryClubId = req.query.clubId ? Number(req.query.clubId) : null;
+    const headerClubId = req.headers["x-club-id"] ? Number(req.headers["x-club-id"]) : null;
+    const queryClubId = req.query.clubId ? Number(req.query.clubId) : headerClubId;
     let targetClub: any = null;
 
     if (queryClubId && !Number.isNaN(queryClubId)) {

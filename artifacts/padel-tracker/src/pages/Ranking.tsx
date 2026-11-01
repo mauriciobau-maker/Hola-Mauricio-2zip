@@ -29,6 +29,7 @@ export default function Ranking() {
             setSelectedSportId(found.id);
           } else {
             const defaultSport =
+              (d.isFootball && validSports.find((s: any) => s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol"))) ||
               validSports.find((s: any) => s.slug === "padel") ||
               validSports.find((s: any) => s.slug === "tenis" || s.useSets) ||
               validSports[0];

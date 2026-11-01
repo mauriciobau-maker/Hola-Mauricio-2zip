@@ -43,8 +43,20 @@ export function AuthButton() {
 
     if (nextUser) {
       localStorage.setItem("padel_auth_user", JSON.stringify(nextUser));
+      if (nextUser.clubId) {
+        localStorage.setItem("active_club_id", String(nextUser.clubId));
+        if (nextUser.clubId === 3) {
+          localStorage.setItem("selected_sport_id", "3");
+        } else if (nextUser.clubId === 2) {
+          localStorage.setItem("selected_sport_id", "2");
+        } else {
+          localStorage.setItem("selected_sport_id", "1");
+        }
+      }
     } else {
       localStorage.removeItem("padel_auth_user");
+      localStorage.removeItem("active_club_id");
+      localStorage.removeItem("selected_sport_id");
     }
 
     window.dispatchEvent(new CustomEvent("padel_auth_update", { detail: nextUser ?? null }));
