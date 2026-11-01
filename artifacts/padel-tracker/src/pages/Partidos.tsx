@@ -44,7 +44,31 @@ export default function Partidos() {
   useEffect(() => {
     fetch("/api/clubs/current")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setClub(d))
+      .then((d) => {
+        setClub(d);
+        if (d?.sports && d.sports.length > 0) {
+          const clubSportSlugs = d.sports.map((s: any) => (s.slug === "futbol" || s.name?.toLowerCase().includes("fútbol") ? "futbol" : s.slug));
+          const savedSportId = localStorage.getItem("selected_sport_id");
+          let currentKey = "all";
+          if (savedSportId === "3") currentKey = "futbol";
+          else if (savedSportId === "2") currentKey = "tenis";
+          else if (savedSportId === "1") currentKey = "padel";
+
+          if (d.sports.length === 1) {
+            const singleSport = d.sports[0];
+            const isFut = singleSport.slug === "futbol" || singleSport.name?.toLowerCase().includes("fútbol");
+            const targetKey = isFut ? "futbol" : singleSport.slug;
+            setSelectedSport(targetKey);
+            localStorage.setItem("selected_sport_id", String(singleSport.id));
+          } else if (currentKey !== "all" && !clubSportSlugs.includes(currentKey)) {
+            const firstSport = d.sports[0];
+            const isFut = firstSport.slug === "futbol" || firstSport.name?.toLowerCase().includes("fútbol");
+            const targetKey = isFut ? "futbol" : firstSport.slug;
+            setSelectedSport(targetKey);
+            localStorage.setItem("selected_sport_id", String(firstSport.id));
+          }
+        }
+      })
       .catch(() => {});
 
     const handleSportChange = (e?: any) => {
@@ -127,7 +151,7 @@ export default function Partidos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {club?.sports && club.sports.length > 1 && (
+          {club?.sports && club.sports.length > 0 && (
             <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border rounded-xl">
               <button
                 onClick={() => handleSelectSport("all")}

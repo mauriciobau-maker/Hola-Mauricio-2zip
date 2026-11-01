@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { useGetEncuentro } from "@workspace/api-client-react";
+import {
+  useGetEncuentro,
+  getListMatchesQueryKey,
+  getGetRankingQueryKey,
+  getGetDashboardQueryKey,
+} from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -465,7 +470,14 @@ export function EncuentroDetalle() {
   // Sincronizar parámetros del encuentro (deporte, canchas asignadas, formato)
   useEffect(() => {
     if (data?.encuentro) {
-      if (data.encuentro.sportId) {
+      const isFut =
+        data.encuentro.sportId === 3 ||
+        data.encuentro.title?.toLowerCase().includes("fútbol") ||
+        data.encuentro.title?.toLowerCase().includes("futbol") ||
+        data.encuentro.title?.toLowerCase().includes("pichanga");
+      if (isFut) {
+        setSelectedSportId(3);
+      } else if (data.encuentro.sportId) {
         setSelectedSportId(data.encuentro.sportId);
       }
       if (data.encuentro.courtsAvailable) {
@@ -475,7 +487,7 @@ export function EncuentroDetalle() {
         setFormato(data.encuentro.formato);
       }
     }
-  }, [data?.encuentro?.id, data?.encuentro?.sportId, data?.encuentro?.courtsAvailable, data?.encuentro?.formato]);
+  }, [data?.encuentro?.id, data?.encuentro?.sportId, data?.encuentro?.title, data?.encuentro?.courtsAvailable, data?.encuentro?.formato]);
 
   useEffect(() => {
     if (isFootball) {
@@ -767,6 +779,9 @@ export function EncuentroDetalle() {
       if (res.ok) {
         setShowGenerateForm(false);
         reloadMatches();
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       } else {
         setRsvpError(resData.message || "Error al generar partidos");
       }
@@ -849,6 +864,9 @@ export function EncuentroDetalle() {
       const data = await res.json();
       if (res.ok) {
         reloadMatches();
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       } else {
         alert(data.error || "No se pudo confirmar el partido");
       }
@@ -867,6 +885,9 @@ export function EncuentroDetalle() {
       const data = await res.json();
       if (res.ok) {
         await refreshEncuentroData();
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         const baseMsg = data.pendingCount > 0
           ? `Encuentro finalizado. Quedaron ${data.pendingCount} partidos sin resultado oficial.`
           : (t.finalizeSuccessMsg || "¡Encuentro finalizado con éxito! Todos los resultados y rankings están computados.");
@@ -976,6 +997,9 @@ export function EncuentroDetalle() {
         setEditingMatchId(null);
         reloadMatches();
         await refreshEncuentroData();
+        queryClient.invalidateQueries({ queryKey: getListMatchesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRankingQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       } else {
         const errData = await res.json().catch(() => ({}));
         alert(errData.message || errData.error || "No se pudo guardar el resultado del partido.");

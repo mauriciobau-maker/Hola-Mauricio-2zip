@@ -659,12 +659,25 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
       updateData.status = "confirmed";
     }
 
-    // Asegurar clubId si no estaba asignado
+    updateData.playedAt = new Date();
+
+    const [encuentro] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+
+    const isFutMatch =
+      existingMatch.sportId === 3 ||
+      encuentro?.sportId === 3 ||
+      encuentro?.title?.toLowerCase().includes("fútbol") ||
+      encuentro?.title?.toLowerCase().includes("futbol") ||
+      encuentro?.title?.toLowerCase().includes("pichanga");
+
+    if (isFutMatch && existingMatch.sportId !== 3) {
+      updateData.sportId = 3;
+    }
+
     if (!existingMatch.clubId) {
-      const [encuentro] = await db
-        .select({ clubId: encuentrosTable.clubId })
-        .from(encuentrosTable)
-        .where(eq(encuentrosTable.id, encuentroId));
       const effectiveClubId = encuentro?.clubId || (req.user as any)?.clubId || 1;
       updateData.clubId = effectiveClubId;
     }
@@ -731,12 +744,18 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       .where(eq(encuentrosTable.id, encuentroId));
 
     // Deportes: 1 = Pádel, 2 = Tenis, 3 = Fútbol
-    const idDeDeporte = sportId ? Number(sportId) : (encuentroDb?.sportId ? Number(encuentroDb.sportId) : 1);
     const isFootball =
-      idDeDeporte === 3 ||
+      sportId === 3 ||
+      encuentroDb?.sportId === 3 ||
       encuentroDb?.title?.toLowerCase().includes("fútbol") ||
       encuentroDb?.title?.toLowerCase().includes("futbol") ||
       encuentroDb?.title?.toLowerCase().includes("pichanga");
+
+    const idDeDeporte = isFootball ? 3 : (sportId ? Number(sportId) : (encuentroDb?.sportId ? Number(encuentroDb.sportId) : 1));
+
+    if (isFootball && encuentroDb && encuentroDb.sportId !== 3) {
+      await db.update(encuentrosTable).set({ sportId: 3 }).where(eq(encuentrosTable.id, encuentroId));
+    }
 
     let sizePorEquipo = 2;
     if (isFootball) {

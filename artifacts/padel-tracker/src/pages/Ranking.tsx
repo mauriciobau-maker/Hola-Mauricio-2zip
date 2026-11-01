@@ -10,7 +10,7 @@ function initials(name: string) {
 }
 
 export default function Ranking() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [club, setClub] = useState<any>(null);
   const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
   const [ranking, setRanking] = useState<any[]>([]);
@@ -520,6 +520,7 @@ function WinRateBar({ rate }: { rate: number }) {
 }
 
 function PodiumCard({ entry, isFirst = false, isFootball = false }: { entry: any; isFirst?: boolean; isFootball?: boolean }) {
+  const { language } = useLanguage();
   const colors = {
     1: "border-yellow-500/40 bg-yellow-500/10",
     2: "border-gray-400/40 bg-gray-400/10",
