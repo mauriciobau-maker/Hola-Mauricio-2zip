@@ -11,35 +11,27 @@ const isVercel =
 
 if (isVercel) {
   setBaseUrl(API_BASE);
-}
-
-if (typeof window !== "undefined") {
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     let url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
-    if (url.startsWith("/api/") || (isVercel && url.startsWith(API_BASE))) {
-      if (isVercel && url.startsWith("/api/")) {
-        url = `${API_BASE}${url}`;
-      }
+    if (url && typeof url === "string" && url.startsWith("/api/")) {
+      url = `${API_BASE}${url}`;
       const headers = new Headers(init?.headers || {});
       try {
         const token = localStorage.getItem("padel_auth_token");
-        if (token && !headers.has("Authorization") && !headers.has("authorization")) {
+        if (token && !headers.has("Authorization")) {
           headers.set("Authorization", `Bearer ${token}`);
         }
       } catch {}
 
       try {
-        let activeClubId = localStorage.getItem("active_club_id");
-        if (!activeClubId) {
-          const stored = localStorage.getItem("padel_auth_user");
-          if (stored) {
-            const u = JSON.parse(stored);
-            if (u?.clubId) activeClubId = String(u.clubId);
+        const stored = localStorage.getItem("padel_auth_user");
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u?.clubId && !url.includes("clubId=")) {
+            const separator = url.includes("?") ? "&" : "?";
+            url = `${url}${separator}clubId=${u.clubId}`;
           }
-        }
-        if (activeClubId && !headers.has("x-club-id")) {
-          headers.set("x-club-id", String(activeClubId));
         }
       } catch {}
       return originalFetch(url, { ...init, headers, credentials: init?.credentials || "include" });
@@ -57,5 +49,3 @@ setAuthTokenGetter(() => {
 });
 
 createRoot(document.getElementById("root")!).render(<App />);
-
-
