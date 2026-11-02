@@ -351,18 +351,24 @@ ${matches.map((m: any, idx: number) => {
 // 4. Recordatorio Amigable de Cobro
 router.post("/recordatorio-cobro", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { debtorName, amount, concept = "Cancha y pelotas", bankDetails, lang = "es" } = req.body;
+    const { debtorName, amount, concept = "Arriendo de pistas deportivas y gastos de juego", bankDetails, lang = "es" } = req.body;
 
-    const prompt = `Redacta un mensaje cordial, respetuoso y amigable para WhatsApp recordando el pago pendiente de una cuota de juego.
-- Jugador: ${debtorName}
-- Concepto: ${concept}
-- Monto: ${amount}
-- Datos bancarios / instrucciones: ${bankDetails || "Consultar en la app"}
-- Idioma: ${lang}
+    const targetLang = lang === "en" ? "English" : lang === "pt" ? "Portuguese" : "Spanish";
+    const namePlaceholder = lang === "en" ? "[Player Name]" : lang === "pt" ? "[Nome do Jogador]" : "[Nombre del Jugador]";
+    const cleanDebtorName = debtorName && debtorName !== "undefined" ? debtorName : namePlaceholder;
+    const cleanAmount = amount && amount !== "undefined" && !isNaN(Number(amount)) ? `$${Number(amount).toLocaleString("es-CL")}` : "";
 
-Reglas:
-- Sé súper empático y positivo (nunca acusatorio ni frío).
-- Mantén la armonía del grupo de amigos del club.`;
+    const prompt = `Write a cordial, respectful, and friendly WhatsApp payment reminder message for a sports court fee.
+- Target Language: ${targetLang} (You MUST write the response exclusively in ${targetLang})
+- Player Name: ${cleanDebtorName}
+- Concept: ${concept}
+- Amount: ${cleanAmount || (lang === "en" ? "the corresponding amount" : lang === "pt" ? "o valor correspondente" : "el monto correspondiente")}
+- Bank / Transfer instructions: ${bankDetails || (lang === "en" ? "the club's usual bank account" : lang === "pt" ? "os dados bancários habituais do clube" : "los datos bancarios habituales del club")}
+
+Rules:
+- Be super empathetic and polite (never cold or accusatory).
+- Keep friendly harmony among club sports friends.
+- Output ONLY the message text ready to send on WhatsApp, with appropriate emojis.`;
 
     const ai = getGenAI();
     if (ai) {
@@ -385,7 +391,15 @@ Reglas:
       }
     }
 
-    const fallback = `¡Hola ${debtorName}! 👋 Espero que estés excelente. Te escribo un breve recordatorio de la cuota de *${concept}* por *$${amount}*. Cuando tengas un momento, puedes subir tu comprobante directo en la app o transferir a: ${bankDetails || "los datos bancarios habituales del club"}. ¡Muchas gracias y nos vemos en la cancha! 🎾`;
+    let fallback = "";
+    if (lang === "en") {
+      fallback = `Hi ${cleanDebtorName}! 👋 Hope you're doing great. Quick friendly reminder regarding the court fee for *${concept}*${cleanAmount ? ` for *${cleanAmount}*` : ""}. Whenever you have a moment, you can upload your payment receipt directly in the app or transfer to: ${bankDetails || "the club's usual bank account"}. Thank you very much, see you on the court! 🎾`;
+    } else if (lang === "pt") {
+      fallback = `Olá ${cleanDebtorName}! 👋 Espero que esteja tudo ótimo. Passando para um breve lembrete da taxa de *${concept}*${cleanAmount ? ` no valor de *${cleanAmount}*` : ""}. Assim que puder, você pode anexar o comprovante direto no app ou transferir para: ${bankDetails || "os dados bancários habituais do clube"}. Muito obrigado e nos vemos na quadra! 🎾`;
+    } else {
+      fallback = `¡Hola ${cleanDebtorName}! 👋 Espero que estés excelente. Te escribo un breve recordatorio de la cuota de *${concept}*${cleanAmount ? ` por *${cleanAmount}*` : ""}. Cuando tengas un momento, puedes subir tu comprobante directo en la app o transferir a: ${bankDetails || "los datos bancarios habituales del club"}. ¡Muchas gracias y nos vemos en la cancha! 🎾`;
+    }
+
     res.json({ text: fallback, aiPowered: false });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

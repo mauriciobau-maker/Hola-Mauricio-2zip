@@ -585,16 +585,32 @@ export default function Cobros() {
       // 1. MODO ADMINISTRADOR: Envía un recordatorio de cobro al jugador
       const rawPhone = (cobro.playerPhone || "").replace(/\D/g, "");
       if (!rawPhone) {
-        notifyError(`El jugador ${cobro.playerName || ""} no tiene un teléfono registrado.`);
+        notifyError(
+          language === "en"
+            ? `Player ${cobro.playerName || ""} has no phone number registered.`
+            : language === "pt"
+            ? `O jogador ${cobro.playerName || ""} não tem telefone registrado.`
+            : `El jugador ${cobro.playerName || ""} no tiene un teléfono registrado.`
+        );
         return;
       }
 
-      const msg = encodeURIComponent(
-        `Hola ${cobro.playerName || "amigo"}! 🎾 Te escribimos desde la administración del Club con el detalle de tu cobro pendiente:\n\n${detalle}\n\n👉 *Total a transferir: $${cobro.monto.toLocaleString(
+      let msgText = "";
+      if (language === "en") {
+        msgText = `Hi ${cobro.playerName || "friend"}! 🎾 Writing from the Club Administration with details of your pending payment:\n\n${detalle}\n\n👉 *Total to transfer: $${cobro.monto.toLocaleString(
           "es-CL"
-        )}*\n\nPor favor adjunta tu comprobante de transferencia en la aplicación o envíanos la captura por aquí. ¡Muchas gracias!`
-      );
+        )}*\n\nPlease attach your payment receipt in the app or send us a screenshot here. Thank you very much!`;
+      } else if (language === "pt") {
+        msgText = `Olá ${cobro.playerName || "amigo"}! 🎾 Mensagem da Administração do Clube com os detalhes do seu pagamento pendente:\n\n${detalle}\n\n👉 *Total a transferir: $${cobro.monto.toLocaleString(
+          "es-CL"
+        )}*\n\nPor favor anexe seu comprovante de transferência no app ou envie por aqui. Muito obrigado!`;
+      } else {
+        msgText = `Hola ${cobro.playerName || "amigo"}! 🎾 Te escribimos desde la administración del Club con el detalle de tu cobro pendiente:\n\n${detalle}\n\n👉 *Total a transferir: $${cobro.monto.toLocaleString(
+          "es-CL"
+        )}*\n\nPor favor adjunta tu comprobante de transferencia en la aplicación o envíanos la captura por aquí. ¡Muchas gracias!`;
+      }
 
+      const msg = encodeURIComponent(msgText);
       window.open(`https://wa.me/${rawPhone}?text=${msg}`, "_blank");
     } else {
       // 2. MODO JUGADOR: El jugador notifica al ADMINISTRADOR que ya pagó para que lo revise y confirme
@@ -705,7 +721,14 @@ export default function Cobros() {
 
             <ParrynAssistant
               mode="recordatorio-cobro"
-              payload={{ concept: "Arriendo de pistas deportivas y gastos de juego" }}
+              payload={{
+                concept:
+                  language === "en"
+                    ? "Court rental and game expenses"
+                    : language === "pt"
+                    ? "Aluguel de quadra e despesas de jogo"
+                    : "Arriendo de pistas deportivas y gastos de juego",
+              }}
               buttonLabel={t("cobros.remindParryn")}
             />
           </div>

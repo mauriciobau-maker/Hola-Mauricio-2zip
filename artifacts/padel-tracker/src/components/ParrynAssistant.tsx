@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Bot, Sparkles, Send, Copy, Check, MessageSquare, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "../context/LanguageContext";
@@ -17,6 +17,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
   const [result, setResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isFirstMount = useRef(true);
 
   const defaultLabels = {
     convocatoria: language === "en" ? "Draft WhatsApp Call-up ✨" : language === "pt" ? "Convocatória WhatsApp ✨" : "Redactar Convocatoria WhatsApp ✨",
@@ -26,7 +27,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
     general: language === "en" ? "Ask Sports Secretary ✨" : language === "pt" ? "Assistente Esportivo ✨" : "Consultar Asistente Deportivo ✨",
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (overrideLang?: string) => {
     setLoading(true);
     setError(null);
     setResult(null);
@@ -39,12 +40,14 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
       general: "/api/parryn/asistente",
     };
 
+    const currentLang = overrideLang || language;
+
     try {
       const res = await fetch(endpoints[mode], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...payload, lang: language }),
+        body: JSON.stringify({ ...payload, lang: currentLang }),
       });
 
       const data = await res.json();
@@ -60,6 +63,19 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
     }
   };
 
+  // Reaccionar inmediatamente cuando el usuario cambia el idioma en el selector
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    if (isOpen) {
+      handleGenerate(language);
+    } else {
+      setResult(null);
+    }
+  }, [language]);
+
   const handleCopy = () => {
     if (!result) return;
     navigator.clipboard.writeText(result);
@@ -73,7 +89,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
         <Button
           onClick={() => {
             setIsOpen(true);
-            if (!result) handleGenerate();
+            handleGenerate(language);
           }}
           variant="outline"
           size="sm"
@@ -91,7 +107,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
               </div>
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                  Asistencia Deportiva
+                  {language === "en" ? "Sports Assistant" : language === "pt" ? "Assistência Esportiva" : "Asistencia Deportiva"}
                 </h4>
                 <p className="text-xs text-muted-foreground">
                   {language === "en"
@@ -121,7 +137,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
               <div>
                 <p className="font-semibold">Parryn</p>
                 <p>{error}</p>
-                <Button onClick={handleGenerate} variant="ghost" size="sm" className="mt-2 h-7 text-xs">
+                <Button onClick={() => handleGenerate(language)} variant="ghost" size="sm" className="mt-2 h-7 text-xs">
                   {language === "en" ? "Retry" : language === "pt" ? "Tentar novamente" : "Reintentar"}
                 </Button>
               </div>
@@ -134,7 +150,7 @@ export function ParrynAssistant({ mode, payload = {}, buttonLabel, className = "
 
               <div className="flex items-center justify-between gap-2 pt-1">
                 <Button
-                  onClick={handleGenerate}
+                  onClick={() => handleGenerate(language)}
                   variant="ghost"
                   size="sm"
                   className="text-xs h-8 text-muted-foreground hover:text-foreground"
