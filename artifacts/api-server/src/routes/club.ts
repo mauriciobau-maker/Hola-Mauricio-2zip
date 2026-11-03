@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import { db, clubsTable, clubSportsTable, sportsTable, clubSportCategoriesTable, usersTable } from "@workspace/db";
+import { isSuperAdminUser, isClubAdminUser } from "../middlewares/requireCommunity";
 
 const router: IRouter = Router();
 
@@ -46,6 +47,8 @@ router.get("/club", async (req, res): Promise<void> => {
       console.error("⚠️ Error cargando deportes del club:", e);
     }
 
+    const isStaff = isSuperAdminUser(req.user) || Boolean((req.user as any).isClubAdmin);
+
     res.json({
       id: club.id,
       name: club.name,
@@ -54,7 +57,7 @@ router.get("/club", async (req, res): Promise<void> => {
       active: club.active,
       createdAt: club.createdAt ? (club.createdAt as Date).toISOString() : null,
       sports: clubSports,
-      inviteCode: (club as any).inviteCode || null,
+      inviteCode: isStaff ? ((club as any).inviteCode || null) : null,
       logoUrl: (club as any).logoUrl || null,
       country: (club as any).country || "Chile",
       state: (club as any).state || null,
@@ -73,7 +76,7 @@ router.get("/club", async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/public/:slug — perfil público del club, sin autenticación
+// GET /clubs/public/:slug — perfil público del club, sin autenticación (sin exponer inviteCode ni datos privados)
 router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   try {
     const slug = String(req.params.slug || "").trim().toLowerCase();
@@ -108,26 +111,6 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       console.error("⚠️ Error cargando deportes del club público:", e);
     }
 
-    let admin: any = null;
-    try {
-      const [clubAdmin] = await db
-        .select({
-          name: usersTable.name,
-          nickname: usersTable.nickname,
-          email: usersTable.email,
-          phone: usersTable.phone,
-        })
-        .from(usersTable)
-        .where(and(eq(usersTable.clubId, club.id), eq(usersTable.isClubAdmin, 1)))
-        .limit(1);
-
-      if (clubAdmin) {
-        admin = clubAdmin;
-      }
-    } catch (e) {
-      console.error("⚠️ Error cargando contacto del administrador público:", e);
-    }
-
     res.json({
       id: club.id,
       name: club.name,
@@ -135,7 +118,8 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       logoUrl: (club as any).logoUrl || null,
       primaryColor: (club as any).primaryColor || null,
       secondaryColor: (club as any).secondaryColor || null,
-      inviteCode: (club as any).inviteCode || null,
+      // Se omite explícitamente el código de invitación privado en respuestas públicas
+      inviteCode: null,
       country: (club as any).country || "Chile",
       state: (club as any).state || null,
       city: (club as any).city || null,
@@ -143,9 +127,10 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
       mapUrl: (club as any).mapUrl || null,
       defaultLanguage: (club as any).defaultLanguage || "es",
       sports,
-      adminName: admin?.name || admin?.nickname || null,
-      adminEmail: admin?.email || null,
-      adminPhone: admin?.phone || null,
+      // Se omiten datos privados personales del administrador en endpoint público
+      adminName: null,
+      adminEmail: null,
+      adminPhone: null,
       adminWhatsappAlias: (club as any).adminWhatsappAlias || null,
     });
   } catch (error) {
@@ -154,31 +139,55 @@ router.get("/clubs/public/:slug", async (req, res): Promise<void> => {
   }
 });
 
-// GET /clubs/current — Devuelve el club actual respetando query param clubId o usuario
+// GET /clubs/current — Devuelve el club actual respetando rol y derivación de sesión
 router.get("/clubs/current", async (req, res): Promise<void> => {
   try {
-    const headerClubId = req.headers["x-club-id"] ? Number(req.headers["x-club-id"]) : null;
-    const queryClubId = req.query.clubId ? Number(req.query.clubId) : headerClubId;
+    const user = req.user as any;
     let targetClub: any = null;
 
-    if (queryClubId && !Number.isNaN(queryClubId)) {
-      const [club] = await db
-        .select()
-        .from(clubsTable)
-        .where(eq(clubsTable.id, queryClubId));
-      if (club) targetClub = club;
-    }
-
-    if (!targetClub && user && user.clubId) {
-      const [club] = await db
-        .select()
-        .from(clubsTable)
-        .where(eq(clubsTable.id, user.clubId));
-      if (club) targetClub = club;
+    if (user) {
+      if (isSuperAdminUser(user)) {
+        const headerClubId = req.headers["x-club-id"] ? Number(req.headers["x-club-id"]) : null;
+        const queryClubId = req.query.clubId ? Number(req.query.clubId) : headerClubId;
+        if (queryClubId && !Number.isNaN(queryClubId)) {
+          const [club] = await db
+            .select()
+            .from(clubsTable)
+            .where(eq(clubsTable.id, queryClubId));
+          if (club) targetClub = club;
+        }
+        if (!targetClub && user.clubId) {
+          const [club] = await db
+            .select()
+            .from(clubsTable)
+            .where(eq(clubsTable.id, user.clubId));
+          if (club) targetClub = club;
+        }
+      } else {
+        // Usuario autenticado regular: derivar club obligatoriamente de la sesión
+        if (user.clubId) {
+          const [club] = await db
+            .select()
+            .from(clubsTable)
+            .where(eq(clubsTable.id, user.clubId));
+          if (club) targetClub = club;
+        }
+      }
+    } else {
+      // Petición pública no autenticada
+      const headerClubId = req.headers["x-club-id"] ? Number(req.headers["x-club-id"]) : null;
+      const queryClubId = req.query.clubId ? Number(req.query.clubId) : headerClubId;
+      if (queryClubId && !Number.isNaN(queryClubId)) {
+        const [club] = await db
+          .select()
+          .from(clubsTable)
+          .where(eq(clubsTable.id, queryClubId));
+        if (club) targetClub = club;
+      }
     }
 
     if (!targetClub) {
-      const [firstClub] = await db.select().from(clubsTable).limit(1);
+      const [firstClub] = await db.select().from(clubsTable).orderBy(clubsTable.id).limit(1);
       targetClub = firstClub;
     }
 
@@ -222,7 +231,17 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
       (targetClub.name.toLowerCase().includes("fútbol") && !hasRacketSports) ||
       targetClub.id === 3;
 
-    res.json({ ...targetClub, sports, isFootball, hasRacketSports, hasFootball });
+    // Solo exponer inviteCode al personal autorizado del club o Super Admin
+    const isStaff = isSuperAdminUser(user) || (user?.isClubAdmin && user.clubId === targetClub.id);
+
+    res.json({
+      ...targetClub,
+      inviteCode: isStaff ? targetClub.inviteCode : null,
+      sports,
+      isFootball,
+      hasRacketSports,
+      hasFootball,
+    });
   } catch (error) {
     console.error("⚠️ Error atrapado de forma segura en GET /clubs/current:", error);
     res.json(null);
@@ -232,8 +251,28 @@ router.get("/clubs/current", async (req, res): Promise<void> => {
 // PATCH /club/settings — Actualiza parámetros del club (nombre, colores, logo, ciudad, etc.)
 router.patch("/club/settings", async (req, res): Promise<void> => {
   try {
+    if (!req.isAuthenticated() || !req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
     const user = req.user as any;
-    const clubId = Number(req.body.clubId) || user?.clubId || 1;
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    // Si es Super Admin puede indicar clubId; si no, se deriva estrictamente de req.user.clubId
+    const clubId = isSuperAdmin ? (Number(req.body.clubId) || user.clubId) : user.clubId;
+
+    if (!clubId) {
+      res.status(400).json({ error: "Club no especificado o usuario sin club asignado" });
+      return;
+    }
+
+    // Verificar si el usuario tiene rol de administrador del club o Super Admin
+    if (!isSuperAdmin && !user.isClubAdmin) {
+      res.status(403).json({ error: "Solo los administradores del club pueden modificar la configuración" });
+      return;
+    }
+
     const { name, logoUrl, primaryColor, secondaryColor, city, country, address, mapUrl, defaultLanguage } = req.body;
 
     const updateData: Record<string, any> = {};
@@ -267,14 +306,21 @@ router.patch("/club/settings", async (req, res): Promise<void> => {
   }
 });
 
-// PATCH /club/sports — activa o desactiva un deporte para el club
+// PATCH /club/sports — activa o desactiva un deporte para el club (Solo Admin/Staff)
 router.patch("/club/sports", async (req, res): Promise<void> => {
   if (!req.isAuthenticated() || !req.user) {
     res.status(401).json({ error: "No autenticado" });
     return;
   }
 
-  const clubId = (req.user as { clubId?: number | null }).clubId;
+  const user = req.user as any;
+  const isSuperAdmin = isSuperAdminUser(user);
+  if (!isSuperAdmin && !user.isClubAdmin) {
+    res.status(403).json({ error: "Solo administradores pueden configurar los deportes del club" });
+    return;
+  }
+
+  const clubId = isSuperAdmin ? (Number(req.body.clubId) || user.clubId) : user.clubId;
   if (!clubId) {
     res.status(403).json({ error: "El usuario no pertenece a ningún club" });
     return;
@@ -364,7 +410,14 @@ router.post("/club/categories", async (req, res): Promise<void> => {
     return;
   }
 
-  const clubId = (req.user as { clubId?: number | null }).clubId;
+  const user = req.user as any;
+  const isSuperAdmin = isSuperAdminUser(user);
+  if (!isSuperAdmin && !user.isClubAdmin) {
+    res.status(403).json({ error: "Solo los administradores del club pueden crear categorías" });
+    return;
+  }
+
+  const clubId = isSuperAdmin ? (Number(req.body.clubId) || user.clubId) : user.clubId;
   if (!clubId) {
     res.status(403).json({ error: "El usuario no pertenece a ningún club" });
     return;

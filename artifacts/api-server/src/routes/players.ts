@@ -312,6 +312,11 @@ router.post(
   "/players",
   async (req, res): Promise<void> => {
     try {
+      if (!req.isAuthenticated() || !req.user) {
+        res.status(401).json({ error: "No autenticado" });
+        return;
+      }
+
       const bodyData =
         req.body?.data
           ? req.body.data
@@ -330,17 +335,16 @@ router.post(
         return;
       }
 
-      const user = req.user as {
-        role?: string;
-        clubId?: number | null;
-      } | undefined;
+      const user = req.user as any;
+      const isSuperAdmin = isSuperAdminUser(user);
+      const isClubAdmin = Boolean(user.isClubAdmin);
 
-      const isSuperAdmin =
-        user?.role === "superadmin" ||
-        user?.role === "admin";
+      if (!isSuperAdmin && !isClubAdmin) {
+        res.status(403).json({ error: "Solo los administradores del club pueden registrar nuevos jugadores" });
+        return;
+      }
 
-      let targetClubId =
-        user?.clubId ?? null;
+      let targetClubId = user?.clubId ?? null;
 
       if (isSuperAdmin) {
         const clubIdInput =
@@ -376,6 +380,11 @@ router.post(
               foundClub.id;
           }
         }
+      }
+
+      if (!targetClubId) {
+        res.status(400).json({ error: "Debes pertenecer a un club o especificar un club válido para registrar jugadores" });
+        return;
       }
 
       const nameFormatted =
@@ -608,6 +617,11 @@ router.get(
 router.patch(
   "/players/:id",
   async (req, res): Promise<void> => {
+    if (!req.isAuthenticated() || !req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
     const raw =
       Array.isArray(
         req.params.id
@@ -631,6 +645,27 @@ router.patch(
       return;
     }
 
+    const [existingPlayer] = await db
+      .select()
+      .from(playersTable)
+      .where(eq(playersTable.id, params.data.id))
+      .limit(1);
+
+    if (!existingPlayer) {
+      res.status(404).json({ error: "Jugador no encontrado" });
+      return;
+    }
+
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
+    const isClubAdmin = Boolean(user?.isClubAdmin) && (user?.clubId === existingPlayer.clubId || isSuperAdmin);
+    const isSelfPlayer = user?.playerId === existingPlayer.id;
+
+    if (!isSuperAdmin && !isClubAdmin && !isSelfPlayer) {
+      res.status(403).json({ error: "No tienes permiso para modificar este perfil de jugador" });
+      return;
+    }
+
     const body =
       UpdatePlayerBody.safeParse(
         req.body
@@ -644,23 +679,12 @@ router.patch(
       return;
     }
 
-    const user = req.user as {
-      role?: string;
-      playerId?: number;
-      clubId?: number | null;
-    } | undefined;
-
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.role ===
-        "superadmin";
-
     const updates: Record<
       string,
       unknown
     > = {};
 
-    if (isAdmin) {
+    if (isSuperAdmin || isClubAdmin) {
       if (
         body.data.name !==
           undefined &&
@@ -806,7 +830,7 @@ router.patch(
       .update(playersTable)
       .set(updates)
       .where(
-        whereClause
+        eq(playersTable.id, existingPlayer.id)
       )
       .returning();
 
@@ -819,6 +843,7 @@ router.patch(
     }
 
     if (
+      (isSuperAdmin || isClubAdmin) &&
       Array.isArray(
         categoryIds
       )
@@ -897,12 +922,17 @@ router.delete(
       return;
     }
 
-    const user = req.user as {
-      clubId?: number | null;
-      isAdmin?: number | boolean | null;
-      role?: string | null;
-    };
-    const ownershipClause = isSuperAdminUser(user)
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
+    const isClubAdmin = Boolean(user?.isClubAdmin);
+
+    // Solo los administradores del club o Super Admin pueden dar de baja jugadores
+    if (!isSuperAdmin && !isClubAdmin) {
+      res.status(403).json({ error: "Solo los administradores del club pueden eliminar jugadores" });
+      return;
+    }
+
+    const ownershipClause = isSuperAdmin
       ? eq(playersTable.id, params.data.id)
       : and(
           eq(playersTable.id, params.data.id),

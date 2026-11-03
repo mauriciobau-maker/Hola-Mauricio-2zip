@@ -1,8 +1,9 @@
 import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as z from "zod";
-import { eq } from "drizzle-orm";
-import { db, usersTable, clubsTable } from "@workspace/db";
+import { eq, or, sql } from "drizzle-orm";
+import { db, usersTable, clubsTable, playersTable } from "@workspace/db";
+import { isSuperAdminUser } from "../middlewares/requireCommunity";
 import {
   clearSession,
   getOidcConfig,
@@ -134,7 +135,7 @@ router.get("/auth/user", async (req: Request, res: Response) => {
 });
 
 router.post("/auth/link-player", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated() || !req.user) {
     res.status(401).json({ error: "No autenticado" });
     return;
   }
@@ -143,6 +144,25 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     res.status(400).json({ error: "playerId requerido" });
     return;
   }
+
+  // Verificar que el jugador exista y pertenezca al club del usuario (salvo Super Admin)
+  const [player] = await db
+    .select()
+    .from(playersTable)
+    .where(eq(playersTable.id, playerId))
+    .limit(1);
+
+  if (!player) {
+    res.status(404).json({ error: "Jugador no encontrado" });
+    return;
+  }
+
+  const isSuperAdmin = isSuperAdminUser(req.user);
+  if (!isSuperAdmin && req.user.clubId && player.clubId !== req.user.clubId) {
+    res.status(403).json({ error: "No tienes permiso para vincular un perfil de jugador perteneciente a otro club" });
+    return;
+  }
+
   const [updated] = await db
     .update(usersTable)
     .set({ playerId, updatedAt: new Date() })
@@ -152,7 +172,7 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
 });
 
 router.post("/auth/join-club", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated() || !req.user) {
     res.status(401).json({ error: "No autenticado" });
     return;
   }
@@ -176,22 +196,46 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     return;
   }
 
+  const userCondition = req.user.email
+    ? or(eq(usersTable.id, req.user.id), eq(usersTable.email, req.user.email))
+    : eq(usersTable.id, req.user.id);
+
   const [updated] = await db
     .update(usersTable)
     .set({ clubId: club.id, updatedAt: new Date() })
-    .where(eq(usersTable.id, req.user.id))
+    .where(userCondition)
     .returning();
+
+  let finalUser = updated;
+  if (!finalUser) {
+    const [inserted] = await db
+      .insert(usersTable)
+      .values({
+        id: req.user.id,
+        email: req.user.email,
+        name: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || null,
+        clubId: club.id,
+      } as any)
+      .returning();
+    finalUser = inserted;
+  }
 
   res.json({
     success: true,
     club: { id: club.id, name: club.name, slug: club.slug },
-    user: updated,
+    user: finalUser,
   });
 });
 
 router.post("/auth/switch-club", async (req: Request, res: Response) => {
   if (!req.isAuthenticated() || !req.user) {
     res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
+  // El cambio arbitrario de club está estrictamente reservado a Super Admins autorizados
+  if (!isSuperAdminUser(req.user)) {
+    res.status(403).json({ error: "Solo Super Admin autorizado puede alternar entre clubes" });
     return;
   }
 
@@ -216,18 +260,38 @@ router.post("/auth/switch-club", async (req: Request, res: Response) => {
     return;
   }
 
+  const userCondition = req.user.email
+    ? or(eq(usersTable.id, req.user.id), eq(usersTable.email, req.user.email))
+    : eq(usersTable.id, req.user.id);
+
   const [updated] = await db
     .update(usersTable)
     .set({ clubId, updatedAt: new Date() })
-    .where(eq(usersTable.id, req.user.id))
+    .where(userCondition)
     .returning();
 
-  const userWithClub = await getUserWithClub(updated.id);
+  let finalUser = updated;
+  if (!finalUser) {
+    const [inserted] = await db
+      .insert(usersTable)
+      .values({
+        id: req.user.id,
+        email: req.user.email,
+        name: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || "Super Admin",
+        clubId,
+        isAdmin: 1,
+        isClubAdmin: 1,
+      } as any)
+      .returning();
+    finalUser = inserted;
+  }
+
+  const userWithClub = finalUser?.id ? await getUserWithClub(finalUser.id) : null;
 
   res.json({
     success: true,
     club: { id: club.id, name: club.name, slug: club.slug },
-    user: userWithClub ?? updated,
+    user: userWithClub ?? finalUser,
   });
 });
 
@@ -329,6 +393,13 @@ function getMockSessionForRole(roleParamRaw?: string): SessionData {
 }
 
 router.get("/login/demo", async (req: Request, res: Response) => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const allowDemo = !isProduction || process.env.ALLOW_DEMO_LOGIN === "true";
+  if (!allowDemo) {
+    res.status(403).json({ error: "Accesos de demostración deshabilitados en entorno de producción" });
+    return;
+  }
+
   const role = (req.query.as as string) || (req.query.role as string) || "superadmin";
   const mockUser = getMockSessionForRole(role);
   const sid = await createSession(mockUser);
@@ -337,6 +408,13 @@ router.get("/login/demo", async (req: Request, res: Response) => {
 });
 
 router.post("/login/demo", async (req: Request, res: Response) => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const allowDemo = !isProduction || process.env.ALLOW_DEMO_LOGIN === "true";
+  if (!allowDemo) {
+    res.status(403).json({ error: "Accesos de demostración deshabilitados en entorno de producción" });
+    return;
+  }
+
   const role = (req.body?.as as string) || (req.body?.role as string) || (req.query.as as string) || "superadmin";
   const mockUser = getMockSessionForRole(role);
   const sid = await createSession(mockUser);

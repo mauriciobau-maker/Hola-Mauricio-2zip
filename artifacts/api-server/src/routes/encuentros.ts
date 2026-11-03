@@ -9,6 +9,7 @@ import {
   sportModalitiesTable,
 } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
+import { resolveEffectiveClubId } from "../middlewares/requireCommunity";
 
 const router = Router();
 
@@ -76,9 +77,7 @@ async function getAsistenciaList(encuentroId: number) {
 // GET /api/encuentros
 router.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
-    const userClubId = (req as any).user?.clubId;
-    const queryClubId = req.query.clubId ? parseInt(req.query.clubId as string, 10) : null;
-    const effectiveClubId = queryClubId || userClubId;
+    const effectiveClubId = await resolveEffectiveClubId(req);
 
     let query = db.select().from(encuentrosTable);
     const list = effectiveClubId

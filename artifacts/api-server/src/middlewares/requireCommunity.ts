@@ -2,65 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { db, clubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-export async function resolveEffectiveClubId(req: Request): Promise<number | null> {
-  // 1. Explicit query param ?clubId=
-  if (req.query.clubId) {
-    const parsed = Number(req.query.clubId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  // 2. Explicit header x-club-id
-  const headerClubId = req.headers["x-club-id"];
-  if (headerClubId) {
-    const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  // 3. Explicit body clubId
-  if (req.body && typeof req.body === "object" && (req.body as any).clubId) {
-    const parsed = Number((req.body as any).clubId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  // 4. Query param ?club= (slug)
-  if (typeof req.query.club === "string" && req.query.club.trim()) {
-    try {
-      const [found] = await db
-        .select({ id: clubsTable.id })
-        .from(clubsTable)
-        .where(eq(clubsTable.slug, req.query.club.trim()))
-        .limit(1);
-      if (found?.id) return found.id;
-    } catch {}
-  }
-
-  // 5. Authenticated user clubId
-  const userClubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
-  if (userClubId) return userClubId;
-
-  // 6. Default: first active club in DB
-  try {
-    const [firstActive] = await db
-      .select({ id: clubsTable.id })
-      .from(clubsTable)
-      .where(eq(clubsTable.active, true))
-      .orderBy(clubsTable.id)
-      .limit(1);
-
-    if (firstActive?.id) return firstActive.id;
-
-    const [firstClub] = await db
-      .select({ id: clubsTable.id })
-      .from(clubsTable)
-      .orderBy(clubsTable.id)
-      .limit(1);
-
-    return firstClub?.id ?? null;
-  } catch {
-    return 1;
-  }
-}
-
 export function isSuperAdminUser(
   user: { isAdmin?: number | boolean | null; role?: string | null; email?: string | null } | undefined,
 ): boolean {
@@ -81,6 +22,113 @@ export function isSuperAdminUser(
     user.role === "admin" ||
     user.role === "SUPER_ADMIN"
   );
+}
+
+export function isClubAdminUser(
+  user: { isAdmin?: number | boolean | null; isClubAdmin?: number | boolean | null; role?: string | null; email?: string | null; clubId?: number | null } | undefined,
+  targetClubId?: number | null,
+): boolean {
+  if (!user) return false;
+  if (isSuperAdminUser(user)) return true;
+
+  const isClubAdmin =
+    Number(user.isClubAdmin) >= 1 ||
+    user.isClubAdmin === true ||
+    user.role === "club_admin" ||
+    user.role === "adminclub" ||
+    user.role === "colaborador" ||
+    user.role === "staff";
+
+  if (!isClubAdmin) return false;
+  if (targetClubId != null && user.clubId != null) {
+    return user.clubId === targetClubId;
+  }
+  return true;
+}
+
+export async function resolveEffectiveClubId(req: Request): Promise<number | null> {
+  const user = req.user as { clubId?: number | null } | undefined;
+
+  // 1. Authenticated user
+  if (user) {
+    // Solo un Super Admin puede consultar o alternar de club mediante parámetros de petición
+    if (isSuperAdminUser(req.user)) {
+      if (req.query.clubId) {
+        const parsed = Number(req.query.clubId);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+      const headerClubId = req.headers["x-club-id"];
+      if (headerClubId) {
+        const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+      if (req.body && typeof req.body === "object" && (req.body as any).clubId) {
+        const parsed = Number((req.body as any).clubId);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+      if (typeof req.query.club === "string" && req.query.club.trim()) {
+        try {
+          const [found] = await db
+            .select({ id: clubsTable.id })
+            .from(clubsTable)
+            .where(eq(clubsTable.slug, req.query.club.trim()))
+            .limit(1);
+          if (found?.id) return found.id;
+        } catch {}
+      }
+      // Si el Super Admin no envió override explícito, usar su clubId asignado
+      if (user.clubId) return user.clubId;
+    } else {
+      // Usuario autenticado regular: EL CLUB SE DERIVA ESTRICTAMENTE DE LA SESIÓN.
+      // Se ignoran tajantemente manipulaciones de ?clubId= o cabeceras x-club-id externas.
+      return user.clubId ?? null;
+    }
+  }
+
+  // 2. Unauthenticated / Public access (ej. landing page pública por slug)
+  if (typeof req.query.club === "string" && req.query.club.trim()) {
+    try {
+      const [found] = await db
+        .select({ id: clubsTable.id })
+        .from(clubsTable)
+        .where(eq(clubsTable.slug, req.query.club.trim()))
+        .limit(1);
+      if (found?.id) return found.id;
+    } catch {}
+  }
+
+  if (req.query.clubId) {
+    const parsed = Number(req.query.clubId);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  const headerClubId = req.headers["x-club-id"];
+  if (headerClubId) {
+    const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Fallback: primer club activo en la BD
+  try {
+    const [firstActive] = await db
+      .select({ id: clubsTable.id })
+      .from(clubsTable)
+      .where(eq(clubsTable.active, true))
+      .orderBy(clubsTable.id)
+      .limit(1);
+
+    if (firstActive?.id) return firstActive.id;
+
+    const [firstClub] = await db
+      .select({ id: clubsTable.id })
+      .from(clubsTable)
+      .orderBy(clubsTable.id)
+      .limit(1);
+
+    return firstClub?.id ?? null;
+  } catch {
+    return 1;
+  }
 }
 
 /**
@@ -149,13 +197,48 @@ export function requireCommunityAccess(
 }
 
 /**
- * Example usage (do not apply yet — P0-003-B):
- *
- *   import { requireAuth, requireClub } from "../middlewares/requireCommunity";
- *
- *   // Protect an entire router:
- *   router.use("/encuentros", requireAuth, requireClub, encuentrosRouter);
- *
- *   // Protect a single endpoint:
- *   router.delete("/matches/:id", requireAuth, requireClub, async (req, res) => { ... });
+ * Rejects requests if user is not Club Admin or Super Admin.
  */
+export function requireClubAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  if (isSuperAdminUser(req.user)) {
+    next();
+    return;
+  }
+
+  if (isClubAdminUser(req.user)) {
+    next();
+    return;
+  }
+
+  res.status(403).json({ error: "Club Admin role required" });
+}
+
+/**
+ * Rejects requests if user is not Super Admin.
+ */
+export function requireSuperAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  if (isSuperAdminUser(req.user)) {
+    next();
+    return;
+  }
+
+  res.status(403).json({ error: "Super Admin role required" });
+}

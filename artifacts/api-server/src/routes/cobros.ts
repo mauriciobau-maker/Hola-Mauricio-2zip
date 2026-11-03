@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool, cobrosTable, playersTable, torneoCalculosTable, usersTable, clubsTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { requireAuth, requireClub } from "../middlewares/requireCommunity";
+import { requireAuth, requireClub, isSuperAdminUser, isClubAdminUser } from "../middlewares/requireCommunity";
 
 const router = Router();
 
@@ -35,18 +35,8 @@ async function ensureDbSchema() {
 
 function isStaffUser(user: any): boolean {
   if (!user) return false;
-  return (
-    user.isAdmin === 1 ||
-    user.isAdmin === true ||
-    user.isClubAdmin === 1 ||
-    user.isClubAdmin === true ||
-    user.role === "superadmin" ||
-    user.role === "admin" ||
-    user.role === "colaborador" ||
-    user.role === "adminclub" ||
-    user.role === "club_admin" ||
-    user.role === "SUPER_ADMIN"
-  );
+  if (isSuperAdminUser(user)) return true;
+  return isClubAdminUser(user);
 }
 
 // All cobros routes require an authenticated user with a community assignment
@@ -211,6 +201,22 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Verificar que el jugador pertenezca al club asignado
+    const [player] = await db
+      .select({ id: playersTable.id, name: playersTable.name, nickname: playersTable.nickname, phone: playersTable.phone, clubId: playersTable.clubId })
+      .from(playersTable)
+      .where(eq(playersTable.id, playerId));
+
+    if (!player) {
+      res.status(404).json({ error: "Jugador no encontrado" });
+      return;
+    }
+
+    if (player.clubId !== clubId && !isSuperAdminUser(req.user)) {
+      res.status(403).json({ error: "El jugador no pertenece a tu club" });
+      return;
+    }
+
     const parsedMonto = Number(monto);
     if (isNaN(parsedMonto) || parsedMonto <= 0) {
       res.status(400).json({ error: "El monto debe ser un número mayor a 0" });
@@ -234,12 +240,6 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         estado: "pendiente",
       })
       .returning();
-
-    // Obtener datos del jugador para devolver completo
-    const [player] = await db
-      .select({ name: playersTable.name, nickname: playersTable.nickname, phone: playersTable.phone })
-      .from(playersTable)
-      .where(eq(playersTable.id, playerId));
 
     res.json({
       ...newCobro,
@@ -374,6 +374,8 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
     } catch (e) {
       console.warn("Auditoría de torneoCalculos no guardada:", e);
     }
+
+    const basePerPlayer = jugadores.length > 0 ? Math.round(totalCostos / jugadores.length) : 0;
 
     res.json({
       success: true,

@@ -70,8 +70,11 @@ export async function authMiddleware(
 
   let session = await getSession(sid);
 
-  // Soporte para tokens de demostración / cross-origin sin cookies de terceros
-  if (!session?.user?.id && sid.startsWith("demo-token-")) {
+  // Soporte para tokens de demostración / cross-origin sin cookies de terceros (limitado a entorno demo)
+  const isProduction = process.env.NODE_ENV === "production";
+  const allowDemo = !isProduction || process.env.ALLOW_DEMO_LOGIN === "true";
+
+  if (!session?.user?.id && sid.startsWith("demo-token-") && allowDemo) {
     const role = sid.replace("demo-token-", "").toLowerCase();
     if (role === "superadmin" || role === "admin" || role === "mauricio") {
       session = {
