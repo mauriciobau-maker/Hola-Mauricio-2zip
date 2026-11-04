@@ -459,15 +459,7 @@ router.post(
         insertValues.courtSide = typeof courtSideVal === "string" && courtSideVal.trim() ? courtSideVal.trim() : null;
       }
 
-      const [player] =
-        await db
-          .insert(playersTable)
-          .values(
-            insertValues as any
-          )
-          .returning();
-
-      const categoryIds =
+      const categoryIdsRaw =
         (parsedCategoryIds as
           | number[]
           | undefined) ||
@@ -479,27 +471,51 @@ router.post(
           | undefined) ||
         [];
 
-      if (
-        Array.isArray(
-          categoryIds
-        ) &&
-        categoryIds.length > 0
-      ) {
-        await db
-          .insert(
-            playerCategoriesTable
+      const cleanCategoryIds = Array.isArray(categoryIdsRaw)
+        ? categoryIdsRaw
+            .map((cid: any) => Number(cid))
+            .filter((cid: number) => Number.isInteger(cid) && cid > 0)
+        : [];
+
+      if (cleanCategoryIds.length > 0 && targetClubId) {
+        const validCategories = await db
+          .select({ id: clubSportCategoriesTable.id })
+          .from(clubSportCategoriesTable)
+          .innerJoin(
+            clubSportsTable,
+            eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)
           )
-          .values(
-            categoryIds.map(
-              (categoryId) => ({
-                playerId:
-                  player.id,
-                categoryId:
-                  Number(
-                    categoryId
-                  ),
-              })
+          .where(
+            and(
+              eq(clubSportsTable.clubId, targetClubId),
+              inArray(clubSportCategoriesTable.id, cleanCategoryIds)
             )
+          );
+
+        const validIdSet = new Set(validCategories.map((c) => c.id));
+        const invalidIds = cleanCategoryIds.filter((cid) => !validIdSet.has(cid));
+
+        if (invalidIds.length > 0) {
+          res.status(400).json({
+            error: `Las categorías [${invalidIds.join(", ")}] no existen o no pertenecen al club especificado`,
+          });
+          return;
+        }
+      }
+
+      const [player] = await db
+        .insert(playersTable)
+        .values(insertValues as any)
+        .returning();
+
+      if (cleanCategoryIds.length > 0) {
+        await db
+          .insert(playerCategoriesTable)
+          .values(
+            cleanCategoryIds.map((categoryId) => ({
+              playerId: player.id,
+              categoryId,
+            }))
           );
       }
 
@@ -748,15 +764,45 @@ router.patch(
       }
 
       if (Array.isArray(categoryIds)) {
+        const cleanCategoryIds = categoryIds
+          .map((cid: any) => Number(cid))
+          .filter((cid: number) => Number.isInteger(cid) && cid > 0);
+
+        if (cleanCategoryIds.length > 0 && existingPlayer.clubId) {
+          const validCategories = await db
+            .select({ id: clubSportCategoriesTable.id })
+            .from(clubSportCategoriesTable)
+            .innerJoin(
+              clubSportsTable,
+              eq(clubSportCategoriesTable.clubSportId, clubSportsTable.id)
+            )
+            .where(
+              and(
+                eq(clubSportsTable.clubId, existingPlayer.clubId),
+                inArray(clubSportCategoriesTable.id, cleanCategoryIds)
+              )
+            );
+
+          const validIdSet = new Set(validCategories.map((c) => c.id));
+          const invalidIds = cleanCategoryIds.filter((cid) => !validIdSet.has(cid));
+
+          if (invalidIds.length > 0) {
+            res.status(400).json({
+              error: `Las categorías [${invalidIds.join(", ")}] no existen o no pertenecen al club del jugador`,
+            });
+            return;
+          }
+        }
+
         await db
           .delete(playerCategoriesTable)
           .where(eq(playerCategoriesTable.playerId, existingPlayer.id));
 
-        if (categoryIds.length > 0) {
+        if (cleanCategoryIds.length > 0) {
           await db
             .insert(playerCategoriesTable)
             .values(
-              categoryIds.map((categoryId: number) => ({
+              cleanCategoryIds.map((categoryId: number) => ({
                 playerId: existingPlayer.id,
                 categoryId,
               }))
@@ -905,6 +951,7 @@ router.delete(
 
 router.get(
   "/players/:id/stats",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
