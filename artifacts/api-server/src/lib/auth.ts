@@ -122,3 +122,33 @@ export function getSessionId(req: Request): string | undefined {
   }
   return req.cookies?.[SESSION_COOKIE];
 }
+
+/**
+ * Determina si el acceso de demostración (demo tokens, /login/demo, etc.) está permitido.
+ * En producción se bloquea por defecto y solo se habilita si ALLOW_DEMO_LOGIN === "true".
+ * La falta o cualquier valor inesperado de NODE_ENV bloquea demo por defecto para evitar
+ * activaciones accidentales en entornos desplegados en la nube o producción.
+ */
+export function isDemoLoginAllowed(): boolean {
+  if (process.env.ALLOW_DEMO_LOGIN === "true") {
+    return true;
+  }
+  if (process.env.ALLOW_DEMO_LOGIN === "false") {
+    return false;
+  }
+
+  const nodeEnv = (process.env.NODE_ENV || "").toLowerCase().trim();
+  const isExplicitDevOrTest = nodeEnv === "development" || nodeEnv === "test";
+
+  const isCloudHost = Boolean(
+    process.env.VERCEL ||
+    process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RENDER ||
+    process.env.FLY_APP_NAME ||
+    process.env.HEROKU_APP_ID ||
+    process.env.KUBERNETES_SERVICE_HOST
+  );
+
+  return isExplicitDevOrTest && !isCloudHost;
+}
+

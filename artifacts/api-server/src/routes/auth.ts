@@ -13,6 +13,7 @@ import {
   SESSION_COOKIE,
   SESSION_TTL,
   ISSUER_URL,
+  isDemoLoginAllowed,
   type SessionData,
 } from "../lib/auth";
 
@@ -158,9 +159,11 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
   }
 
   const isSuperAdmin = isSuperAdminUser(req.user);
-  if (!isSuperAdmin && req.user.clubId && player.clubId !== req.user.clubId) {
-    res.status(403).json({ error: "No tienes permiso para vincular un perfil de jugador perteneciente a otro club" });
-    return;
+  if (!isSuperAdmin) {
+    if (!req.user.clubId || player.clubId !== req.user.clubId) {
+      res.status(403).json({ error: "Debes tener un club asignado y pertenecer al mismo club del jugador para vincular tu perfil" });
+      return;
+    }
   }
 
   const [updated] = await db
@@ -393,9 +396,7 @@ function getMockSessionForRole(roleParamRaw?: string): SessionData {
 }
 
 router.get("/login/demo", async (req: Request, res: Response) => {
-  const isProduction = process.env.NODE_ENV === "production";
-  const allowDemo = !isProduction || process.env.ALLOW_DEMO_LOGIN === "true";
-  if (!allowDemo) {
+  if (!isDemoLoginAllowed()) {
     res.status(403).json({ error: "Accesos de demostración deshabilitados en entorno de producción" });
     return;
   }
@@ -408,9 +409,7 @@ router.get("/login/demo", async (req: Request, res: Response) => {
 });
 
 router.post("/login/demo", async (req: Request, res: Response) => {
-  const isProduction = process.env.NODE_ENV === "production";
-  const allowDemo = !isProduction || process.env.ALLOW_DEMO_LOGIN === "true";
-  if (!allowDemo) {
+  if (!isDemoLoginAllowed()) {
     res.status(403).json({ error: "Accesos de demostración deshabilitados en entorno de producción" });
     return;
   }
@@ -426,6 +425,10 @@ router.get("/login", async (req: Request, res: Response) => {
   const returnTo = getSafeReturnTo(req.query.returnTo);
 
   if (!process.env.REPL_ID) {
+    if (!isDemoLoginAllowed()) {
+      res.status(403).send("El inicio de sesión simulado no está permitido en este entorno.");
+      return;
+    }
     const roleParam = ((req.query.as as string) || (req.query.role as string) || "superadmin").toLowerCase();
     const mockUser = getMockSessionForRole(roleParam);
     const sid = await createSession(mockUser);

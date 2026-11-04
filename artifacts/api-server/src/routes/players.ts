@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import {
   db,
   playersTable,
@@ -658,227 +658,170 @@ router.patch(
 
     const user = req.user as any;
     const isSuperAdmin = isSuperAdminUser(user);
-    const isClubAdmin = Boolean(user?.isClubAdmin) && (user?.clubId === existingPlayer.clubId || isSuperAdmin);
-    const isSelfPlayer = user?.playerId === existingPlayer.id;
+    const isSelfPlayer = Boolean(user?.playerId && user.playerId === existingPlayer.id);
+    const isClubAdminForPlayer = Boolean(user?.isClubAdmin) && user?.clubId === existingPlayer.clubId;
 
-    if (!isSuperAdmin && !isClubAdmin && !isSelfPlayer) {
+    if (!isSuperAdmin && !isClubAdminForPlayer && !isSelfPlayer) {
       res.status(403).json({ error: "No tienes permiso para modificar este perfil de jugador" });
       return;
     }
 
-    const body =
-      UpdatePlayerBody.safeParse(
-        req.body
-      );
+    const updates: Record<string, unknown> = {};
 
-    if (!body.success) {
-      res.status(400).json({
-        error:
-          body.error.message,
-      });
-      return;
-    }
+    // Edición administrativa: Super Admin global o administrador del club gestionando a un jugador de su club.
+    // La autoedición de un jugador sobre su propio perfil nunca tiene permisos administrativos para alterar ELO, categoría, waId, correo, etc.
+    const isAdministrativeEdit = isSuperAdmin || (isClubAdminForPlayer && !isSelfPlayer);
 
-    const updates: Record<
-      string,
-      unknown
-    > = {};
-
-    if (isSuperAdmin || isClubAdmin) {
-      if (
-        body.data.name !==
-          undefined &&
-        body.data.name.trim() !==
-          ""
-      ) {
-        updates.name =
-          formatName(
-            body.data.name
-          );
-      }
-
-      if (
-        "nickname" in
-        body.data
-      ) {
-        updates.nickname =
-          body.data.nickname
-            ? formatName(
-                body.data.nickname
-              )
-            : null;
-      }
-    }
-
-    const {
-      phone,
-      waId,
-      wspConsent,
-      language,
-      categoryIds,
-      dominantHand,
-      courtSide,
-      email,
-      profileImageUrl,
-    } = req.body;
-
-    if (
-      phone !== undefined
-    ) {
-      updates.phone =
-        typeof phone ===
-          "string" &&
-        phone.trim()
-          ? phone.trim()
-          : null;
-    }
-
-    if (
-      waId !== undefined
-    ) {
-      updates.waId =
-        typeof waId ===
-          "string" &&
-        waId.trim()
-          ? waId.trim()
-          : null;
-    }
-
-    if (
-      wspConsent !==
-      undefined
-    ) {
-      updates.wspConsent =
-        Boolean(
-          wspConsent
-        );
-    }
-
-    if (
-      language !==
-        undefined &&
-      typeof language ===
-        "string"
-    ) {
-      updates.language =
-        language;
-    }
-
-    if (dominantHand !== undefined) {
-      updates.dominantHand = dominantHand && typeof dominantHand === "string" ? dominantHand.trim() : null;
-    }
-
-    if (courtSide !== undefined) {
-      updates.courtSide = courtSide && typeof courtSide === "string" ? courtSide.trim() : null;
-    }
-
-    if (email !== undefined || profileImageUrl !== undefined) {
-      try {
-        const [existingUser] = await db
-          .select({ id: usersTable.id })
-          .from(usersTable)
-          .where(eq(usersTable.playerId, params.data.id))
-          .limit(1);
-
-        const cleanEmail = email !== undefined && typeof email === "string" ? email.trim() || null : undefined;
-        const cleanPhoto = profileImageUrl !== undefined && typeof profileImageUrl === "string" ? profileImageUrl.trim() || null : undefined;
-
-        if (existingUser) {
-          const userUpdates: Record<string, unknown> = {};
-          if (cleanEmail !== undefined) userUpdates.email = cleanEmail;
-          if (cleanPhoto !== undefined) userUpdates.profileImageUrl = cleanPhoto;
-          if (Object.keys(userUpdates).length > 0) {
-            await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, existingUser.id));
-          }
-        } else if (cleanEmail || cleanPhoto) {
-          await db.insert(usersTable).values({
-            email: cleanEmail ?? null,
-            profileImageUrl: cleanPhoto ?? null,
-            playerId: params.data.id,
-            name: updates.name ? String(updates.name) : undefined,
-            clubId: clubId ?? null,
-          });
+    if (isAdministrativeEdit) {
+      // Edición administrativa autorizada (Super Admin global o Admin del club al que pertenece el jugador)
+      const body = UpdatePlayerBody.safeParse(req.body);
+      if (body.success) {
+        if (body.data.name !== undefined && body.data.name.trim() !== "") {
+          updates.name = formatName(body.data.name);
         }
-      } catch (err) {
-        logger.warn("Could not index linked user photo/email:", err);
+        if ("nickname" in body.data) {
+          updates.nickname = body.data.nickname ? formatName(body.data.nickname) : null;
+        }
       }
-    }
 
-    const clubId =
-      user?.clubId;
+      const {
+        phone,
+        waId,
+        wspConsent,
+        language,
+        categoryIds,
+        dominantHand,
+        courtSide,
+        email,
+        profileImageUrl,
+      } = req.body;
 
-    const whereClause =
-      clubId
-        ? and(
-            eq(
-              playersTable.id,
-              params.data.id
-            ),
-            eq(
-              playersTable.clubId,
-              clubId
-            )
-          )
-        : eq(
-            playersTable.id,
-            params.data.id
-          );
+      if (phone !== undefined) {
+        updates.phone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+      }
+      if (waId !== undefined) {
+        updates.waId = typeof waId === "string" && waId.trim() ? waId.trim() : null;
+      }
+      if (wspConsent !== undefined) {
+        updates.wspConsent = Boolean(wspConsent);
+      }
+      if (language !== undefined && typeof language === "string") {
+        updates.language = language;
+      }
+      if (dominantHand !== undefined) {
+        updates.dominantHand = dominantHand && typeof dominantHand === "string" ? dominantHand.trim() : null;
+      }
+      if (courtSide !== undefined) {
+        updates.courtSide = courtSide && typeof courtSide === "string" ? courtSide.trim() : null;
+      }
 
-    const [
-      updatedRecord,
-    ] = await db
-      .update(playersTable)
-      .set(updates)
-      .where(
-        eq(playersTable.id, existingPlayer.id)
-      )
-      .returning();
+      if (email !== undefined || profileImageUrl !== undefined) {
+        try {
+          const [existingUser] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.playerId, params.data.id))
+            .limit(1);
 
-    if (!updatedRecord) {
-      res.status(404).json({
-        error:
-          "Jugador no encontrado",
-      });
-      return;
-    }
+          const cleanEmail = email !== undefined && typeof email === "string" ? email.trim() || null : undefined;
+          const cleanPhoto = profileImageUrl !== undefined && typeof profileImageUrl === "string" ? profileImageUrl.trim() || null : undefined;
 
-    if (
-      (isSuperAdmin || isClubAdmin) &&
-      Array.isArray(
-        categoryIds
-      )
-    ) {
-      await db
-        .delete(
-          playerCategoriesTable
-        )
-        .where(
-          eq(
-            playerCategoriesTable.playerId,
-            updatedRecord.id
-          )
-        );
+          if (existingUser) {
+            const userUpdates: Record<string, unknown> = {};
+            if (cleanEmail !== undefined) userUpdates.email = cleanEmail;
+            if (cleanPhoto !== undefined) userUpdates.profileImageUrl = cleanPhoto;
+            if (Object.keys(userUpdates).length > 0) {
+              await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, existingUser.id));
+            }
+          } else if (cleanEmail || cleanPhoto) {
+            await db.insert(usersTable).values({
+              email: cleanEmail ?? null,
+              profileImageUrl: cleanPhoto ?? null,
+              playerId: params.data.id,
+              name: updates.name ? String(updates.name) : existingPlayer.name,
+              clubId: existingPlayer.clubId ?? null,
+            });
+          }
+        } catch (err) {
+          logger.warn("Could not index linked user photo/email:", err);
+        }
+      }
 
-      if (
-        categoryIds.length > 0
-      ) {
+      if (Array.isArray(categoryIds)) {
         await db
-          .insert(
-            playerCategoriesTable
-          )
-          .values(
-            categoryIds.map(
-              (
-                categoryId: number
-              ) => ({
-                playerId:
-                  updatedRecord.id,
+          .delete(playerCategoriesTable)
+          .where(eq(playerCategoriesTable.playerId, existingPlayer.id));
+
+        if (categoryIds.length > 0) {
+          await db
+            .insert(playerCategoriesTable)
+            .values(
+              categoryIds.map((categoryId: number) => ({
+                playerId: existingPlayer.id,
                 categoryId,
-              })
-            )
-          );
+              }))
+            );
+        }
+      }
+    } else {
+      // Autoedición del perfil por el propio jugador (isSelfPlayer)
+      // Permite ÚNICAMENTE: teléfono, mano hábil, lado de juego, idioma y foto de perfil
+      // Bloquea estrictamente: correo, waId, consentimiento de WhatsApp, nombre, apodo, ELO, ranking, categoría
+      const {
+        phone,
+        dominantHand,
+        courtSide,
+        language,
+        profileImageUrl,
+      } = req.body;
+
+      if (phone !== undefined) {
+        updates.phone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+      }
+      if (dominantHand !== undefined) {
+        updates.dominantHand = dominantHand && typeof dominantHand === "string" ? dominantHand.trim() : null;
+      }
+      if (courtSide !== undefined) {
+        updates.courtSide = courtSide && typeof courtSide === "string" ? courtSide.trim() : null;
+      }
+      if (language !== undefined && typeof language === "string") {
+        updates.language = language;
+      }
+
+      if (profileImageUrl !== undefined) {
+        const cleanPhoto = typeof profileImageUrl === "string" ? profileImageUrl.trim() || null : null;
+        try {
+          const [existingUser] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(eq(usersTable.id, user.id))
+            .limit(1);
+
+          if (existingUser) {
+            await db
+              .update(usersTable)
+              .set({ profileImageUrl: cleanPhoto })
+              .where(eq(usersTable.id, existingUser.id));
+          }
+        } catch (err) {
+          logger.warn("Could not update self player profile image:", err);
+        }
       }
     }
+
+    let updatedRecord = existingPlayer;
+    if (Object.keys(updates).length > 0) {
+      const [rec] = await db
+        .update(playersTable)
+        .set(updates)
+        .where(eq(playersTable.id, existingPlayer.id))
+        .returning();
+      if (rec) {
+        updatedRecord = rec;
+      }
+    }
+
+
 
     const responseObj =
       await enrichPlayer(
@@ -989,30 +932,35 @@ router.get(
     const playerId =
       params.data.id;
 
-    const userClubId = (
-      req.user as {
-        clubId?: number | null;
-      } | undefined
-    )?.clubId;
-
-    const [player] =
-      await db
-        .select()
-        .from(playersTable)
-        .where(
-          eq(
-            playersTable.id,
-            playerId
-          )
-        );
+    const [player] = await db
+      .select()
+      .from(playersTable)
+      .where(eq(playersTable.id, playerId));
 
     if (!player) {
       res.status(404).json({
-        error:
-          "Jugador no encontrado",
+        error: "Jugador no encontrado",
       });
       return;
     }
+
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
+    const sessionClubId = user?.clubId ? Number(user.clubId) : null;
+    const playerClubId = player.clubId ? Number(player.clubId) : null;
+
+    // Aislamiento entre clubes:
+    // Si el usuario autenticado tiene club asignado y no es Super Admin,
+    // se impide consultar datos de partidos o participantes de jugadores de otro club.
+    if (!isSuperAdmin && sessionClubId && playerClubId && sessionClubId !== playerClubId) {
+      res.status(403).json({ error: "No tienes permiso para ver estadísticas de jugadores de otro club" });
+      return;
+    }
+
+    // Determinar el club efectivo:
+    // Si la sesión tiene club, se aísla a dicho club.
+    // Si la consulta es sin club (pública o sin sesión con club), se aísla estrictamente al club al que pertenece el jugador.
+    const effectiveClubId = sessionClubId ?? playerClubId;
 
     const rawSportId = req.query.sportId;
     const sportId =
@@ -1075,33 +1023,36 @@ router.get(
       } catch {}
     }
 
+    // Si no se puede determinar ningún club (p. ej. jugador huérfano sin club asignado), no se retornan partidos de ningún club
     const matchWhereClause = and(
-      userClubId ? eq(matchesTable.clubId, userClubId) : undefined,
+      effectiveClubId ? eq(matchesTable.clubId, effectiveClubId) : eq(matchesTable.clubId, -1),
       targetSportId ? eq(matchesTable.sportId, targetSportId) : undefined
     );
 
-    const [
-      allMatches,
-      allMatchPlayers,
-      allPlayersList,
-    ] = await Promise.all([
-      db
-        .select()
-        .from(matchesTable)
-        .where(matchWhereClause)
-        .orderBy(
-          desc(
-            matchesTable.playedAt
-          )
-        ),
+    const allMatches = await db
+      .select()
+      .from(matchesTable)
+      .where(matchWhereClause)
+      .orderBy(desc(matchesTable.playedAt));
 
-      db
-        .select()
-        .from(matchPlayersTable),
+    const matchIds = allMatches.map((m) => m.id);
 
-      db
-        .select()
-        .from(playersTable),
+    // Evitar escanear participantes y jugadores de otros clubes:
+    // 1. Participantes limitados a los partidos del club
+    // 2. Jugadores limitados al club objetivo
+    const [allMatchPlayers, allPlayersList] = await Promise.all([
+      matchIds.length > 0
+        ? db
+            .select()
+            .from(matchPlayersTable)
+            .where(inArray(matchPlayersTable.matchId, matchIds))
+        : Promise.resolve([]),
+      effectiveClubId
+        ? db
+            .select({ id: playersTable.id, name: playersTable.name })
+            .from(playersTable)
+            .where(eq(playersTable.clubId, effectiveClubId))
+        : Promise.resolve([]),
     ]);
 
     const mpByMatchId: Record<
@@ -1330,6 +1281,15 @@ router.get(
     }
 
     /**
+     * Si la consulta es realizada por un miembro autenticado del club o Super Admin,
+     * se incluyen los participantes. Si es consulta pública o sin club, se limita
+     * explícitamente a la información pública del partido omitiendo datos de participantes.
+     */
+    const isClubMemberOrSuperAdmin = Boolean(
+      user && (isSuperAdmin || (sessionClubId && sessionClubId === playerClubId))
+    );
+
+    /**
      * Últimos 5 partidos.
      */
     const recentMatches =
@@ -1341,37 +1301,39 @@ router.get(
               match.id
             ] ?? [];
 
-          const team1Players =
-            participants
-              .filter(
-                (mp) =>
-                  mp.team ===
-                  "team1"
-              )
-              .map((mp) => ({
-                id: mp.playerId,
-                name:
-                  playerMap[
-                    mp.playerId
-                  ] ??
-                  "Desconocido",
-              }));
+          const team1Players = isClubMemberOrSuperAdmin
+            ? participants
+                .filter(
+                  (mp) =>
+                    mp.team ===
+                    "team1"
+                )
+                .map((mp) => ({
+                  id: mp.playerId,
+                  name:
+                    playerMap[
+                      mp.playerId
+                    ] ??
+                    "Desconocido",
+                }))
+            : [];
 
-          const team2Players =
-            participants
-              .filter(
-                (mp) =>
-                  mp.team ===
-                  "team2"
-              )
-              .map((mp) => ({
-                id: mp.playerId,
-                name:
-                  playerMap[
-                    mp.playerId
-                  ] ??
-                  "Desconocido",
-              }));
+          const team2Players = isClubMemberOrSuperAdmin
+            ? participants
+                .filter(
+                  (mp) =>
+                    mp.team ===
+                    "team2"
+                )
+                .map((mp) => ({
+                  id: mp.playerId,
+                  name:
+                    playerMap[
+                      mp.playerId
+                    ] ??
+                    "Desconocido",
+                }))
+            : [];
 
           return {
             id: match.id,

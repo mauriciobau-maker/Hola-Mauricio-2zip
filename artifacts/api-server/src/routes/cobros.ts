@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool, cobrosTable, playersTable, torneoCalculosTable, usersTable, clubsTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireClub, isSuperAdminUser, isClubAdminUser } from "../middlewares/requireCommunity";
 
 const router = Router();
@@ -262,7 +262,10 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const clubId = (req.user as { clubId: number }).clubId;
+    // El club se deriva estrictamente de la sesión autenticada. Se ignora cualquier clubId enviado por el cliente.
+    const sessionClubId = (req.user as { clubId: number }).clubId;
+    const isSuperAdmin = isSuperAdminUser(req.user);
+
     const { nombre, items, jugadores } = req.body;
 
     if (!nombre || typeof nombre !== "string" || !nombre.trim()) {
@@ -280,8 +283,43 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Mapear qué ítems aplican a cada jugador
+    // Validar identificadores numéricos de los jugadores
     const allSelectedPlayerIds = jugadores.map((j: any) => Number(j.playerId));
+    if (allSelectedPlayerIds.some((pid: number) => isNaN(pid) || !Number.isInteger(pid) || pid <= 0)) {
+      res.status(400).json({ error: "Uno o más identificadores de jugadores son inválidos" });
+      return;
+    }
+
+    const uniquePlayerIds = Array.from(new Set(allSelectedPlayerIds));
+    if (uniquePlayerIds.length === 0) {
+      res.status(400).json({ error: "Debes seleccionar al menos un jugador válido" });
+      return;
+    }
+
+    // Consultar todos los jugadores antes de calcular o insertar nada
+    const existingPlayers = await db
+      .select({ id: playersTable.id, clubId: playersTable.clubId })
+      .from(playersTable)
+      .where(inArray(playersTable.id, uniquePlayerIds));
+
+    // 1. Verificar que TODOS los jugadores existan en la base de datos
+    if (existingPlayers.length !== uniquePlayerIds.length) {
+      res.status(400).json({ error: "Uno o más jugadores seleccionados no existen en el sistema" });
+      return;
+    }
+
+    // 2. Verificar que pertenezcan al club de la sesión (solo Super Admin puede operar entre clubes)
+    if (!isSuperAdmin) {
+      const playerFromOtherClub = existingPlayers.find((p) => p.clubId !== sessionClubId);
+      if (playerFromOtherClub) {
+        res.status(403).json({ error: "Uno o más jugadores no pertenecen al club de tu sesión actual" });
+        return;
+      }
+    }
+
+    const playerClubMap = new Map(existingPlayers.map((p) => [p.id, p.clubId]));
+
+    // Mapear qué ítems aplican a cada jugador
     const playerItemsMap = new Map<number, { concepto: string; monto: number }[]>();
     for (const pid of allSelectedPlayerIds) {
       playerItemsMap.set(pid, []);
@@ -345,12 +383,13 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
       ];
 
       const montoFinal = Math.max(0, totalBase + ajuste);
+      const targetClubId = isSuperAdmin ? (playerClubMap.get(playerId) ?? sessionClubId) : sessionClubId;
 
       const [cobro] = await db
         .insert(cobrosTable)
         .values({
           playerId,
-          clubId,
+          clubId: targetClubId,
           monto: montoFinal,
           items: playerItems,
           notas: `Reparto evento "${nombre.trim()}" (Total: $${totalCostos.toLocaleString("es-CL")})`,
@@ -364,7 +403,7 @@ router.post("/torneo-calcular", async (req: Request, res: Response): Promise<voi
     // Registrar en torneoCalculosTable para auditoría
     try {
       await db.insert(torneoCalculosTable).values({
-        clubId,
+        clubId: sessionClubId,
         nombre: nombre.trim(),
         items: validItems,
         jugadores,
