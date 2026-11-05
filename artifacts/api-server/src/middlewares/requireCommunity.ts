@@ -91,44 +91,18 @@ export async function resolveEffectiveClubId(req: Request): Promise<number | nul
       const [found] = await db
         .select({ id: clubsTable.id })
         .from(clubsTable)
-        .where(eq(clubsTable.slug, req.query.club.trim()))
+        .where(
+          and(
+            eq(clubsTable.slug, req.query.club.trim()),
+            eq(clubsTable.active, true)
+          )
+        )
         .limit(1);
       if (found?.id) return found.id;
     } catch {}
   }
 
-  if (req.query.clubId) {
-    const parsed = Number(req.query.clubId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  const headerClubId = req.headers["x-club-id"];
-  if (headerClubId) {
-    const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  // 3. Fallback: primer club activo en la BD
-  try {
-    const [firstActive] = await db
-      .select({ id: clubsTable.id })
-      .from(clubsTable)
-      .where(eq(clubsTable.active, true))
-      .orderBy(clubsTable.id)
-      .limit(1);
-
-    if (firstActive?.id) return firstActive.id;
-
-    const [firstClub] = await db
-      .select({ id: clubsTable.id })
-      .from(clubsTable)
-      .orderBy(clubsTable.id)
-      .limit(1);
-
-    return firstClub?.id ?? null;
-  } catch {
-    return 1;
-  }
+  return null;
 }
 
 /**

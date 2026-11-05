@@ -8,13 +8,15 @@ import {
   matchPlayersTable,
   sportModalitiesTable,
 } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
-import { resolveEffectiveClubId } from "../middlewares/requireCommunity";
+import { eq, and, inArray } from "drizzle-orm";
+import { resolveEffectiveClubId, isSuperAdminUser } from "../middlewares/requireCommunity";
 
 const router = Router();
 
-async function getAsistenciaList(encuentroId: number) {
-  const players = await db.select().from(playersTable);
+async function getAsistenciaList(encuentroId: number, clubId?: number | null) {
+  const players = clubId
+    ? await db.select().from(playersTable).where(eq(playersTable.clubId, clubId))
+    : await db.select().from(playersTable);
   const playerMap: Record<
     number,
     {
@@ -78,15 +80,21 @@ async function getAsistenciaList(encuentroId: number) {
 router.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const effectiveClubId = await resolveEffectiveClubId(req);
+    const user = (req as any).user;
+    const isSuperAdmin = isSuperAdminUser(user);
 
-    let query = db.select().from(encuentrosTable);
+    if (!effectiveClubId && !isSuperAdmin) {
+      res.json([]);
+      return;
+    }
+
     const list = effectiveClubId
       ? await db.select().from(encuentrosTable).where(eq(encuentrosTable.clubId, effectiveClubId))
       : await db.select().from(encuentrosTable);
 
     const result = await Promise.all(
       list.map(async (e) => {
-        const asistencia = await getAsistenciaList(e.id);
+        const asistencia = await getAsistenciaList(e.id, e.clubId);
         const formattedEncuentro = {
           ...e,
           dateTime:
@@ -126,7 +134,16 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const asistencia = await getAsistenciaList(id);
+    const effectiveClubId = await resolveEffectiveClubId(req);
+    const user = (req as any).user;
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    if (!isSuperAdmin && (!effectiveClubId || e.clubId !== effectiveClubId)) {
+      res.status(403).json({ message: "No tienes permiso para ver este encuentro" });
+      return;
+    }
+
+    const asistencia = await getAsistenciaList(id, e.clubId);
     res.json({
       encuentro: {
         ...e,
@@ -155,14 +172,45 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const isSuperAdmin = isSuperAdminUser(user);
     const bodyData = req.body.data ?? req.body;
     const { title, dateTime, location, maxSpots, notes, playerIds, durationMinutes, courtsAvailable, sportId, formato } = bodyData;
 
-    const effectiveClubId = bodyData.clubId
-      ? Number(bodyData.clubId)
-      : req.headers["x-club-id"]
-      ? Number(req.headers["x-club-id"])
+    const effectiveClubId = isSuperAdmin && (bodyData.clubId || req.headers["x-club-id"])
+      ? Number(bodyData.clubId || req.headers["x-club-id"])
       : (user.clubId || null);
+
+    if (!effectiveClubId) {
+      res.status(400).json({ message: "Se requiere un club activo para crear un encuentro." });
+      return;
+    }
+
+    const uniquePlayerIds = new Set<number>();
+    if (playerIds && Array.isArray(playerIds) && playerIds.length > 0) {
+      for (const pid of playerIds) {
+        if (pid) uniquePlayerIds.add(Number(pid));
+      }
+    }
+
+    // Auto-confirm the creator if linked to a player profile
+    if (user.playerId) {
+      uniquePlayerIds.add(Number(user.playerId));
+    }
+
+    if (uniquePlayerIds.size > 0) {
+      const pIdsArray = Array.from(uniquePlayerIds);
+      const playersInClub = await db
+        .select({ id: playersTable.id, clubId: playersTable.clubId })
+        .from(playersTable)
+        .where(inArray(playersTable.id, pIdsArray));
+
+      const validIds = new Set(playersInClub.filter(p => p.clubId === effectiveClubId).map(p => p.id));
+      const invalidPlayers = pIdsArray.filter(pid => !validIds.has(pid));
+      if (invalidPlayers.length > 0 || playersInClub.length !== pIdsArray.length) {
+        res.status(400).json({ message: "Todos los participantes deben pertenecer al club del encuentro." });
+        return;
+      }
+    }
 
     const [created] = await db
       .insert(encuentrosTable)
@@ -181,18 +229,6 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       })
       .returning();
 
-    const uniquePlayerIds = new Set<number>();
-    if (playerIds && Array.isArray(playerIds) && playerIds.length > 0) {
-      for (const pid of playerIds) {
-        if (pid) uniquePlayerIds.add(Number(pid));
-      }
-    }
-
-    // Auto-confirm the creator if linked to a player profile
-    if (user.playerId) {
-      uniquePlayerIds.add(Number(user.playerId));
-    }
-
     for (const playerId of uniquePlayerIds) {
       const isCreator = user.playerId && Number(user.playerId) === playerId;
       await db.insert(asistenciaTable).values({
@@ -203,7 +239,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    const asistencia = await getAsistenciaList(created.id);
+    const asistencia = await getAsistenciaList(created.id, effectiveClubId);
     const formattedEncuentro = {
       ...created,
       dateTime:
@@ -243,13 +279,19 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && e.clubId !== user.clubId) {
+      res.status(403).json({ message: "No tienes permiso para acceder a encuentros de otro club." });
+      return;
+    }
+
     const isOrganizer =
       String(user.id) === String(e.organizerId) ||
-      Boolean(user.isAdmin) ||
-      Boolean(user.isClubAdmin && user.isClubAdmin > 0) ||
+      isSuperAdmin ||
+      Boolean(user.isClubAdmin && user.clubId === e.clubId) ||
       (user.playerId && String(user.playerId) === String(e.organizerId));
     if (!isOrganizer) {
-      res.status(403).json({ message: "Solo el organizador o administrador puede editar este encuentro." });
+      res.status(403).json({ message: "Solo el organizador o administrador del club puede editar este encuentro." });
       return;
     }
 
@@ -280,7 +322,7 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
 
     // Si se modificó maxSpots, reajustar lista de confirmados vs reserva
     if (updates.maxSpots !== undefined) {
-      const asistenciaActual = await getAsistenciaList(id);
+      const asistenciaActual = await getAsistenciaList(id, e.clubId);
       const limit = updates.maxSpots;
       if (limit && limit > 0) {
         const confirmados = asistenciaActual.filter((a) => a.status === "confirmed");
@@ -306,7 +348,7 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const asistenciaFinal = await getAsistenciaList(id);
+    const asistenciaFinal = await getAsistenciaList(id, e.clubId);
     res.json({
       encuentro: {
         ...updated,
@@ -352,12 +394,27 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Seguridad: Si se intenta modificar la asistencia de otro jugador, debe ser organizador del encuentro o admin
-    if (reqPlayerId && Number(reqPlayerId) !== user.playerId) {
-      const isOrganizer = user.id === e.organizerId || user.isAdmin;
-      if (!isOrganizer) {
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && e.clubId !== user.clubId) {
+      res.status(403).json({ message: "No perteneces al club de este encuentro." });
+      return;
+    }
+
+    const [targetPlayer] = await db.select().from(playersTable).where(eq(playersTable.id, targetPlayerId));
+    if (!targetPlayer || targetPlayer.clubId !== e.clubId) {
+      res.status(400).json({ message: "El jugador no pertenece al club de este encuentro." });
+      return;
+    }
+
+    // Seguridad: Si se intenta modificar la asistencia de otro jugador, debe ser organizador del encuentro o admin de su club
+    if (targetPlayerId !== user.playerId) {
+      const isOrganizerOrAdmin =
+        String(user.id) === String(e.organizerId) ||
+        isSuperAdmin ||
+        Boolean(user.isClubAdmin && user.clubId === e.clubId);
+      if (!isOrganizerOrAdmin) {
         res.status(403).json({
-          message: "Solo el organizador del encuentro o un administrador puede confirmar o modificar la asistencia de otros participantes.",
+          message: "Solo el organizador del encuentro o un administrador del club puede confirmar o modificar la asistencia de otros participantes.",
         });
         return;
       }
@@ -366,7 +423,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
     let finalStatus = status;
 
     if (status === "confirmed") {
-      const asistenciaActual = await getAsistenciaList(encuentroId);
+      const asistenciaActual = await getAsistenciaList(encuentroId, e.clubId);
       const confirmedCount = asistenciaActual.filter(
         (a) => a.status === "confirmed" && a.playerId !== targetPlayerId
       ).length;
@@ -422,7 +479,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    let asistenciaActualizada = await getAsistenciaList(encuentroId);
+    let asistenciaActualizada = await getAsistenciaList(encuentroId, e.clubId);
     const confirmedActual = asistenciaActualizada.filter(
       (a) => a.status === "confirmed"
     ).length;
@@ -443,7 +500,7 @@ router.post("/:id/rsvp", async (req: Request, res: Response): Promise<void> => {
           .set({ status: "confirmed", respondedAt: new Date() })
           .where(eq(asistenciaTable.id, promovido.id));
 
-        asistenciaActualizada = await getAsistenciaList(encuentroId);
+        asistenciaActualizada = await getAsistenciaList(encuentroId, e.clubId);
       }
     }
 
@@ -487,7 +544,18 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (e.organizerId !== user.id && !user.isAdmin) {
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && e.clubId !== user.clubId) {
+      res.status(403).json({ message: "No perteneces al club de este encuentro." });
+      return;
+    }
+
+    const canDelete =
+      String(e.organizerId) === String(user.id) ||
+      isSuperAdmin ||
+      Boolean(user.isClubAdmin && user.clubId === e.clubId);
+
+    if (!canDelete) {
       res
         .status(403)
         .json({ message: "No tienes permiso para eliminar este encuentro" });
@@ -522,13 +590,30 @@ router.get("/:id/partidos", async (req: Request, res: Response): Promise<void> =
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
 
+    const [encuentro] = await db.select().from(encuentrosTable).where(eq(encuentrosTable.id, encuentroId));
+    if (!encuentro) {
+      res.status(404).json({ message: "Encuentro no encontrado" });
+      return;
+    }
+
+    const effectiveClubId = await resolveEffectiveClubId(req);
+    const user = (req as any).user;
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    if (!isSuperAdmin && (!effectiveClubId || encuentro.clubId !== effectiveClubId)) {
+      res.status(403).json({ message: "No tienes permiso para ver los partidos de este encuentro" });
+      return;
+    }
+
     const rawMatches = await db
       .select()
       .from(matchesTable)
       .where(eq(matchesTable.encuentroId, encuentroId))
       .orderBy(matchesTable.round, matchesTable.court, matchesTable.id);
 
-    const allPlayers = await db.select().from(playersTable);
+    const allPlayers = encuentro.clubId
+      ? await db.select().from(playersTable).where(eq(playersTable.clubId, encuentro.clubId))
+      : await db.select().from(playersTable);
     const playerMap = new Map(allPlayers.map((p) => [p.id, p.name]));
 
     const formattedMatches = await Promise.all(
@@ -596,9 +681,18 @@ router.delete("/:id/partidos", async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const isOrganizer = user.id === e.organizerId || user.isAdmin;
-    if (!isOrganizer) {
-      res.status(403).json({ message: "Solo el organizador o un administrador puede eliminar los partidos del encuentro." });
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && e.clubId !== user.clubId) {
+      res.status(403).json({ message: "No tienes permiso para acceder a encuentros de otro club." });
+      return;
+    }
+
+    const canDeleteMatches =
+      String(user.id) === String(e.organizerId) ||
+      isSuperAdmin ||
+      Boolean(user.isClubAdmin && user.clubId === e.clubId);
+    if (!canDeleteMatches) {
+      res.status(403).json({ message: "Solo el organizador o un administrador del club puede eliminar los partidos del encuentro." });
       return;
     }
 
@@ -621,6 +715,12 @@ router.delete("/:id/partidos", async (req: Request, res: Response): Promise<void
 // PATCH /api/encuentros/:id/partidos/:matchId -> Guardar resultado / sets del partido
 router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Promise<void> => {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
     const rawMatchId = req.params.matchId;
     const matchId = parseInt(Array.isArray(rawMatchId) ? rawMatchId[0] : rawMatchId, 10);
     const rawEncuentroId = req.params.id;
@@ -635,6 +735,22 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
 
     if (!existingMatch) {
       res.status(404).json({ message: "Partido no encontrado" });
+      return;
+    }
+
+    const [encuentro] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+
+    if (!encuentro) {
+      res.status(404).json({ message: "Encuentro no encontrado" });
+      return;
+    }
+
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && encuentro.clubId !== user.clubId) {
+      res.status(403).json({ message: "No tienes permiso para modificar partidos de otro club." });
       return;
     }
 
@@ -660,11 +776,6 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
 
     updateData.playedAt = new Date();
 
-    const [encuentro] = await db
-      .select()
-      .from(encuentrosTable)
-      .where(eq(encuentrosTable.id, encuentroId));
-
     const isFutMatch =
       existingMatch.sportId === 3 ||
       encuentro?.sportId === 3 ||
@@ -677,8 +788,7 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
     }
 
     if (!existingMatch.clubId) {
-      const effectiveClubId = encuentro?.clubId || (req.user as any)?.clubId || 1;
-      updateData.clubId = effectiveClubId;
+      updateData.clubId = encuentro.clubId;
     }
 
     const [updated] = await db
@@ -696,8 +806,39 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
 // PATCH /api/encuentros/:id/finalizar
 router.patch("/:id/finalizar", async (req: Request, res: Response): Promise<void> => {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
+
+    const [encuentro] = await db
+      .select()
+      .from(encuentrosTable)
+      .where(eq(encuentrosTable.id, encuentroId));
+
+    if (!encuentro) {
+      res.status(404).json({ message: "Encuentro no encontrado" });
+      return;
+    }
+
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && encuentro.clubId !== user.clubId) {
+      res.status(403).json({ message: "No tienes permiso para finalizar encuentros de otro club." });
+      return;
+    }
+
+    const canFinalize =
+      String(user.id) === String(encuentro.organizerId) ||
+      isSuperAdmin ||
+      Boolean(user.isClubAdmin && user.clubId === encuentro.clubId);
+    if (!canFinalize) {
+      res.status(403).json({ message: "Solo el organizador o un administrador del club puede finalizar el encuentro." });
+      return;
+    }
 
     const matches = await db.select().from(matchesTable).where(eq(matchesTable.encuentroId, encuentroId));
     const pendingCount = matches.filter((m) => m.status === "pending_confirmation" || m.result === "pending").length;
@@ -721,6 +862,12 @@ router.patch("/:id/finalizar", async (req: Request, res: Response): Promise<void
 // POST /api/encuentros/:id/generar-partidos
 router.post("/:id/generar-partidos", async (req: Request, res: Response): Promise<void> => {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
     const rawId = req.params.id;
     const encuentroId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
     const {
@@ -734,13 +881,33 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       rivalTeamName,
     } = req.body;
 
-    const asistencia = await getAsistenciaList(encuentroId);
-    const confirmados = asistencia.filter((a) => a.status === "confirmed");
-
     const [encuentroDb] = await db
       .select()
       .from(encuentrosTable)
       .where(eq(encuentrosTable.id, encuentroId));
+
+    if (!encuentroDb) {
+      res.status(404).json({ message: "Encuentro no encontrado" });
+      return;
+    }
+
+    const isSuperAdmin = isSuperAdminUser(user);
+    if (!isSuperAdmin && encuentroDb.clubId !== user.clubId) {
+      res.status(403).json({ message: "No tienes permiso para acceder a encuentros de otro club." });
+      return;
+    }
+
+    const canGenerate =
+      String(user.id) === String(encuentroDb.organizerId) ||
+      isSuperAdmin ||
+      Boolean(user.isClubAdmin && user.clubId === encuentroDb.clubId);
+    if (!canGenerate) {
+      res.status(403).json({ message: "Solo el organizador o un administrador del club puede generar partidos." });
+      return;
+    }
+
+    const asistencia = await getAsistenciaList(encuentroId, encuentroDb.clubId);
+    const confirmados = asistencia.filter((a) => a.status === "confirmed");
 
     // Deportes: 1 = Pádel, 2 = Tenis, 3 = Fútbol
     const isFootball =
@@ -803,7 +970,9 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
     }
 
     // Traer información deportiva completa para balancear por Elo
-    const allDbPlayers = await db.select().from(playersTable);
+    const allDbPlayers = encuentroDb?.clubId
+      ? await db.select().from(playersTable).where(eq(playersTable.clubId, encuentroDb.clubId))
+      : await db.select().from(playersTable);
     const playerDetailMap = new Map<number, any>();
     for (const p of allDbPlayers) {
       playerDetailMap.set(p.id, p);
@@ -1280,7 +1449,7 @@ router.post("/:id/generar-partidos", async (req: Request, res: Response): Promis
       .where(eq(matchesTable.encuentroId, encuentroId));
 
     const partidosCreados = [];
-    const effectiveClubId = encuentroDb?.clubId || (req.user as any)?.clubId || 1;
+    const effectiveClubId = encuentroDb.clubId;
 
     for (const cruce of crucesPartidos) {
       const [newMatch] = await db

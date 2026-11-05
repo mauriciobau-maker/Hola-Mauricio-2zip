@@ -17,7 +17,7 @@ import { useLanguage } from "../context/LanguageContext";
 export function AuthButton() {
   const { user, isLoading, logout } = useAuth();
   const [, navigate] = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Super Admin se oculta para testers y solo se activa para el dueño (por email) o mediante acceso maestro (?admin=master o ?super=1)
   const isMasterAuthorized = typeof window !== "undefined" && (
@@ -60,6 +60,26 @@ export function AuthButton() {
     }
 
     window.dispatchEvent(new CustomEvent("padel_auth_update", { detail: nextUser ?? null }));
+  };
+
+  const handleSwitchClub = async (targetClubId: number) => {
+    try {
+      const res = await fetch("/api/auth/switch-club", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ clubId: targetClubId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          persistAuthSession(data.user, localStorage.getItem("padel_auth_token"));
+          window.location.reload();
+        }
+      }
+    } catch (err) {
+      console.error("Error switching club:", err);
+    }
   };
 
   const isOwnerEmail = user?.email === "mbau73@hotmail.com" || user?.email === "mauricio.bau@gmail.com";
@@ -301,6 +321,49 @@ export function AuthButton() {
             <User className="h-4 w-4" />
             {t("auth.myProfile")}
           </DropdownMenuItem>
+        )}
+
+        {/* Mis Clubes / Selector de club activo */}
+        {((user as any).memberships && (user as any).memberships.length > 0) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground flex items-center justify-between">
+              <span>{language === "en" ? "My Clubs" : language === "pt" ? "Meus Clubes" : "Mis Clubes"}</span>
+              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.2 rounded font-bold">
+                {(user as any).memberships.length}
+              </span>
+            </DropdownMenuLabel>
+            {((user as any).memberships as any[]).map((m: any) => {
+              const isActive = (user as any).clubId === m.clubId;
+              const isMemAdmin = m.role === "club_admin" || m.role === "admin";
+              return (
+                <DropdownMenuItem
+                  key={m.clubId}
+                  onClick={() => handleSwitchClub(m.clubId)}
+                  className={`gap-2 cursor-pointer text-xs justify-between ${
+                    isActive ? "bg-primary/10 font-bold text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Building2 className={`h-3.5 w-3.5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                    <span className="truncate">{m.clubName}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded border font-semibold ${
+                        isMemAdmin
+                          ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                          : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                      }`}
+                    >
+                      {isMemAdmin ? "Admin" : "Jugador"}
+                    </span>
+                    {isActive && <span className="text-[10px] text-primary font-bold">✓</span>}
+                  </div>
+                </DropdownMenuItem>
+              );
+            })}
+          </>
         )}
 
         <DropdownMenuSeparator />

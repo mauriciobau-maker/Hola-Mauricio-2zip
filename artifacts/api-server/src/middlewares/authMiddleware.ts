@@ -13,7 +13,21 @@ import {
 
 declare global {
   namespace Express {
-    interface User extends AuthUser {}
+    interface User extends AuthUser {
+      role?: string;
+      memberships?: Array<{
+        id: number;
+        clubId: number;
+        role: string;
+        playerId?: number | null;
+        clubName?: string;
+        clubSlug?: string;
+        clubLogoUrl?: string | null;
+        clubPlan?: string | null;
+        status: string;
+      }>;
+      activeMembership?: any;
+    }
 
     interface Request {
       isAuthenticated(): this is AuthedRequest;
@@ -186,11 +200,11 @@ export async function authMiddleware(
 
   req.user = refreshed.user;
 
-  // Sincronizar permisos en tiempo real desde la base de datos
+  // Sincronizar membresías y permisos en tiempo real desde la base de datos
   if (req.user?.id || req.user?.email) {
     try {
-      const { db, usersTable } = await import("@workspace/db");
-      const { eq, or } = await import("drizzle-orm");
+      const { db, usersTable, membershipsTable, clubsTable } = await import("@workspace/db");
+      const { eq, or, and } = await import("drizzle-orm");
       const conditions = [];
       if (req.user.id) conditions.push(eq(usersTable.id, req.user.id));
       if (req.user.email) conditions.push(eq(usersTable.email, req.user.email));
@@ -202,26 +216,114 @@ export async function authMiddleware(
         .limit(1);
 
       if (dbUser) {
-        req.user = {
-          ...req.user,
-          isAdmin: Number(dbUser.isAdmin) >= 1 ? 1 : 0,
-          isClubAdmin: Number(dbUser.isClubAdmin) >= 1 ? 1 : 0,
-          clubId: dbUser.clubId ?? (req.user as any).clubId,
-        };
-      }
-    } catch {}
-  }
+        // Lista de Super Administradores maestros garantizados
+        const SUPER_ADMINS = [
+          "mauricio.bau@gmail.com",
+          "pedidosltdc@gmail.com",
+          "admin@padeltracker.com",
+          "mbau73@hotmail.com"
+        ];
+        const isMasterSuperAdmin = Boolean(
+          (dbUser.email && SUPER_ADMINS.includes(dbUser.email.toLowerCase())) ||
+          Number(dbUser.isAdmin) >= 1
+        );
 
-  // Lista de Super Administradores maestros garantizados
-  const SUPER_ADMINS = [
-    "mauricio.bau@gmail.com",
-    "pedidosltdc@gmail.com",
-    "admin@padeltracker.com",
-    "mbau73@hotmail.com"
-  ];
-  if (req.user?.email && SUPER_ADMINS.includes(req.user.email.toLowerCase())) {
-    req.user.isAdmin = 1;
-    req.user.isClubAdmin = 1;
+        // Consultar todas las membresías activas del usuario en clubes activos
+        const userMemberships = await db
+          .select({
+            id: membershipsTable.id,
+            clubId: membershipsTable.clubId,
+            role: membershipsTable.role,
+            playerId: membershipsTable.playerId,
+            status: membershipsTable.status,
+            clubName: clubsTable.name,
+            clubSlug: clubsTable.slug,
+            clubLogoUrl: clubsTable.logoUrl,
+            clubPlan: clubsTable.plan,
+          })
+          .from(membershipsTable)
+          .innerJoin(clubsTable, eq(membershipsTable.clubId, clubsTable.id))
+          .where(
+            and(
+              eq(membershipsTable.userId, dbUser.id),
+              eq(membershipsTable.status, "active"),
+              eq(clubsTable.active, true)
+            )
+          );
+
+        // Determinar club activo:
+        // 1. Si es Super Admin y envió x-club-id o query clubId
+        // 2. session.activeClubId
+        // 3. dbUser.clubId (último club activo persistido)
+        // 4. Primera membresía activa disponible
+        let targetClubId: number | null = null;
+
+        if (isMasterSuperAdmin) {
+          const headerClubId = req.headers["x-club-id"];
+          if (headerClubId) {
+            const parsed = Number(Array.isArray(headerClubId) ? headerClubId[0] : headerClubId);
+            if (!isNaN(parsed) && parsed > 0) targetClubId = parsed;
+          }
+          if (!targetClubId && req.query.clubId) {
+            const parsed = Number(req.query.clubId);
+            if (!isNaN(parsed) && parsed > 0) targetClubId = parsed;
+          }
+        }
+
+        if (!targetClubId) {
+          targetClubId = (session as any).activeClubId ?? dbUser.clubId ?? userMemberships[0]?.clubId ?? null;
+        }
+
+        // Buscar la membresía específica para el club activo
+        const activeMembership = userMemberships.find((m) => m.clubId === targetClubId) ?? null;
+
+        if (isMasterSuperAdmin) {
+          req.user = {
+            ...req.user,
+            id: dbUser.id,
+            email: dbUser.email,
+            isAdmin: 1,
+            isClubAdmin: 1,
+            role: "superadmin",
+            clubId: targetClubId ?? dbUser.clubId ?? null,
+            playerId: activeMembership?.playerId ?? dbUser.playerId ?? null,
+            memberships: userMemberships,
+            activeMembership,
+          };
+        } else if (activeMembership) {
+          // El rol y la ficha se derivan estrictamente de la membresía activa en ese club
+          const isClubAdmin = activeMembership.role === "club_admin" || activeMembership.role === "admin" ? 1 : 0;
+          req.user = {
+            ...req.user,
+            id: dbUser.id,
+            email: dbUser.email,
+            isAdmin: 0,
+            isClubAdmin,
+            role: activeMembership.role,
+            clubId: activeMembership.clubId,
+            playerId: activeMembership.playerId ?? null,
+            memberships: userMemberships,
+            activeMembership,
+          };
+        } else {
+          // Usuario sin membresía activa en el club solicitado
+          req.user = {
+            ...req.user,
+            id: dbUser.id,
+            email: dbUser.email,
+            isAdmin: 0,
+            isClubAdmin: 0,
+            role: "player",
+            clubId: null,
+            playerId: null,
+            memberships: userMemberships,
+            activeMembership: null,
+          };
+        }
+      }
+    } catch (e) {
+      console.error("Error sincronizando membresías en authMiddleware:", e);
+    }
   }
 
   next();

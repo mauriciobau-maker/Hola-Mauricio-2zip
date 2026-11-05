@@ -21,6 +21,8 @@ import {
   requireAuth,
   requireClub,
   resolveEffectiveClubId,
+  isSuperAdminUser,
+  isClubAdminUser,
 } from "../middlewares/requireCommunity";
 import { getSportModality, validatePlayersForClub } from "../lib/modalities";
 
@@ -685,26 +687,21 @@ router.post(
     // ----------------------------------------------------------
     const allClubPlayerIdsToCheck = isRival ? allT1 : [...allT1, ...normalizedTeam2Ids, ...normalizedTeam2SubIds];
 
-    let clubId = req.body.clubId ? Number(req.body.clubId) : null;
-    if (!clubId && req.headers["x-club-id"]) {
-      const headerVal = Number(Array.isArray(req.headers["x-club-id"]) ? req.headers["x-club-id"][0] : req.headers["x-club-id"]);
-      if (!isNaN(headerVal) && headerVal > 0) clubId = headerVal;
-    }
-    if (!clubId && allClubPlayerIdsToCheck.length > 0) {
-      const [firstPlayer] = await db
-        .select({ clubId: playersTable.clubId })
-        .from(playersTable)
-        .where(eq(playersTable.id, allClubPlayerIdsToCheck[0]))
-        .limit(1);
-      if (firstPlayer?.clubId) {
-        clubId = firstPlayer.clubId;
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
+
+    let clubId: number | null = null;
+    if (isSuperAdmin) {
+      if (req.body.clubId) {
+        clubId = Number(req.body.clubId);
+      } else if (req.headers["x-club-id"]) {
+        const headerVal = Number(Array.isArray(req.headers["x-club-id"]) ? req.headers["x-club-id"][0] : req.headers["x-club-id"]);
+        if (!isNaN(headerVal) && headerVal > 0) clubId = headerVal;
       }
     }
+
     if (!clubId) {
-      clubId = await resolveEffectiveClubId(req);
-    }
-    if (!clubId && req.user) {
-      clubId = (req.user as any).clubId;
+      clubId = user?.clubId ? Number(user.clubId) : null;
     }
 
     if (!clubId) {
@@ -870,9 +867,9 @@ router.post(
     }
 
     const user = req.user as any;
-    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+    const isSuperAdmin = isSuperAdminUser(user);
 
-    if (existing.clubId && existing.clubId !== clubId && !isStaff) {
+    if (existing.clubId && existing.clubId !== clubId && !isSuperAdmin) {
       res.status(403).json({
         error: "Forbidden",
       });
@@ -1155,7 +1152,9 @@ router.patch(
     }
 
     const user = req.user as any;
-    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+    const isSuperAdmin = isSuperAdminUser(user);
+    const isClubAdminInThisClub = Boolean(user?.isClubAdmin === 1 && user?.clubId === existing.clubId);
+    const isStaff = isSuperAdmin || isClubAdminInThisClub;
 
     let isEncuentroOrganizer = false;
     if (existing.encuentroId) {
@@ -1172,7 +1171,7 @@ router.patch(
       }
     }
 
-    if (existing.clubId && existing.clubId !== clubId && !isStaff && !isEncuentroOrganizer) {
+    if (existing.clubId && existing.clubId !== clubId && !isSuperAdmin) {
       res.status(403).json({
         error: "Forbidden",
       });
@@ -1620,20 +1619,18 @@ router.delete(
       return;
     }
 
-    if (
-      existing.clubId !==
-      clubId
-    ) {
-      res.status(403).json({
-        error:
-          "Forbidden",
-      });
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
 
+    if (existing.clubId !== clubId && !isSuperAdmin) {
+      res.status(403).json({
+        error: "Forbidden",
+      });
       return;
     }
 
-    const user = req.user as any;
-    const isStaff = user?.isAdmin === 1 || user?.isClubAdmin === 1;
+    const isClubAdminInThisClub = Boolean(user?.isClubAdmin === 1 && user?.clubId === existing.clubId);
+    const isStaff = isSuperAdmin || isClubAdminInThisClub;
 
     let isEncuentroOrganizer = false;
     if (existing.encuentroId) {

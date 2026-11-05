@@ -267,6 +267,12 @@ router.get(
   async (req, res): Promise<void> => {
     try {
       const clubId = await resolveEffectiveClubId(req);
+      const isSuperAdmin = isSuperAdminUser((req as any).user);
+      if (!clubId && !isSuperAdmin) {
+        res.json([]);
+        return;
+      }
+
       const rawSportId = req.query.sportId;
       const sportId =
         rawSportId !== undefined && rawSportId !== "" ? Number(rawSportId) : null;

@@ -14,6 +14,7 @@ export interface SessionData {
   access_token: string;
   refresh_token?: string;
   expires_at?: number;
+  activeClubId?: number;
 }
 
 const inMemorySessions = new Map<string, SessionData & { expire: Date }>();

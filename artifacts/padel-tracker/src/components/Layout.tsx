@@ -44,6 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isPublicClubRoute = /^\/[^/]+$/.test(location) && !reservedSingleSegmentRoutes.has(location);
   const isSuperAdmin = !!(user && ((user as any).role === "superadmin" || (user as any).role === "super_admin"));
   const isAdmin = !!(user && (user as any).isAdmin && (user as any).isAdmin > 0) || isSuperAdmin;
+  const isClubAdmin = !!(user && ((user as any).isClubAdmin && (user as any).isClubAdmin > 0)) || isAdmin;
 
   useEffect(() => {
     if (!isLoading && user && !(user as any).clubId && !isAdmin && !isPublicClubRoute && location !== "/onboarding" && location !== "/vincular" && location !== "/admin") {
@@ -283,19 +284,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span>{t("secretaryNav")}</span>
               </Link>
 
-              <Link
-                href="/mi-club"
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0",
-                  location === "/mi-club"
-                    ? "bg-primary/20 text-primary border border-primary/40 font-bold"
-                    : "text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border/80"
-                )}
-                title={language === "en" ? "Customize my club, branding and colors" : language === "pt" ? "Personalizar meu clube, cores e foto" : "Personalizar mi club, colores y foto"}
-              >
-                <Building2 size={13} className="text-primary" />
-                <span>{t("myClub")}</span>
-              </Link>
+              {isClubAdmin && (
+                <Link
+                  href="/mi-club"
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0",
+                    location === "/mi-club"
+                      ? "bg-primary/20 text-primary border border-primary/40 font-bold"
+                      : "text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border/80"
+                  )}
+                  title={language === "en" ? "Customize my club, branding and colors" : language === "pt" ? "Personalizar meu clube, cores e foto" : "Personalizar mi club, colores y foto"}
+                >
+                  <Building2 size={13} className="text-primary" />
+                  <span>{t("myClub")}</span>
+                </Link>
+              )}
 
               <Link
                 href="/manual"
@@ -385,19 +388,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {t(item.key)}
               </Link>
             ))}
-            <Link
-              href="/mi-club"
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-colors",
-                location === "/mi-club"
-                  ? "bg-primary/15 text-primary"
-                  : "text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Building2 size={16} className="text-primary" />
-              <span>{t("clubSettings")}</span>
-            </Link>
+            {isClubAdmin && (
+              <Link
+                href="/mi-club"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-colors",
+                  location === "/mi-club"
+                    ? "bg-primary/15 text-primary"
+                    : "text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Building2 size={16} className="text-primary" />
+                <span>{t("clubSettings")}</span>
+              </Link>
+            )}
 
             <Link
               href="/manual"

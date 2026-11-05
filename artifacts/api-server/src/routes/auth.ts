@@ -1,13 +1,15 @@
 import * as oidc from "openid-client";
 import { Router, type IRouter, type Request, type Response } from "express";
 import * as z from "zod";
-import { eq, or, sql } from "drizzle-orm";
-import { db, usersTable, clubsTable, playersTable } from "@workspace/db";
+import { eq, or, and, ne, sql } from "drizzle-orm";
+import { db, usersTable, clubsTable, playersTable, membershipsTable } from "@workspace/db";
 import { isSuperAdminUser } from "../middlewares/requireCommunity";
 import {
   clearSession,
   getOidcConfig,
   getSessionId,
+  getSession,
+  updateSession,
   createSession,
   deleteSession,
   SESSION_COOKIE,
@@ -91,7 +93,7 @@ async function upsertUser(claims: Record<string, unknown>) {
   return user;
 }
 
-async function getUserWithClub(userId: string) {
+async function getUserWithClub(userId: string, requestedClubId?: number | null) {
   const [user] = await db
     .select()
     .from(usersTable)
@@ -105,9 +107,48 @@ async function getUserWithClub(userId: string) {
     "admin@padeltracker.com",
     "mbau73@hotmail.com"
   ];
-  if (user.email && SUPER_ADMINS.includes(user.email.toLowerCase())) {
+  const isMasterSuper = Boolean(user.email && SUPER_ADMINS.includes(user.email.toLowerCase())) || Number(user.isAdmin) >= 1;
+  if (isMasterSuper) {
     user.isAdmin = 1;
     user.isClubAdmin = 1;
+  }
+
+  // Cargar todas las membresías activas del usuario
+  const memberships = await db
+    .select({
+      id: membershipsTable.id,
+      clubId: membershipsTable.clubId,
+      role: membershipsTable.role,
+      playerId: membershipsTable.playerId,
+      status: membershipsTable.status,
+      clubName: clubsTable.name,
+      clubSlug: clubsTable.slug,
+      clubLogoUrl: clubsTable.logoUrl,
+      clubPlan: clubsTable.plan,
+    })
+    .from(membershipsTable)
+    .innerJoin(clubsTable, eq(membershipsTable.clubId, clubsTable.id))
+    .where(
+      and(
+        eq(membershipsTable.userId, user.id),
+        eq(membershipsTable.status, "active"),
+        eq(clubsTable.active, true)
+      )
+    );
+
+  const effectiveClubId = requestedClubId ?? user.clubId ?? memberships[0]?.clubId ?? null;
+  const activeMembership = memberships.find((m) => m.clubId === effectiveClubId) ?? null;
+
+  if (activeMembership) {
+    user.clubId = activeMembership.clubId;
+    user.isClubAdmin = (activeMembership.role === "club_admin" || activeMembership.role === "admin") ? 1 : 0;
+    (user as any).role = activeMembership.role;
+    user.playerId = activeMembership.playerId ?? null;
+  } else if (!isMasterSuper) {
+    user.clubId = null;
+    user.isClubAdmin = 0;
+    (user as any).role = "player";
+    user.playerId = null;
   }
 
   let club = null;
@@ -119,19 +160,85 @@ async function getUserWithClub(userId: string) {
     club = c ?? null;
   }
 
-  return { ...user, club };
+  return { ...user, club, memberships, activeMembership };
 }
 
-router.get("/auth/user", async (req: Request, res: Response) => {
+router.get(["/auth/user", "/auth/me"], async (req: Request, res: Response) => {
   if (!req.isAuthenticated() || !req.user) {
     res.json({ user: null });
     return;
   }
   try {
-    const userWithClub = await getUserWithClub(req.user.id);
+    const userWithClub = await getUserWithClub(req.user.id, req.user.clubId);
     res.json({ user: userWithClub ?? req.user });
   } catch {
     res.json({ user: req.user });
+  }
+});
+
+router.get("/auth/memberships", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated() || !req.user) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+  try {
+    const isSuperAdmin = isSuperAdminUser(req.user);
+
+    let memberships = await db
+      .select({
+        id: membershipsTable.id,
+        clubId: membershipsTable.clubId,
+        role: membershipsTable.role,
+        playerId: membershipsTable.playerId,
+        status: membershipsTable.status,
+        clubName: clubsTable.name,
+        clubSlug: clubsTable.slug,
+        clubLogoUrl: clubsTable.logoUrl,
+        clubPlan: clubsTable.plan,
+      })
+      .from(membershipsTable)
+      .innerJoin(clubsTable, eq(membershipsTable.clubId, clubsTable.id))
+      .where(
+        and(
+          eq(membershipsTable.userId, req.user.id),
+          eq(membershipsTable.status, "active"),
+          eq(clubsTable.active, true)
+        )
+      );
+
+    if (isSuperAdmin) {
+      const allClubs = await db
+        .select({
+          clubId: clubsTable.id,
+          clubName: clubsTable.name,
+          clubSlug: clubsTable.slug,
+          clubLogoUrl: clubsTable.logoUrl,
+          clubPlan: clubsTable.plan,
+        })
+        .from(clubsTable)
+        .where(eq(clubsTable.active, true));
+
+      const existingClubIds = new Set(memberships.map((m) => m.clubId));
+      for (const c of allClubs) {
+        if (!existingClubIds.has(c.clubId)) {
+          memberships.push({
+            id: -c.clubId,
+            clubId: c.clubId,
+            role: "superadmin",
+            playerId: null,
+            status: "active",
+            clubName: c.clubName,
+            clubSlug: c.clubSlug,
+            clubLogoUrl: c.clubLogoUrl,
+            clubPlan: c.clubPlan,
+          });
+        }
+      }
+    }
+
+    res.json({ memberships, activeClubId: req.user.clubId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Error al obtener membresías" });
   }
 });
 
@@ -146,7 +253,15 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     return;
   }
 
-  // Verificar que el jugador exista y pertenezca al club del usuario (salvo Super Admin)
+  const isSuperAdmin = isSuperAdminUser(req.user);
+  const activeClubId = req.user.clubId;
+
+  if (!isSuperAdmin && !activeClubId) {
+    res.status(403).json({ error: "Debes tener un club asignado en tu sesión activa para vincular un perfil" });
+    return;
+  }
+
+  // Verificar que el jugador exista
   const [player] = await db
     .select()
     .from(playersTable)
@@ -158,20 +273,65 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     return;
   }
 
-  const isSuperAdmin = isSuperAdminUser(req.user);
-  if (!isSuperAdmin) {
-    if (!req.user.clubId || player.clubId !== req.user.clubId) {
-      res.status(403).json({ error: "Debes tener un club asignado y pertenecer al mismo club del jugador para vincular tu perfil" });
-      return;
+  // Si no es Super Admin, verificar que el jugador pertenezca al club activo
+  if (!isSuperAdmin && player.clubId !== activeClubId) {
+    res.status(403).json({ error: "El jugador no pertenece a tu club activo" });
+    return;
+  }
+
+  const targetClubId = isSuperAdmin ? (player.clubId || activeClubId) : activeClubId;
+  if (!targetClubId) {
+    res.status(400).json({ error: "No se pudo determinar el club del jugador" });
+    return;
+  }
+
+  // Requisito 1 & 5: Evitar que una ficha de jugador se vincule a otra cuenta sin autorización
+  const [alreadyLinked] = await db
+    .select({ id: membershipsTable.id, userId: membershipsTable.userId })
+    .from(membershipsTable)
+    .where(
+      and(
+        eq(membershipsTable.clubId, targetClubId),
+        eq(membershipsTable.playerId, playerId),
+        ne(membershipsTable.userId, req.user.id)
+      )
+    )
+    .limit(1);
+
+  if (alreadyLinked) {
+    res.status(409).json({ error: "Esta ficha de jugador ya está vinculada a otra cuenta en este club" });
+    return;
+  }
+
+  // Actualizar la membresía del usuario para este club
+  await db
+    .update(membershipsTable)
+    .set({ playerId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(membershipsTable.userId, req.user.id),
+        eq(membershipsTable.clubId, targetClubId)
+      )
+    );
+
+  // Mantener compatibilidad en usersTable
+  await db
+    .update(usersTable)
+    .set({ playerId, updatedAt: new Date() })
+    .where(eq(usersTable.id, req.user.id));
+
+  // Actualizar sesión activa
+  const sid = getSessionId(req);
+  if (sid) {
+    const session = await getSession(sid);
+    if (session) {
+      session.user.playerId = playerId;
+      await updateSession(sid, session);
     }
   }
 
-  const [updated] = await db
-    .update(usersTable)
-    .set({ playerId, updatedAt: new Date() })
-    .where(eq(usersTable.id, req.user.id))
-    .returning();
-  res.json({ user: updated });
+  const userWithClub = await getUserWithClub(req.user.id, targetClubId);
+  res.json({ success: true, user: userWithClub });
 });
 
 router.post("/auth/join-club", async (req: Request, res: Response) => {
@@ -199,34 +359,64 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     return;
   }
 
-  const userCondition = req.user.email
-    ? or(eq(usersTable.id, req.user.id), eq(usersTable.email, req.user.email))
-    : eq(usersTable.id, req.user.id);
+  // Asegurar que el usuario existe en usersTable
+  const [dbUser] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.id))
+    .limit(1);
 
-  const [updated] = await db
-    .update(usersTable)
-    .set({ clubId: club.id, updatedAt: new Date() })
-    .where(userCondition)
-    .returning();
-
-  let finalUser = updated;
-  if (!finalUser) {
-    const [inserted] = await db
-      .insert(usersTable)
-      .values({
-        id: req.user.id,
-        email: req.user.email,
-        name: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || null,
-        clubId: club.id,
-      } as any)
-      .returning();
-    finalUser = inserted;
+  if (!dbUser) {
+    await db.insert(usersTable).values({
+      id: req.user.id,
+      email: req.user.email,
+      name: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || null,
+      clubId: club.id,
+    } as any);
+  } else {
+    // Actualizar users.clubId como último club activo
+    await db
+      .update(usersTable)
+      .set({ clubId: club.id, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user.id));
   }
+
+  // Requisito 1 & 6: Crear o reactivar la membresía SIN reemplazar las existentes en otros clubes
+  await db
+    .insert(membershipsTable)
+    .values({
+      userId: req.user.id,
+      clubId: club.id,
+      role: "player",
+      status: "active",
+    })
+    .onConflictDoUpdate({
+      target: [membershipsTable.userId, membershipsTable.clubId],
+      set: {
+        status: "active",
+        updatedAt: new Date(),
+      },
+    });
+
+  // Actualizar sesión activa
+  const sid = getSessionId(req);
+  if (sid) {
+    const session = await getSession(sid);
+    if (session) {
+      session.activeClubId = club.id;
+      session.user.clubId = club.id;
+      session.user.isClubAdmin = 0;
+      session.user.playerId = null;
+      await updateSession(sid, session);
+    }
+  }
+
+  const userWithClub = await getUserWithClub(req.user.id, club.id);
 
   res.json({
     success: true,
     club: { id: club.id, name: club.name, slug: club.slug },
-    user: finalUser,
+    user: userWithClub,
   });
 });
 
@@ -236,65 +426,74 @@ router.post("/auth/switch-club", async (req: Request, res: Response) => {
     return;
   }
 
-  // El cambio arbitrario de club está estrictamente reservado a Super Admins autorizados
-  if (!isSuperAdminUser(req.user)) {
-    res.status(403).json({ error: "Solo Super Admin autorizado puede alternar entre clubes" });
-    return;
-  }
-
   const { clubId } = req.body;
-  if (!clubId || typeof clubId !== "number") {
-    res.status(400).json({ error: "clubId requerido" });
+  const targetClubId = Number(clubId);
+  if (!targetClubId || isNaN(targetClubId)) {
+    res.status(400).json({ error: "clubId válido requerido" });
     return;
   }
 
-  const [club] = await db
-    .select()
-    .from(clubsTable)
-    .where(eq(clubsTable.id, clubId));
+  const isSuperAdmin = isSuperAdminUser(req.user);
 
-  if (!club) {
-    res.status(404).json({ error: "Club no encontrado" });
-    return;
+  let activeMembership = null;
+  if (!isSuperAdmin) {
+    const [membership] = await db
+      .select()
+      .from(membershipsTable)
+      .where(
+        and(
+          eq(membershipsTable.userId, req.user.id),
+          eq(membershipsTable.clubId, targetClubId),
+          eq(membershipsTable.status, "active")
+        )
+      )
+      .limit(1);
+
+    if (!membership) {
+      res.status(403).json({ error: "No tienes una membresía activa en este club" });
+      return;
+    }
+    activeMembership = membership;
+  } else {
+    // Si es Super Admin, verificar que el club exista y esté activo
+    const [targetClub] = await db
+      .select()
+      .from(clubsTable)
+      .where(eq(clubsTable.id, targetClubId))
+      .limit(1);
+    if (!targetClub) {
+      res.status(404).json({ error: "Club no encontrado" });
+      return;
+    }
   }
 
-  if (!club.active) {
-    res.status(403).json({ error: "Este club no está activo" });
-    return;
-  }
-
-  const userCondition = req.user.email
-    ? or(eq(usersTable.id, req.user.id), eq(usersTable.email, req.user.email))
-    : eq(usersTable.id, req.user.id);
-
-  const [updated] = await db
+  // Actualizar last active club en usersTable
+  await db
     .update(usersTable)
-    .set({ clubId, updatedAt: new Date() })
-    .where(userCondition)
-    .returning();
+    .set({ clubId: targetClubId, updatedAt: new Date() })
+    .where(eq(usersTable.id, req.user.id));
 
-  let finalUser = updated;
-  if (!finalUser) {
-    const [inserted] = await db
-      .insert(usersTable)
-      .values({
-        id: req.user.id,
-        email: req.user.email,
-        name: `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || "Super Admin",
-        clubId,
-        isAdmin: 1,
-        isClubAdmin: 1,
-      } as any)
-      .returning();
-    finalUser = inserted;
+  // Actualizar sesión activa
+  const sid = getSessionId(req);
+  if (sid) {
+    const session = await getSession(sid);
+    if (session) {
+      session.activeClubId = targetClubId;
+      session.user.clubId = targetClubId;
+      if (activeMembership) {
+        session.user.isClubAdmin = activeMembership.role === "club_admin" || activeMembership.role === "admin" ? 1 : 0;
+        session.user.playerId = activeMembership.playerId ?? null;
+      }
+      await updateSession(sid, session);
+    }
   }
 
-  const userWithClub = finalUser?.id ? await getUserWithClub(finalUser.id) : null;
+  const userWithClub = await getUserWithClub(req.user.id, targetClubId);
 
   res.json({
     success: true,
-    club: { id: club.id, name: club.name, slug: club.slug },
-    user: userWithClub ?? finalUser,
+    club: userWithClub?.club ?? { id: targetClubId },
+    user: userWithClub,
   });
 });
 
