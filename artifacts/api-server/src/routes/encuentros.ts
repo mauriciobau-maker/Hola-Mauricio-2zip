@@ -9,7 +9,7 @@ import {
   sportModalitiesTable,
 } from "@workspace/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { resolveEffectiveClubId, isSuperAdminUser } from "../middlewares/requireCommunity";
+import { resolveEffectiveClubId, isSuperAdminUser, isClubAdminUser } from "../middlewares/requireCommunity";
 
 const router = Router();
 
@@ -748,9 +748,39 @@ router.patch("/:id/partidos/:matchId", async (req: Request, res: Response): Prom
       return;
     }
 
+    // Verificar que el partido pertenezca al encuentro especificado
+    if (existingMatch.encuentroId !== encuentro.id) {
+      res.status(400).json({ message: "El partido no pertenece al encuentro especificado." });
+      return;
+    }
+
+    // Verificar que el partido pertenezca al club del encuentro (rechaza si es nulo o si no coincide)
+    if (!existingMatch.clubId || existingMatch.clubId !== encuentro.clubId) {
+      res.status(400).json({ message: "El partido no pertenece al club autorizado del encuentro." });
+      return;
+    }
+
     const isSuperAdmin = isSuperAdminUser(user);
     if (!isSuperAdmin && encuentro.clubId !== user.clubId) {
       res.status(403).json({ message: "No tienes permiso para modificar partidos de otro club." });
+      return;
+    }
+
+    const isClubAdmin = isClubAdminUser(user, encuentro.clubId);
+    const isAuthorizedOrganizer = String(user.id) === String(encuentro.organizerId);
+
+    // Limitar la modificación de marcadores, resultados y estados al organizador autorizado o a un administrador del club
+    const isModifyingScoreOrStatus =
+      team1Score !== undefined ||
+      team2Score !== undefined ||
+      result !== undefined ||
+      sets !== undefined ||
+      status !== undefined;
+
+    if (isModifyingScoreOrStatus && !isSuperAdmin && !isClubAdmin && !isAuthorizedOrganizer) {
+      res.status(403).json({
+        message: "Solo el organizador autorizado o un administrador del club pueden modificar marcadores, resultados y estados.",
+      });
       return;
     }
 

@@ -3,7 +3,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import * as z from "zod";
 import { eq, or, and, ne, sql } from "drizzle-orm";
 import { db, usersTable, clubsTable, playersTable, membershipsTable } from "@workspace/db";
-import { isSuperAdminUser } from "../middlewares/requireCommunity";
+import { isSuperAdminUser, normalizeClubRole } from "../middlewares/requireCommunity";
 import {
   clearSession,
   getOidcConfig,
@@ -141,8 +141,9 @@ async function getUserWithClub(userId: string, requestedClubId?: number | null) 
 
   if (activeMembership) {
     user.clubId = activeMembership.clubId;
-    user.isClubAdmin = (activeMembership.role === "club_admin" || activeMembership.role === "admin") ? 1 : 0;
-    (user as any).role = activeMembership.role;
+    const normalizedRole = normalizeClubRole(activeMembership.role);
+    user.isClubAdmin = normalizedRole === "club_admin" ? 1 : 0;
+    (user as any).role = normalizedRole;
     user.playerId = activeMembership.playerId ?? null;
   } else if (!isMasterSuper) {
     user.clubId = null;
@@ -285,6 +286,34 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
     return;
   }
 
+  // Valida durante la vinculación que la ficha pertenezca estrictamente al club correspondiente
+  if (player.clubId !== targetClubId) {
+    res.status(400).json({ error: "La ficha de jugador no pertenece al club correspondiente" });
+    return;
+  }
+
+  // Verificar que el usuario tenga una membresía activa en este club
+  const [userMembership] = await db
+    .select()
+    .from(membershipsTable)
+    .where(
+      and(
+        eq(membershipsTable.userId, req.user.id),
+        eq(membershipsTable.clubId, targetClubId)
+      )
+    )
+    .limit(1);
+
+  if (!userMembership) {
+    res.status(403).json({ error: "No tienes una membresía en este club para vincular la ficha" });
+    return;
+  }
+
+  if (userMembership.status !== "active") {
+    res.status(403).json({ error: "Tu membresía en este club está inactiva" });
+    return;
+  }
+
   // Requisito 1 & 5: Evitar que una ficha de jugador se vincule a otra cuenta sin autorización
   const [alreadyLinked] = await db
     .select({ id: membershipsTable.id, userId: membershipsTable.userId })
@@ -314,11 +343,19 @@ router.post("/auth/link-player", async (req: Request, res: Response) => {
       )
     );
 
-  // Mantener compatibilidad en usersTable
-  await db
-    .update(usersTable)
-    .set({ playerId, updatedAt: new Date() })
-    .where(eq(usersTable.id, req.user.id));
+  // Manejar relaciones antiguas: solo actualizar usersTable.playerId si su club activo coincide con targetClubId
+  const [currentUserRow] = await db
+    .select({ clubId: usersTable.clubId })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.id))
+    .limit(1);
+
+  if (currentUserRow?.clubId === targetClubId) {
+    await db
+      .update(usersTable)
+      .set({ playerId, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user.id));
+  }
 
   // Actualizar sesión activa
   const sid = getSessionId(req);
@@ -381,22 +418,35 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
       .where(eq(usersTable.id, req.user.id));
   }
 
-  // Requisito 1 & 6: Crear o reactivar la membresía SIN reemplazar las existentes en otros clubes
-  await db
-    .insert(membershipsTable)
-    .values({
+  // Requisito 4: Evitar que POST /auth/join-club reactive automáticamente membresías inactivas o conserve privilegios administrativos
+  const [existingMembership] = await db
+    .select()
+    .from(membershipsTable)
+    .where(
+      and(
+        eq(membershipsTable.userId, req.user.id),
+        eq(membershipsTable.clubId, club.id)
+      )
+    )
+    .limit(1);
+
+  if (existingMembership) {
+    if (existingMembership.status !== "active") {
+      res.status(403).json({
+        error: "Tu membresía en este club está inactiva. La reactivación de membresías inactivas o roles privilegiados requiere autorización administrativa explícita.",
+      });
+      return;
+    }
+    // Si ya es miembro activo, la unión no debe elevar ni transferir privilegios no autorizados
+  } else {
+    // Nueva membresía creada estrictamente con rol 'player' y status 'active'
+    await db.insert(membershipsTable).values({
       userId: req.user.id,
       clubId: club.id,
       role: "player",
       status: "active",
-    })
-    .onConflictDoUpdate({
-      target: [membershipsTable.userId, membershipsTable.clubId],
-      set: {
-        status: "active",
-        updatedAt: new Date(),
-      },
     });
+  }
 
   // Actualizar sesión activa
   const sid = getSessionId(req);
@@ -405,8 +455,8 @@ router.post("/auth/join-club", async (req: Request, res: Response) => {
     if (session) {
       session.activeClubId = club.id;
       session.user.clubId = club.id;
-      session.user.isClubAdmin = 0;
-      session.user.playerId = null;
+      session.user.isClubAdmin = existingMembership ? (normalizeClubRole(existingMembership.role) === "club_admin" ? 1 : 0) : 0;
+      session.user.playerId = existingMembership?.playerId ?? null;
       await updateSession(sid, session);
     }
   }
@@ -481,7 +531,7 @@ router.post("/auth/switch-club", async (req: Request, res: Response) => {
       session.activeClubId = targetClubId;
       session.user.clubId = targetClubId;
       if (activeMembership) {
-        session.user.isClubAdmin = activeMembership.role === "club_admin" || activeMembership.role === "admin" ? 1 : 0;
+        session.user.isClubAdmin = normalizeClubRole(activeMembership.role) === "club_admin" ? 1 : 0;
         session.user.playerId = activeMembership.playerId ?? null;
       }
       await updateSession(sid, session);

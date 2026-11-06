@@ -10,6 +10,7 @@ import {
   isDemoLoginAllowed,
   type SessionData,
 } from "../lib/auth";
+import { normalizeClubRole } from "./requireCommunity";
 
 declare global {
   namespace Express {
@@ -291,15 +292,17 @@ export async function authMiddleware(
             activeMembership,
           };
         } else if (activeMembership) {
-          // El rol y la ficha se derivan estrictamente de la membresía activa en ese club
-          const isClubAdmin = activeMembership.role === "club_admin" || activeMembership.role === "admin" ? 1 : 0;
+          // El rol y la ficha se derivan estrictamente de la membresía activa en ese club.
+          // Los roles de club permitidos se validan y normalizan; jamás otorgan permisos de Super Admin.
+          const normalizedRole = normalizeClubRole(activeMembership.role);
+          const isClubAdmin = normalizedRole === "club_admin" ? 1 : 0;
           req.user = {
             ...req.user,
             id: dbUser.id,
             email: dbUser.email,
             isAdmin: 0,
             isClubAdmin,
-            role: activeMembership.role,
+            role: normalizedRole,
             clubId: activeMembership.clubId,
             playerId: activeMembership.playerId ?? null,
             memberships: userMemberships,
@@ -320,9 +323,50 @@ export async function authMiddleware(
             activeMembership: null,
           };
         }
+      } else {
+        // La cuenta no se encontró en la base de datos
+        delete (session as any).activeClubId;
+        if (session.user) {
+          session.user.clubId = null;
+          session.user.isAdmin = 0;
+          session.user.isClubAdmin = 0;
+          session.user.playerId = null;
+          (session.user as any).role = "player";
+        }
+        if (sid) {
+          await updateSession(sid, session).catch(() => {});
+        }
+        req.user = undefined;
       }
     } catch (e) {
       console.error("Error sincronizando membresías en authMiddleware:", e);
+      (req as any).authError = e;
+
+      // Eliminar de la sesión los permisos y el club activo obsoletos
+      delete (session as any).activeClubId;
+      if (session.user) {
+        session.user.clubId = null;
+        session.user.isAdmin = 0;
+        session.user.isClubAdmin = 0;
+        session.user.playerId = null;
+        (session.user as any).role = "player";
+      }
+      if (sid) {
+        try {
+          await updateSession(sid, session);
+        } catch {}
+      }
+
+      // Eliminar de req.user permisos y roles obsoletos
+      if (req.user) {
+        req.user.clubId = null;
+        req.user.isAdmin = 0;
+        req.user.isClubAdmin = 0;
+        req.user.playerId = null;
+        req.user.role = "player";
+        req.user.memberships = [];
+        req.user.activeMembership = null;
+      }
     }
   }
 

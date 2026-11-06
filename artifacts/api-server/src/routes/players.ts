@@ -680,12 +680,24 @@ router.patch(
 
     const user = req.user as any;
     const isSuperAdmin = isSuperAdminUser(user);
-    const isSelfPlayer = Boolean(user?.playerId && user.playerId === existingPlayer.id);
+    const isSelfPlayer = Boolean(
+      user?.playerId &&
+      user.playerId === existingPlayer.id &&
+      user.clubId &&
+      user.clubId === existingPlayer.clubId
+    );
     const isClubAdminForPlayer = Boolean(user?.isClubAdmin) && user?.clubId === existingPlayer.clubId;
 
-    if (!isSuperAdmin && !isClubAdminForPlayer && !isSelfPlayer) {
-      res.status(403).json({ error: "No tienes permiso para modificar este perfil de jugador" });
-      return;
+    if (!isSuperAdmin) {
+      if (user?.playerId === existingPlayer.id && user?.clubId !== existingPlayer.clubId) {
+        res.status(403).json({ error: "No puedes modificar una ficha de jugador que no pertenezca a tu club activo" });
+        return;
+      }
+
+      if (!isClubAdminForPlayer && !isSelfPlayer) {
+        res.status(403).json({ error: "No tienes permiso para modificar este perfil de jugador" });
+        return;
+      }
     }
 
     const updates: Record<string, unknown> = {};
@@ -1446,6 +1458,7 @@ router.get(
 
 router.get(
   "/players/:id/elo-history",
+  requireCommunityAccess,
   async (req, res): Promise<void> => {
     const raw =
       Array.isArray(
@@ -1487,6 +1500,23 @@ router.get(
       return;
     }
 
+    const user = req.user as any;
+    const isSuperAdmin = isSuperAdminUser(user);
+    const sessionClubId = user?.clubId ? Number(user.clubId) : null;
+    const playerClubId = player.clubId ? Number(player.clubId) : null;
+
+    // Aislamiento entre clubes:
+    // Solo miembros del mismo club o Super Admin pueden consultar el historial ELO.
+    // Si falta cualquiera de los clubes o no coinciden, se rechaza la solicitud.
+    if (!isSuperAdmin) {
+      if (!sessionClubId || !playerClubId || sessionClubId !== playerClubId) {
+        res.status(403).json({
+          error: "No tienes permiso para ver el historial ELO de jugadores de otro club",
+        });
+        return;
+      }
+    }
+
     const history =
       await db
         .select({
@@ -1505,9 +1535,12 @@ router.get(
           )
         )
         .where(
-          eq(
-            eloHistoryTable.playerId,
-            id
+          and(
+            eq(
+              eloHistoryTable.playerId,
+              id
+            ),
+            !isSuperAdmin && sessionClubId ? eq(matchesTable.clubId, sessionClubId) : undefined
           )
         )
         .orderBy(

@@ -2,6 +2,26 @@ import type { Request, Response, NextFunction } from "express";
 import { db, clubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
+export const ALLOWED_CLUB_ROLES = ["club_admin", "player"] as const;
+export type AllowedClubRole = (typeof ALLOWED_CLUB_ROLES)[number];
+
+export function isValidClubRole(role: unknown): role is AllowedClubRole {
+  return typeof role === "string" && (ALLOWED_CLUB_ROLES as readonly string[]).includes(role);
+}
+
+export function normalizeClubRole(role: unknown): AllowedClubRole {
+  if (
+    role === "club_admin" ||
+    role === "admin" ||
+    role === "adminclub" ||
+    role === "colaborador" ||
+    role === "staff"
+  ) {
+    return "club_admin";
+  }
+  return "player";
+}
+
 export function isSuperAdminUser(
   user: { isAdmin?: number | boolean | null; role?: string | null; email?: string | null } | undefined,
 ): boolean {
@@ -15,13 +35,7 @@ export function isSuperAdminUser(
   if (user.email && SUPER_ADMINS.includes(user.email.toLowerCase())) {
     return true;
   }
-  return (
-    Number(user.isAdmin) >= 1 ||
-    user.isAdmin === true ||
-    user.role === "superadmin" ||
-    user.role === "admin" ||
-    user.role === "SUPER_ADMIN"
-  );
+  return Number(user.isAdmin) >= 1 || user.isAdmin === true;
 }
 
 export function isClubAdminUser(
@@ -34,10 +48,7 @@ export function isClubAdminUser(
   const isClubAdmin =
     Number(user.isClubAdmin) >= 1 ||
     user.isClubAdmin === true ||
-    user.role === "club_admin" ||
-    user.role === "adminclub" ||
-    user.role === "colaborador" ||
-    user.role === "staff";
+    user.role === "club_admin";
 
   if (!isClubAdmin) return false;
   if (targetClubId != null && user.clubId != null) {
@@ -116,6 +127,10 @@ export function requireAuth(
   res: Response,
   next: NextFunction,
 ): void {
+  if ((req as any).authError) {
+    res.status(503).json({ error: "Error al validar la cuenta o membresías. Intente nuevamente." });
+    return;
+  }
   if (!req.user) {
     res.status(401).json({ error: "Authentication required" });
     return;
@@ -134,6 +149,10 @@ export function requireClub(
   res: Response,
   next: NextFunction,
 ): void {
+  if ((req as any).authError) {
+    res.status(503).json({ error: "Error al validar la cuenta o membresías. Intente nuevamente." });
+    return;
+  }
   const clubId = (req.user as { clubId?: number | null } | undefined)?.clubId;
   if (clubId == null) {
     res.status(403).json({ error: "Community membership required" });
@@ -151,6 +170,10 @@ export function requireCommunityAccess(
   res: Response,
   next: NextFunction,
 ): void {
+  if ((req as any).authError) {
+    res.status(503).json({ error: "Error al validar la cuenta o membresías. Intente nuevamente." });
+    return;
+  }
   if (!req.user) {
     res.status(401).json({ error: "Authentication required" });
     return;
@@ -178,6 +201,10 @@ export function requireClubAdmin(
   res: Response,
   next: NextFunction,
 ): void {
+  if ((req as any).authError) {
+    res.status(503).json({ error: "Error al validar la cuenta o membresías. Intente nuevamente." });
+    return;
+  }
   if (!req.user) {
     res.status(401).json({ error: "Authentication required" });
     return;
@@ -204,6 +231,10 @@ export function requireSuperAdmin(
   res: Response,
   next: NextFunction,
 ): void {
+  if ((req as any).authError) {
+    res.status(503).json({ error: "Error al validar la cuenta o membresías. Intente nuevamente." });
+    return;
+  }
   if (!req.user) {
     res.status(401).json({ error: "Authentication required" });
     return;

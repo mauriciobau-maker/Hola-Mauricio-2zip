@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import {
   db,
   clubsTable,
@@ -9,7 +9,9 @@ import {
   gastosTable,
   clubSportCategoriesTable,
   playersTable,
+  membershipsTable,
 } from "@workspace/db";
+import { isValidClubRole, isSuperAdminUser, isClubAdminUser } from "../middlewares/requireCommunity";
 import type { Request, Response, NextFunction } from "express";
 
 const router: IRouter = Router();
@@ -43,7 +45,6 @@ function checkRole(requiredRole: "SUPER_ADMIN" | "CLUB_ADMIN") {
       Number(user.isAdmin) >= 1 ||
       user.isAdmin === true ||
       user.role === "superadmin" ||
-      user.role === "admin" ||
       user.role === "SUPER_ADMIN" ||
       (user.email && SUPER_ADMINS.includes(user.email.toLowerCase()));
 
@@ -411,7 +412,6 @@ router.patch(
         Number(currentUser?.isAdmin) >= 1 ||
         currentUser?.isAdmin === true ||
         currentUser?.role === "superadmin" ||
-        currentUser?.role === "admin" ||
         currentUser?.role === "SUPER_ADMIN" ||
         (currentUser?.email && [
           "mauricio.bau@gmail.com",
@@ -624,9 +624,300 @@ router.post(
         res.status(404).json({ error: "Club no encontrado / Usuario no encontrado" });
         return;
       }
-      res.json({ userId, clubId });
+
+      // Sincronizar membresía explícita en membershipsTable
+      const role = isAdmin ? "club_admin" : "player";
+      await db
+        .insert(membershipsTable)
+        .values({
+          userId,
+          clubId,
+          role,
+          status: "active",
+        })
+        .onConflictDoUpdate({
+          target: [membershipsTable.userId, membershipsTable.clubId],
+          set: {
+            role,
+            status: "active",
+            updatedAt: new Date(),
+          },
+        });
+
+      res.json({ userId, clubId, role, status: "active" });
     } catch (error) {
       res.status(500).json({ error: "Error al asignar usuario" });
+    }
+  },
+);
+
+// POST /admin/clubs/:id/memberships
+// Permite a Super Admin o al Administrador del club crear o asignar una membresía limitando roles y acciones según el club
+router.post(
+  "/admin/clubs/:id/memberships",
+  async (req, res): Promise<void> => {
+    const caller = (req as any).user;
+    if (!caller) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    const rawId = req.params.id;
+    const clubId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
+    if (isNaN(clubId)) {
+      res.status(400).json({ error: "clubId inválido" });
+      return;
+    }
+
+    const isSuper = isSuperAdminUser(caller);
+    const isClubAdmin = isClubAdminUser(caller, clubId) && caller.clubId === clubId;
+
+    if (!isSuper && !isClubAdmin) {
+      res.status(403).json({ error: "Solo el Super Admin o el administrador del club pueden gestionar membresías de este club" });
+      return;
+    }
+
+    const { userId, role = "player", status = "active", playerId } = req.body;
+
+    if (!userId || typeof userId !== "string") {
+      res.status(400).json({ error: "userId requerido" });
+      return;
+    }
+
+    if (!isValidClubRole(role)) {
+      res.status(400).json({ error: "Rol de club no permitido. Debe ser 'club_admin' o 'player'" });
+      return;
+    }
+
+    if (status !== "active" && status !== "inactive") {
+      res.status(400).json({ error: "Estado no válido. Debe ser 'active' o 'inactive'" });
+      return;
+    }
+
+    // Verificar que el usuario exista
+    const [targetUser] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!targetUser) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    let targetPlayerId: number | null = null;
+    if (playerId !== undefined && playerId !== null) {
+      const parsedPlayerId = Number(playerId);
+      if (isNaN(parsedPlayerId)) {
+        res.status(400).json({ error: "playerId inválido" });
+        return;
+      }
+
+      const [player] = await db
+        .select()
+        .from(playersTable)
+        .where(eq(playersTable.id, parsedPlayerId))
+        .limit(1);
+
+      if (!player) {
+        res.status(404).json({ error: "Jugador no encontrado" });
+        return;
+      }
+
+      if (player.clubId !== clubId) {
+        res.status(400).json({ error: "La ficha de jugador no pertenece al club indicado" });
+        return;
+      }
+
+      const [alreadyClaimed] = await db
+        .select()
+        .from(membershipsTable)
+        .where(
+          and(
+            eq(membershipsTable.clubId, clubId),
+            eq(membershipsTable.playerId, parsedPlayerId),
+            ne(membershipsTable.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (alreadyClaimed) {
+        res.status(409).json({ error: "Esta ficha de jugador ya está asignada a otra cuenta en este club" });
+        return;
+      }
+
+      targetPlayerId = parsedPlayerId;
+    }
+
+    try {
+      const [membership] = await db
+        .insert(membershipsTable)
+        .values({
+          userId,
+          clubId,
+          role,
+          status,
+          playerId: targetPlayerId,
+        })
+        .onConflictDoUpdate({
+          target: [membershipsTable.userId, membershipsTable.clubId],
+          set: {
+            role,
+            status,
+            playerId: targetPlayerId,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      if (targetUser.clubId === clubId) {
+        await db
+          .update(usersTable)
+          .set({
+            isClubAdmin: role === "club_admin" ? 1 : 0,
+            playerId: targetPlayerId ?? targetUser.playerId,
+            updatedAt: new Date(),
+          })
+          .where(eq(usersTable.id, userId));
+      }
+
+      res.status(201).json(membership);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+// PATCH /admin/clubs/:id/memberships/:userId
+// Permite a Super Admin o al Administrador del club reactivar membresías o modificar roles explícitamente
+router.patch(
+  "/admin/clubs/:id/memberships/:userId",
+  async (req, res): Promise<void> => {
+    const caller = (req as any).user;
+    if (!caller) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    const rawId = req.params.id;
+    const clubId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
+    if (isNaN(clubId)) {
+      res.status(400).json({ error: "clubId inválido" });
+      return;
+    }
+
+    const rawUserId = req.params.userId;
+    const targetUserId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
+    const { role, status, playerId } = req.body;
+
+    const isSuper = isSuperAdminUser(caller);
+    const isClubAdmin = isClubAdminUser(caller, clubId) && caller.clubId === clubId;
+
+    if (!isSuper && !isClubAdmin) {
+      res.status(403).json({ error: "Solo el Super Admin o el administrador del club pueden gestionar membresías de este club" });
+      return;
+    }
+
+    const updateSet: Record<string, any> = { updatedAt: new Date() };
+
+    if (role !== undefined) {
+      if (!isValidClubRole(role)) {
+        res.status(400).json({ error: "Rol de club no permitido. Debe ser 'club_admin' o 'player'" });
+        return;
+      }
+      updateSet.role = role;
+    }
+
+    if (status !== undefined) {
+      if (status !== "active" && status !== "inactive") {
+        res.status(400).json({ error: "Estado no válido. Debe ser 'active' o 'inactive'" });
+        return;
+      }
+      updateSet.status = status;
+    }
+
+    if (playerId !== undefined) {
+      if (playerId === null) {
+        updateSet.playerId = null;
+      } else {
+        const parsedPlayerId = Number(playerId);
+        if (isNaN(parsedPlayerId)) {
+          res.status(400).json({ error: "playerId inválido" });
+          return;
+        }
+
+        const [player] = await db
+          .select()
+          .from(playersTable)
+          .where(eq(playersTable.id, parsedPlayerId))
+          .limit(1);
+
+        if (!player) {
+          res.status(404).json({ error: "Jugador no encontrado" });
+          return;
+        }
+
+        if (player.clubId !== clubId) {
+          res.status(400).json({ error: "La ficha de jugador no pertenece al club indicado" });
+          return;
+        }
+
+        const [alreadyClaimed] = await db
+          .select()
+          .from(membershipsTable)
+          .where(
+            and(
+              eq(membershipsTable.clubId, clubId),
+              eq(membershipsTable.playerId, parsedPlayerId),
+              ne(membershipsTable.userId, targetUserId)
+            )
+          )
+          .limit(1);
+
+        if (alreadyClaimed) {
+          res.status(409).json({ error: "Esta ficha de jugador ya está asignada a otra cuenta en este club" });
+          return;
+        }
+
+        updateSet.playerId = parsedPlayerId;
+      }
+    }
+
+    try {
+      const [existing] = await db
+        .select()
+        .from(membershipsTable)
+        .where(
+          and(
+            eq(membershipsTable.userId, targetUserId),
+            eq(membershipsTable.clubId, clubId)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Membresía no encontrada" });
+        return;
+      }
+
+      const [updated] = await db
+        .update(membershipsTable)
+        .set(updateSet)
+        .where(eq(membershipsTable.id, existing.id))
+        .returning();
+
+      // Si se modificó a club_admin o player, sincronizar con usersTable si es el club activo
+      if (updateSet.role !== undefined) {
+        await db
+          .update(usersTable)
+          .set({ isClubAdmin: updateSet.role === "club_admin" ? 1 : 0 })
+          .where(and(eq(usersTable.id, targetUserId), eq(usersTable.clubId, clubId)));
+      }
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   },
 );
